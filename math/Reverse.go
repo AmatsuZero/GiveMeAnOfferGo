@@ -5,12 +5,12 @@ package math
 import "math"
 
 func Reverse(x int) (result int) {
-	if (x >= 0 && x < 10) || (x < 0 && x > -10)  {
+	if (x >= 0 && x < 10) || (x < 0 && x > -10) {
 		return x
 	}
 	stack := make([]int, 0)
 	left := x % 10
-	for left != 0 || x != 0 {
+	for x != 0 {
 		stack = append(stack, left)
 		x /= 10
 		left = x % 10
@@ -18,7 +18,7 @@ func Reverse(x int) (result int) {
 	length := len(stack)
 	for i, num := range stack {
 		pos := 1
-		for index := 1; index < length - i; index++ {
+		for index := 1; index < length-i; index++ {
 			pos *= 10
 		}
 		result += num * pos
