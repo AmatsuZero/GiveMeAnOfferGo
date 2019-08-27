@@ -1,7 +1,7 @@
 package tests
 
 import (
-	"../math"
+	"GiveMeAnOfferGo/math"
 	"testing"
 )
 

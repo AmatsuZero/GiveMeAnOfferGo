@@ -1,7 +1,7 @@
 package tests
 
 import (
-	"../linkedlist"
+	"GiveMeAnOfferGo/linkedlist"
 	"testing"
 )
 
