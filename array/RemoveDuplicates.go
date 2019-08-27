@@ -1,3 +1,4 @@
+// https://leetcode-cn.com/problems/remove-duplicates-from-sorted-array/description/
 package array
 
 func RemoveDuplicates(nums []int) int {
