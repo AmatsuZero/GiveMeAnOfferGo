@@ -1,4 +1,4 @@
-package goString
+package string
 
 import (
 	"testing"
