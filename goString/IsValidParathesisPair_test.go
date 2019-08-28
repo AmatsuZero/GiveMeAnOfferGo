@@ -1,36 +1,35 @@
-package tests
+package goString
 
 import (
-	"GiveMeAnOfferGo/goString"
 	"testing"
 )
 
 func TestIsValidParenthesisPair(t *testing.T) {
-	if goString.IsValidParenthesisPair("()") {
+	if IsValidParenthesisPair("()") {
 		t.Log("通过")
 	} else {
 		t.Error("失败")
 	}
 
-	if goString.IsValidParenthesisPair("()[]{}") {
+	if IsValidParenthesisPair("()[]{}") {
 		t.Log("通过")
 	} else {
 		t.Error("失败")
 	}
 
-	if !goString.IsValidParenthesisPair("(]") {
+	if !IsValidParenthesisPair("(]") {
 		t.Log("通过")
 	} else {
 		t.Error("失败")
 	}
 
-	if !goString.IsValidParenthesisPair("([)]") {
+	if !IsValidParenthesisPair("([)]") {
 		t.Log("通过")
 	} else {
 		t.Error("失败")
 	}
 
-	if goString.IsValidParenthesisPair("{[]}") {
+	if IsValidParenthesisPair("{[]}") {
 		t.Log("通过")
 	} else {
 		t.Error("失败")
