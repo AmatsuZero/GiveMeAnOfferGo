@@ -1,7 +1,7 @@
 // https://leetcode-cn.com/problems/merge-two-sorted-lists/description/
 package linkedlist
 
-func MergeTwoLists(l1 *ListNode, l2 *ListNode) (head *ListNode) {
+func MergeTwoLists(l1 *Node, l2 *Node) (head *Node) {
 	if l2 == nil {
 		return l1
 	} else if l1 == nil {
@@ -10,8 +10,8 @@ func MergeTwoLists(l1 *ListNode, l2 *ListNode) (head *ListNode) {
 
 	// 此时，两条链都不为nil，可以直接使用l.Val，而不用担心panic
 	// 在l1和l2之间，选择较小的节点作为head，并设置好node
-	var node *ListNode
-	if l1.Val < l2.Val {
+	var node *Node
+	if l1.Value.Compare(l2.Value) == OrderedAscending {
 		head = l1
 		node = l1
 		l1 = l1.Next
@@ -23,7 +23,7 @@ func MergeTwoLists(l1 *ListNode, l2 *ListNode) (head *ListNode) {
 
 	// 循环比较l1和l2的值，始终选择较小的值连上node
 	for l1 != nil && l2 != nil {
-		if l1.Val < l2.Val {
+		if l1.Value.Compare(l2.Value) == OrderedAscending {
 			node.Next = l1
 			l1 = l1.Next
 		} else {
