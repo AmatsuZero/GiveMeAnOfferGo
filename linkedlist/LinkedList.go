@@ -1,6 +1,8 @@
 package linkedlist
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type CompareResult int
 
@@ -53,6 +55,7 @@ func (list *LinkedList) String() string {
 }
 
 func (list *LinkedList) Push(value Comparable) {
+	list.copyNodes()
 	list.Head = NewNode(value, list.Head)
 	if list.Tail == nil {
 		list.Tail = list.Head
@@ -60,6 +63,7 @@ func (list *LinkedList) Push(value Comparable) {
 }
 
 func (list *LinkedList) Append(value Comparable) {
+	list.copyNodes()
 	if list.IsEmpty() {
 		list.Push(value)
 		return
@@ -82,6 +86,7 @@ func (list *LinkedList) NodeAt(index int) *Node {
 }
 
 func (list *LinkedList) Insert(value Comparable, after *Node) *Node {
+	list.copyNodes()
 	if list.Tail == after {
 		list.Append(value)
 		return list.Tail
@@ -91,6 +96,7 @@ func (list *LinkedList) Insert(value Comparable, after *Node) *Node {
 }
 
 func (list *LinkedList) Pop() Comparable {
+	list.copyNodes()
 	defer func() {
 		list.Head = list.Head.Next
 		if list.IsEmpty() {
@@ -101,6 +107,7 @@ func (list *LinkedList) Pop() Comparable {
 }
 
 func (list *LinkedList) RemoveLast() Comparable {
+	list.copyNodes()
 	if list.Head == nil {
 		return nil
 	}
@@ -123,6 +130,7 @@ func (list *LinkedList) RemoveLast() Comparable {
 }
 
 func (list *LinkedList) RemoveAfter(node *Node) Comparable {
+	list.copyNodes()
 	defer func() {
 		if node.Next == list.Tail {
 			list.Tail = node
@@ -131,4 +139,69 @@ func (list *LinkedList) RemoveAfter(node *Node) Comparable {
 	}()
 
 	return node.Next.Value
+}
+
+func (list *LinkedList) copyNodes() {
+	oldNode := list.Head
+	if oldNode == nil {
+		return
+	}
+	list.Head = NewNode(oldNode.Value, nil)
+	newNode := list.Head
+	nextOldNode := oldNode.Next
+	for nextOldNode != nil {
+		newNode.Next = NewNode(nextOldNode.Value, nil)
+		newNode = newNode.Next
+		oldNode = nextOldNode
+		nextOldNode = oldNode.Next
+	}
+	list.Tail = newNode
+}
+
+func (list *LinkedList) Copy() *LinkedList {
+	newList := &LinkedList{
+		Head: list.Head,
+		Tail: list.Tail,
+	}
+	list.copyNodes()
+	return newList
+}
+
+func (list *LinkedList) Traverse(block func(val Comparable)) {
+	if block == nil || list.IsEmpty() {
+		return
+	}
+	current := list.Head
+	for current != nil {
+		block(current.Value)
+		current = current.Next
+	}
+}
+
+func (list *LinkedList) ReverseTraverse(block func(val Comparable)) {
+	if block == nil || list.IsEmpty() {
+		return
+	}
+
+	newList := list.Copy()
+	val := newList.RemoveLast()
+	for val != nil {
+		block(val)
+		val = newList.RemoveLast()
+	}
+}
+
+func (list *LinkedList) Length() (length int) {
+	list.Traverse(func(val Comparable) {
+		length += 1
+	})
+	return
+}
+
+func (list *LinkedList) MiddleValue() Comparable {
+	if list.IsEmpty() {
+		return nil
+	}
+	index := list.Length() / 2
+	return list.NodeAt(index).Value
 }

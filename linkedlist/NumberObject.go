@@ -66,7 +66,7 @@ func (number *NumberObject) FloatValue() float64 {
 }
 
 func (number *NumberObject) Compare(obj interface{}) CompareResult {
-	object, ok := obj.(NumberObject)
+	object, ok := obj.(*NumberObject)
 	if !ok {
 		return InvalidResult
 	}

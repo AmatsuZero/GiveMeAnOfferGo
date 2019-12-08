@@ -83,3 +83,69 @@ func TestRemoveAfterNode(t *testing.T) {
 	fmt.Printf("After removing at index %v: %v \n", index, list)
 	fmt.Printf("Removed Value: %v\n", removedValue)
 }
+
+func TestCOW(t *testing.T) {
+	list1 := new(linkedlist.LinkedList)
+	list1.Append(linkedlist.NewNumberWithInt(1))
+	list1.Append(linkedlist.NewNumberWithInt(2))
+
+	list2 := list1.Copy()
+	fmt.Printf("List1 :%v\n", list1)
+	fmt.Printf("List2 :%v\n", list2)
+
+	fmt.Println("After appending 3 to list2")
+	list2.Append(linkedlist.NewNumberWithInt(3))
+	fmt.Printf("List1 :%v\n", list1)
+	fmt.Printf("List2 :%v\n", list2)
+}
+
+func TestIsSameObject(t *testing.T) {
+	list1 := new(linkedlist.LinkedList)
+	list1.Append(linkedlist.NewNumberWithInt(1))
+	list1.Append(linkedlist.NewNumberWithInt(2))
+
+	fmt.Printf("list1: %p\n", list1.Head)
+
+	_ = list1.Copy()
+	fmt.Printf("list1: %p\n", list1.Head)
+}
+
+func TestTraverse(t *testing.T) {
+	list1 := new(linkedlist.LinkedList)
+	for i := 1; i < 11; i++ {
+		val := linkedlist.NewNumberWithInt(i)
+		list1.Append(val)
+	}
+	list1.Traverse(func(val linkedlist.Comparable) {
+		fmt.Println(val)
+	})
+}
+
+func TestReverseTraverse(t *testing.T) {
+	list1 := new(linkedlist.LinkedList)
+	for i := 1; i < 1001; i++ {
+		val := linkedlist.NewNumberWithInt(i)
+		list1.Append(val)
+	}
+	list1.ReverseTraverse(func(val linkedlist.Comparable) {
+		fmt.Println(val)
+	})
+}
+
+func TestMiddleNode(t *testing.T) {
+	list1 := new(linkedlist.LinkedList)
+	for i := 1; i < 4; i++ {
+		val := linkedlist.NewNumberWithInt(i)
+		list1.Append(val)
+	}
+
+	val := linkedlist.NewNumberWithInt(2)
+	if list1.MiddleValue().Compare(val) != linkedlist.OrderedSame {
+		t.Fail()
+	}
+	list1.Append(linkedlist.NewNumberWithInt(4))
+	val = linkedlist.NewNumberWithInt(3)
+	if list1.MiddleValue().Compare(val) != linkedlist.OrderedSame {
+		t.Fail()
+	}
+}
