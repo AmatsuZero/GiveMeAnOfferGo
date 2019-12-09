@@ -1,15 +1,17 @@
 package LinkedList
 
 import (
+	"GiveMeAnOfferGo/Objects"
 	"GiveMeAnOfferGo/linkedlist"
+	stack2 "GiveMeAnOfferGo/stack"
 	"fmt"
 	"testing"
 )
 
 func TestCreateNode(t *testing.T) {
-	node1 := linkedlist.NewNode(linkedlist.NewNumberWithInt(1), nil)
-	node2 := linkedlist.NewNode(linkedlist.NewNumberWithInt(2), nil)
-	node3 := linkedlist.NewNode(linkedlist.NewNumberWithInt(3), nil)
+	node1 := linkedlist.NewNode(Objects.NewNumberWithInt(1), nil)
+	node2 := linkedlist.NewNode(Objects.NewNumberWithInt(2), nil)
+	node3 := linkedlist.NewNode(Objects.NewNumberWithInt(3), nil)
 	node1.Next = node2
 	node2.Next = node3
 	fmt.Print(node1)
@@ -17,39 +19,39 @@ func TestCreateNode(t *testing.T) {
 
 func TestPushNode(t *testing.T) {
 	list := new(linkedlist.LinkedList)
-	list.Push(linkedlist.NewNumberWithInt(3))
-	list.Push(linkedlist.NewNumberWithInt(2))
-	list.Push(linkedlist.NewNumberWithInt(1))
+	list.Push(Objects.NewNumberWithInt(3))
+	list.Push(Objects.NewNumberWithInt(2))
+	list.Push(Objects.NewNumberWithInt(1))
 	fmt.Print(list)
 }
 
 func TestAppendNode(t *testing.T) {
 	list := new(linkedlist.LinkedList)
-	list.Append(linkedlist.NewNumberWithInt(1))
-	list.Append(linkedlist.NewNumberWithInt(2))
-	list.Append(linkedlist.NewNumberWithInt(3))
+	list.Append(Objects.NewNumberWithInt(1))
+	list.Append(Objects.NewNumberWithInt(2))
+	list.Append(Objects.NewNumberWithInt(3))
 	fmt.Print(list)
 }
 
 func TestInsertNode(t *testing.T) {
 	list := new(linkedlist.LinkedList)
-	list.Push(linkedlist.NewNumberWithInt(3))
-	list.Push(linkedlist.NewNumberWithInt(2))
-	list.Push(linkedlist.NewNumberWithInt(1))
+	list.Push(Objects.NewNumberWithInt(3))
+	list.Push(Objects.NewNumberWithInt(2))
+	list.Push(Objects.NewNumberWithInt(1))
 
 	fmt.Printf("Before Inserting: %v\n", list)
 	middleNode := list.NodeAt(1)
 	for i := 1; i < 4; i++ {
-		middleNode = list.Insert(linkedlist.NewNumberWithInt(-1), middleNode)
+		middleNode = list.Insert(Objects.NewNumberWithInt(-1), middleNode)
 	}
 	fmt.Printf("After Inserting: %v\n", list)
 }
 
 func TestPopNode(t *testing.T) {
 	list := new(linkedlist.LinkedList)
-	list.Push(linkedlist.NewNumberWithInt(3))
-	list.Push(linkedlist.NewNumberWithInt(2))
-	list.Push(linkedlist.NewNumberWithInt(1))
+	list.Push(Objects.NewNumberWithInt(3))
+	list.Push(Objects.NewNumberWithInt(2))
+	list.Push(Objects.NewNumberWithInt(1))
 
 	fmt.Printf("Before poping list: %v\n", list)
 	poppedValue := list.Pop()
@@ -59,9 +61,9 @@ func TestPopNode(t *testing.T) {
 
 func TestRemoveLastNode(t *testing.T) {
 	list := new(linkedlist.LinkedList)
-	list.Push(linkedlist.NewNumberWithInt(3))
-	list.Push(linkedlist.NewNumberWithInt(2))
-	list.Push(linkedlist.NewNumberWithInt(1))
+	list.Push(Objects.NewNumberWithInt(3))
+	list.Push(Objects.NewNumberWithInt(2))
+	list.Push(Objects.NewNumberWithInt(1))
 
 	fmt.Printf("Before removing last node: %v\n", list)
 	removedValue := list.RemoveLast()
@@ -72,9 +74,9 @@ func TestRemoveLastNode(t *testing.T) {
 
 func TestRemoveAfterNode(t *testing.T) {
 	list := new(linkedlist.LinkedList)
-	list.Push(linkedlist.NewNumberWithInt(3))
-	list.Push(linkedlist.NewNumberWithInt(2))
-	list.Push(linkedlist.NewNumberWithInt(1))
+	list.Push(Objects.NewNumberWithInt(3))
+	list.Push(Objects.NewNumberWithInt(2))
+	list.Push(Objects.NewNumberWithInt(1))
 	fmt.Printf("Before removing at particular index: %v\n", list)
 
 	index := 1
@@ -86,23 +88,23 @@ func TestRemoveAfterNode(t *testing.T) {
 
 func TestCOW(t *testing.T) {
 	list1 := new(linkedlist.LinkedList)
-	list1.Append(linkedlist.NewNumberWithInt(1))
-	list1.Append(linkedlist.NewNumberWithInt(2))
+	list1.Append(Objects.NewNumberWithInt(1))
+	list1.Append(Objects.NewNumberWithInt(2))
 
 	list2 := list1.Copy()
 	fmt.Printf("List1 :%v\n", list1)
 	fmt.Printf("List2 :%v\n", list2)
 
 	fmt.Println("After appending 3 to list2")
-	list2.Append(linkedlist.NewNumberWithInt(3))
+	list2.Append(Objects.NewNumberWithInt(3))
 	fmt.Printf("List1 :%v\n", list1)
 	fmt.Printf("List2 :%v\n", list2)
 }
 
 func TestIsSameObject(t *testing.T) {
 	list1 := new(linkedlist.LinkedList)
-	list1.Append(linkedlist.NewNumberWithInt(1))
-	list1.Append(linkedlist.NewNumberWithInt(2))
+	list1.Append(Objects.NewNumberWithInt(1))
+	list1.Append(Objects.NewNumberWithInt(2))
 
 	fmt.Printf("list1: %p\n", list1.Head)
 
@@ -113,10 +115,10 @@ func TestIsSameObject(t *testing.T) {
 func TestTraverse(t *testing.T) {
 	list1 := new(linkedlist.LinkedList)
 	for i := 1; i < 11; i++ {
-		val := linkedlist.NewNumberWithInt(i)
+		val := Objects.NewNumberWithInt(i)
 		list1.Append(val)
 	}
-	list1.Traverse(func(val linkedlist.Comparable) {
+	list1.Traverse(func(val Objects.Comparable) {
 		fmt.Println(val)
 	})
 }
@@ -124,10 +126,10 @@ func TestTraverse(t *testing.T) {
 func TestReverseTraverse(t *testing.T) {
 	list1 := new(linkedlist.LinkedList)
 	for i := 1; i < 1001; i++ {
-		val := linkedlist.NewNumberWithInt(i)
+		val := Objects.NewNumberWithInt(i)
 		list1.Append(val)
 	}
-	list1.ReverseTraverse(func(val linkedlist.Comparable) {
+	list1.ReverseTraverse(func(val Objects.Comparable) {
 		fmt.Println(val)
 	})
 }
@@ -135,17 +137,39 @@ func TestReverseTraverse(t *testing.T) {
 func TestMiddleNode(t *testing.T) {
 	list1 := new(linkedlist.LinkedList)
 	for i := 1; i < 4; i++ {
-		val := linkedlist.NewNumberWithInt(i)
+		val := Objects.NewNumberWithInt(i)
 		list1.Append(val)
 	}
 
-	val := linkedlist.NewNumberWithInt(2)
-	if list1.MiddleValue().Compare(val) != linkedlist.OrderedSame {
+	val := Objects.NewNumberWithInt(2)
+	if list1.MiddleValue().Compare(val) != Objects.OrderedSame {
 		t.Fail()
 	}
-	list1.Append(linkedlist.NewNumberWithInt(4))
-	val = linkedlist.NewNumberWithInt(3)
-	if list1.MiddleValue().Compare(val) != linkedlist.OrderedSame {
+	list1.Append(Objects.NewNumberWithInt(4))
+	val = Objects.NewNumberWithInt(3)
+	if list1.MiddleValue().Compare(val) != Objects.OrderedSame {
 		t.Fail()
 	}
+}
+
+func TestUnique(t *testing.T) {
+	list1 := new(linkedlist.LinkedList)
+	list1.Append(Objects.NewNumberWithInt(1))
+	list1.Append(Objects.NewNumberWithInt(3))
+	list1.Append(Objects.NewNumberWithInt(3))
+	list1.Append(Objects.NewNumberWithInt(3))
+	list1.Append(Objects.NewNumberWithInt(4))
+
+	list2 := list1.Unique()
+	fmt.Println(list2)
+}
+
+func TestConvenientInit(t *testing.T) {
+	s := stack2.NewStack(
+		Objects.NewNumberWithInt(1),
+		Objects.NewNumberWithInt(2),
+		Objects.NewNumberWithInt(3),
+		Objects.NewNumberWithInt(4))
+
+	fmt.Println(s)
 }

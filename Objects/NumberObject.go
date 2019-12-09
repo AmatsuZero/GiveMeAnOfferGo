@@ -1,4 +1,4 @@
-package linkedlist
+package Objects
 
 import (
 	"fmt"
@@ -16,10 +16,6 @@ type NumberObject struct {
 
 func NewNumberWithInt(integer int) *NumberObject {
 	return &NumberObject{value: integer}
-}
-
-func (number *NumberObject) String() string {
-	return fmt.Sprint(number.value)
 }
 
 func getFloat(unk interface{}) (float64, error) {
@@ -79,4 +75,15 @@ func (number *NumberObject) Compare(obj interface{}) CompareResult {
 	} else {
 		return OrderedDescending
 	}
+}
+
+func (number *NumberObject) IsEqualTo(obj interface{}) bool {
+	if obj == nil {
+		return false
+	}
+	return number.Compare(obj) == OrderedSame
+}
+
+func (number *NumberObject) String() string {
+	return fmt.Sprint(number.value)
 }
