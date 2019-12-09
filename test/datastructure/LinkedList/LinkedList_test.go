@@ -1,24 +1,23 @@
 package LinkedList
 
 import (
+	"GiveMeAnOfferGo/Collections"
 	"GiveMeAnOfferGo/Objects"
-	"GiveMeAnOfferGo/linkedlist"
-	stack2 "GiveMeAnOfferGo/stack"
 	"fmt"
 	"testing"
 )
 
 func TestCreateNode(t *testing.T) {
-	node1 := linkedlist.NewNode(Objects.NewNumberWithInt(1), nil)
-	node2 := linkedlist.NewNode(Objects.NewNumberWithInt(2), nil)
-	node3 := linkedlist.NewNode(Objects.NewNumberWithInt(3), nil)
+	node1 := Collections.NewNode(Objects.NewNumberWithInt(1), nil)
+	node2 := Collections.NewNode(Objects.NewNumberWithInt(2), nil)
+	node3 := Collections.NewNode(Objects.NewNumberWithInt(3), nil)
 	node1.Next = node2
 	node2.Next = node3
 	fmt.Print(node1)
 }
 
 func TestPushNode(t *testing.T) {
-	list := new(linkedlist.LinkedList)
+	list := new(Collections.LinkedList)
 	list.Push(Objects.NewNumberWithInt(3))
 	list.Push(Objects.NewNumberWithInt(2))
 	list.Push(Objects.NewNumberWithInt(1))
@@ -26,7 +25,7 @@ func TestPushNode(t *testing.T) {
 }
 
 func TestAppendNode(t *testing.T) {
-	list := new(linkedlist.LinkedList)
+	list := new(Collections.LinkedList)
 	list.Append(Objects.NewNumberWithInt(1))
 	list.Append(Objects.NewNumberWithInt(2))
 	list.Append(Objects.NewNumberWithInt(3))
@@ -34,7 +33,7 @@ func TestAppendNode(t *testing.T) {
 }
 
 func TestInsertNode(t *testing.T) {
-	list := new(linkedlist.LinkedList)
+	list := new(Collections.LinkedList)
 	list.Push(Objects.NewNumberWithInt(3))
 	list.Push(Objects.NewNumberWithInt(2))
 	list.Push(Objects.NewNumberWithInt(1))
@@ -48,7 +47,7 @@ func TestInsertNode(t *testing.T) {
 }
 
 func TestPopNode(t *testing.T) {
-	list := new(linkedlist.LinkedList)
+	list := new(Collections.LinkedList)
 	list.Push(Objects.NewNumberWithInt(3))
 	list.Push(Objects.NewNumberWithInt(2))
 	list.Push(Objects.NewNumberWithInt(1))
@@ -60,7 +59,7 @@ func TestPopNode(t *testing.T) {
 }
 
 func TestRemoveLastNode(t *testing.T) {
-	list := new(linkedlist.LinkedList)
+	list := new(Collections.LinkedList)
 	list.Push(Objects.NewNumberWithInt(3))
 	list.Push(Objects.NewNumberWithInt(2))
 	list.Push(Objects.NewNumberWithInt(1))
@@ -73,7 +72,7 @@ func TestRemoveLastNode(t *testing.T) {
 }
 
 func TestRemoveAfterNode(t *testing.T) {
-	list := new(linkedlist.LinkedList)
+	list := new(Collections.LinkedList)
 	list.Push(Objects.NewNumberWithInt(3))
 	list.Push(Objects.NewNumberWithInt(2))
 	list.Push(Objects.NewNumberWithInt(1))
@@ -87,7 +86,7 @@ func TestRemoveAfterNode(t *testing.T) {
 }
 
 func TestCOW(t *testing.T) {
-	list1 := new(linkedlist.LinkedList)
+	list1 := new(Collections.LinkedList)
 	list1.Append(Objects.NewNumberWithInt(1))
 	list1.Append(Objects.NewNumberWithInt(2))
 
@@ -102,7 +101,7 @@ func TestCOW(t *testing.T) {
 }
 
 func TestIsSameObject(t *testing.T) {
-	list1 := new(linkedlist.LinkedList)
+	list1 := new(Collections.LinkedList)
 	list1.Append(Objects.NewNumberWithInt(1))
 	list1.Append(Objects.NewNumberWithInt(2))
 
@@ -113,7 +112,7 @@ func TestIsSameObject(t *testing.T) {
 }
 
 func TestTraverse(t *testing.T) {
-	list1 := new(linkedlist.LinkedList)
+	list1 := new(Collections.LinkedList)
 	for i := 1; i < 11; i++ {
 		val := Objects.NewNumberWithInt(i)
 		list1.Append(val)
@@ -124,7 +123,7 @@ func TestTraverse(t *testing.T) {
 }
 
 func TestReverseTraverse(t *testing.T) {
-	list1 := new(linkedlist.LinkedList)
+	list1 := new(Collections.LinkedList)
 	for i := 1; i < 1001; i++ {
 		val := Objects.NewNumberWithInt(i)
 		list1.Append(val)
@@ -135,7 +134,7 @@ func TestReverseTraverse(t *testing.T) {
 }
 
 func TestMiddleNode(t *testing.T) {
-	list1 := new(linkedlist.LinkedList)
+	list1 := new(Collections.LinkedList)
 	for i := 1; i < 4; i++ {
 		val := Objects.NewNumberWithInt(i)
 		list1.Append(val)
@@ -153,7 +152,7 @@ func TestMiddleNode(t *testing.T) {
 }
 
 func TestUnique(t *testing.T) {
-	list1 := new(linkedlist.LinkedList)
+	list1 := new(Collections.LinkedList)
 	list1.Append(Objects.NewNumberWithInt(1))
 	list1.Append(Objects.NewNumberWithInt(3))
 	list1.Append(Objects.NewNumberWithInt(3))
@@ -165,7 +164,7 @@ func TestUnique(t *testing.T) {
 }
 
 func TestConvenientInit(t *testing.T) {
-	s := stack2.NewStack(
+	s := Collections.NewStack(
 		Objects.NewNumberWithInt(1),
 		Objects.NewNumberWithInt(2),
 		Objects.NewNumberWithInt(3),

@@ -1,33 +1,61 @@
 package stack
 
 import (
+	"GiveMeAnOfferGo/Collections"
 	"GiveMeAnOfferGo/Objects"
-	stack2 "GiveMeAnOfferGo/stack"
 	"fmt"
 	"testing"
 )
 
 func TestPop(t *testing.T) {
-	stack := new(stack2.Stack)
+	s := new(Collections.Stack)
 	for i := 1; i < 5; i++ {
-		stack.Push(getInt(i))
+		s.Push(getInt(i))
 	}
 
-	fmt.Println(stack)
-	poppedElement := stack.Pop()
+	fmt.Println(s)
+	poppedElement := s.Pop()
 	fmt.Printf("Popped: %v\n", poppedElement)
 }
 
 func TestIsBalancedParentheses(t *testing.T) {
-	str := Objects.StringObject{GoString: "h((e))llo(world)()"}.ToObjectSlice()
-	record := new(stack2.Stack)
-	for _, s := range str {
-		if s.IsEqualTo(getString("(")) {
+	obj := &Objects.StringObject{GoString: "h((e))llo(world)()"}
+	record := new(Collections.Stack)
+
+	left := getString("(")
+	right := getString(")")
+
+	for _, s := range obj.ToObjectSlice() {
+		if s.IsEqualTo(left) {
 			record.Push(s)
-		} else if s.IsEqualTo(getString(")")) && !record.IsEmpty() {
+		} else if s.IsEqualTo(right) {
 			record.Pop()
 		}
 	}
+
+	if !record.IsEmpty() {
+		t.Fail()
+	}
+
+	obj = &Objects.StringObject{GoString: "(hello world"}
+	record.RemoveAll()
+	for _, s := range obj.ToObjectSlice() {
+		if s.IsEqualTo(left) {
+			record.Push(s)
+		} else if s.IsEqualTo(right) {
+			record.Pop()
+		}
+	}
+	if record.IsEmpty() {
+		t.Fail()
+	}
+}
+
+func TestCopy(t *testing.T) {
+	s1 := new(Collections.Stack)
+	s2 := s1.Copy()
+	s2.Push(getInt(1))
+	fmt.Printf("s1 : %p\n s2 : %p\n", s1, s2)
 }
 
 func getInt(i int) *Objects.NumberObject {
