@@ -7,15 +7,15 @@ import (
 )
 
 type Stack struct {
-	storage []Objects.Comparable
+	storage []Objects.ObjectProtocol
 }
 
-func NewStackWithSlice(elements []Objects.Comparable) *Stack {
+func NewStackWithSlice(elements []Objects.ObjectProtocol) *Stack {
 	return &Stack{storage: elements}
 }
 
-func NewStack(element ...Objects.Comparable) *Stack {
-	return &Stack{storage: element}
+func NewStack(elements ...Objects.ObjectProtocol) *Stack {
+	return NewStackWithSlice(elements)
 }
 
 func (stack *Stack) String() string {
@@ -29,11 +29,11 @@ func (stack *Stack) String() string {
 	return topDivider + strings.Join(des, "\n") + bottomDivider
 }
 
-func (stack *Stack) Push(val ...Objects.Comparable) {
+func (stack *Stack) Push(val ...Objects.ObjectProtocol) {
 	stack.storage = append(stack.storage, val...)
 }
 
-func (stack *Stack) Pop() (popped Objects.Comparable) {
+func (stack *Stack) Pop() (popped Objects.ObjectProtocol) {
 	if stack.IsEmpty() {
 		return nil
 	}
@@ -41,7 +41,7 @@ func (stack *Stack) Pop() (popped Objects.Comparable) {
 	return
 }
 
-func (stack *Stack) Peek() Objects.Comparable {
+func (stack *Stack) Peek() Objects.ObjectProtocol {
 	if len(stack.storage) == 0 {
 		return nil
 	}
@@ -57,16 +57,16 @@ func (stack *Stack) AddFromStack(s *Stack) {
 }
 
 func (stack *Stack) RemoveAll() {
-	stack.storage = make([]Objects.Comparable, 0)
+	stack.storage = make([]Objects.ObjectProtocol, 0)
 }
 
 func (stack *Stack) Copy() *Stack {
 	return &Stack{
-		storage: append([]Objects.Comparable(nil), stack.storage...),
+		storage: append([]Objects.ObjectProtocol(nil), stack.storage...),
 	}
 }
 
-func (stack *Stack) Filter(filter func(index int, element Objects.Comparable) bool) {
+func (stack *Stack) Filter(filter func(index int, element Objects.ObjectProtocol) bool) {
 	if filter == nil {
 		return
 	}
@@ -95,7 +95,7 @@ func (stack *Stack) SubRange(from int, to int) *Stack {
 	}
 }
 
-func (stack *Stack) ForEach(traverse func(index int, element Objects.Comparable)) {
+func (stack *Stack) ForEach(traverse func(index int, element Objects.ObjectProtocol)) {
 	if traverse == nil {
 		return
 	}

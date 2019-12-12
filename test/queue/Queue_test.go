@@ -36,5 +36,5 @@ func TestQueueArray(t *testing.T) {
 }
 
 func getString(str string) *Objects.StringObject {
-	return &Objects.StringObject{GoString: str}
+	return &Objects.StringObject{GoString: &str}
 }

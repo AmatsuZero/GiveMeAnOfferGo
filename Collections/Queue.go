@@ -6,31 +6,31 @@ import (
 )
 
 type Queue interface {
-	Enqueue(element Objects.Comparable) bool
-	Dequeue() Objects.Comparable
+	Enqueue(element Objects.ObjectProtocol) bool
+	Dequeue() Objects.ObjectProtocol
 	IsEmpty() bool
-	Peek() Objects.Comparable
+	Peek() Objects.ObjectProtocol
 	Length() int
 }
 
 type QueueArray struct {
-	array []Objects.Comparable
+	array []Objects.ObjectProtocol
 }
 
 func NewQueueArray() *QueueArray {
-	return &QueueArray{array: make([]Objects.Comparable, 0)}
+	return &QueueArray{array: make([]Objects.ObjectProtocol, 0)}
 }
 
 func (qa *QueueArray) IsEmpty() bool {
 	return qa.Length() == 0
 }
 
-func (qa *QueueArray) Enqueue(element Objects.Comparable) bool {
+func (qa *QueueArray) Enqueue(element Objects.ObjectProtocol) bool {
 	qa.array = append(qa.array, element)
 	return true
 }
 
-func (qa *QueueArray) Dequeue() (x Objects.Comparable) {
+func (qa *QueueArray) Dequeue() (x Objects.ObjectProtocol) {
 	if qa.IsEmpty() {
 		return nil
 	}
@@ -38,7 +38,7 @@ func (qa *QueueArray) Dequeue() (x Objects.Comparable) {
 	return
 }
 
-func (qa *QueueArray) Peek() Objects.Comparable {
+func (qa *QueueArray) Peek() Objects.ObjectProtocol {
 	if qa.IsEmpty() {
 		return nil
 	}
@@ -57,12 +57,12 @@ func NewQueueLinedList() *QueueLinkedList {
 	return &QueueLinkedList{list: new(DoublyLinkedList)}
 }
 
-func (qd *QueueLinkedList) Enqueue(val Objects.Comparable) bool {
+func (qd *QueueLinkedList) Enqueue(val Objects.ObjectProtocol) bool {
 	qd.list.Append(val)
 	return true
 }
 
-func (qd *QueueLinkedList) Dequeue() Objects.Comparable {
+func (qd *QueueLinkedList) Dequeue() Objects.ObjectProtocol {
 	element := qd.list.First()
 	if qd.list.IsEmpty() || element == nil {
 		return nil
@@ -70,7 +70,7 @@ func (qd *QueueLinkedList) Dequeue() Objects.Comparable {
 	return qd.list.Remove(element)
 }
 
-func (qd *QueueLinkedList) Peek() Objects.Comparable {
+func (qd *QueueLinkedList) Peek() Objects.ObjectProtocol {
 	first := qd.list.First()
 	if first == nil {
 		return nil

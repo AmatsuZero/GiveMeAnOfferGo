@@ -117,7 +117,7 @@ func TestTraverse(t *testing.T) {
 		val := Objects.NewNumberWithInt(i)
 		list1.Append(val)
 	}
-	list1.Traverse(func(val Objects.Comparable) {
+	list1.Traverse(func(val Objects.ObjectProtocol) {
 		fmt.Println(val)
 	})
 }
@@ -128,7 +128,7 @@ func TestReverseTraverse(t *testing.T) {
 		val := Objects.NewNumberWithInt(i)
 		list1.Append(val)
 	}
-	list1.ReverseTraverse(func(val Objects.Comparable) {
+	list1.ReverseTraverse(func(val Objects.ObjectProtocol) {
 		fmt.Println(val)
 	})
 }

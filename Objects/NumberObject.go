@@ -87,3 +87,7 @@ func (number *NumberObject) IsEqualTo(obj interface{}) bool {
 func (number *NumberObject) String() string {
 	return fmt.Sprint(number.value)
 }
+
+func (number *NumberObject) IsNil() bool {
+	return number.value == nil
+}

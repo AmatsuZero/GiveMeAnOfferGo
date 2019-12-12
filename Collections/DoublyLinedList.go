@@ -8,15 +8,19 @@ import (
 type DoublyLinkedListNode struct {
 	Next     *DoublyLinkedListNode
 	Previous *DoublyLinkedListNode
-	Value    Objects.Comparable
+	Value    Objects.ObjectProtocol
 }
 
-func NewDoublyLinkedListNode(val Objects.Comparable) *DoublyLinkedListNode {
+func NewDoublyLinkedListNode(val Objects.ObjectProtocol) *DoublyLinkedListNode {
 	return &DoublyLinkedListNode{Value: val}
 }
 
 func (node *DoublyLinkedListNode) String() string {
 	return fmt.Sprint(node.Value)
+}
+
+func (node *DoublyLinkedListNode) IsNil() bool {
+	return node.Value == nil
 }
 
 type DoublyLinkedList struct {
@@ -32,7 +36,7 @@ func (dl *DoublyLinkedList) IsEmpty() bool {
 	return dl.Head == nil
 }
 
-func (dl *DoublyLinkedList) Append(val Objects.Comparable) {
+func (dl *DoublyLinkedList) Append(val Objects.ObjectProtocol) {
 	newNode := NewDoublyLinkedListNode(val)
 	if dl.Tail == nil {
 		dl.Head = newNode
@@ -45,7 +49,7 @@ func (dl *DoublyLinkedList) Append(val Objects.Comparable) {
 	dl.Tail = newNode
 }
 
-func (dl *DoublyLinkedList) Remove(node *DoublyLinkedListNode) Objects.Comparable {
+func (dl *DoublyLinkedList) Remove(node *DoublyLinkedListNode) Objects.ObjectProtocol {
 	prev := node.Previous
 	next := node.Next
 

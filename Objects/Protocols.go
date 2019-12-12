@@ -1,8 +1,6 @@
 package Objects
 
-import (
-	"fmt"
-)
+import "fmt"
 
 type CompareResult int
 
@@ -19,7 +17,12 @@ type Equatable interface {
 }
 
 type Comparable interface {
-	fmt.Stringer
 	Equatable
 	Compare(obj interface{}) CompareResult
+}
+
+type ObjectProtocol interface {
+	Comparable
+	fmt.Stringer
+	IsNil() bool
 }

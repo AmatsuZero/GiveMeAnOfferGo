@@ -6,11 +6,11 @@ import (
 )
 
 type Node struct {
-	Value Objects.Comparable
+	Value Objects.ObjectProtocol
 	Next  *Node
 }
 
-func NewNode(value Objects.Comparable, next *Node) *Node {
+func NewNode(value Objects.ObjectProtocol, next *Node) *Node {
 	return &Node{
 		Value: value,
 		Next:  next,
@@ -40,7 +40,7 @@ func (list *LinkedList) String() string {
 	return fmt.Sprintf("%v", list.Head)
 }
 
-func (list *LinkedList) Push(value Objects.Comparable) {
+func (list *LinkedList) Push(value Objects.ObjectProtocol) {
 	list.copyNodes()
 	list.Head = NewNode(value, list.Head)
 	if list.Tail == nil {
@@ -48,7 +48,7 @@ func (list *LinkedList) Push(value Objects.Comparable) {
 	}
 }
 
-func (list *LinkedList) Append(value Objects.Comparable) {
+func (list *LinkedList) Append(value Objects.ObjectProtocol) {
 	list.copyNodes()
 	if list.IsEmpty() {
 		list.Push(value)
@@ -71,7 +71,7 @@ func (list *LinkedList) NodeAt(index int) *Node {
 	return currentNode
 }
 
-func (list *LinkedList) Insert(value Objects.Comparable, after *Node) *Node {
+func (list *LinkedList) Insert(value Objects.ObjectProtocol, after *Node) *Node {
 	list.copyNodes()
 	if list.Tail == after {
 		list.Append(value)
@@ -81,7 +81,7 @@ func (list *LinkedList) Insert(value Objects.Comparable, after *Node) *Node {
 	return after.Next
 }
 
-func (list *LinkedList) Pop() Objects.Comparable {
+func (list *LinkedList) Pop() Objects.ObjectProtocol {
 	list.copyNodes()
 	defer func() {
 		list.Head = list.Head.Next
@@ -92,7 +92,7 @@ func (list *LinkedList) Pop() Objects.Comparable {
 	return list.Head.Value
 }
 
-func (list *LinkedList) RemoveLast() Objects.Comparable {
+func (list *LinkedList) RemoveLast() Objects.ObjectProtocol {
 	list.copyNodes()
 	if list.Head == nil {
 		return nil
@@ -115,7 +115,7 @@ func (list *LinkedList) RemoveLast() Objects.Comparable {
 	return current.Value
 }
 
-func (list *LinkedList) RemoveAfter(node *Node) Objects.Comparable {
+func (list *LinkedList) RemoveAfter(node *Node) Objects.ObjectProtocol {
 	list.copyNodes()
 	defer func() {
 		if node.Next == list.Tail {
@@ -153,7 +153,7 @@ func (list *LinkedList) Copy() *LinkedList {
 	return newList
 }
 
-func (list *LinkedList) Traverse(block func(val Objects.Comparable)) {
+func (list *LinkedList) Traverse(block func(val Objects.ObjectProtocol)) {
 	if block == nil || list.IsEmpty() {
 		return
 	}
@@ -164,7 +164,7 @@ func (list *LinkedList) Traverse(block func(val Objects.Comparable)) {
 	}
 }
 
-func (list *LinkedList) ReverseTraverse(block func(val Objects.Comparable)) {
+func (list *LinkedList) ReverseTraverse(block func(val Objects.ObjectProtocol)) {
 	if block == nil || list.IsEmpty() {
 		return
 	}
@@ -178,13 +178,13 @@ func (list *LinkedList) ReverseTraverse(block func(val Objects.Comparable)) {
 }
 
 func (list *LinkedList) Length() (length int) {
-	list.Traverse(func(val Objects.Comparable) {
+	list.Traverse(func(val Objects.ObjectProtocol) {
 		length += 1
 	})
 	return
 }
 
-func (list *LinkedList) MiddleValue() Objects.Comparable {
+func (list *LinkedList) MiddleValue() Objects.ObjectProtocol {
 	if list.IsEmpty() {
 		return nil
 	}
@@ -192,7 +192,7 @@ func (list *LinkedList) MiddleValue() Objects.Comparable {
 	return list.NodeAt(index).Value
 }
 
-func (list *LinkedList) Last() Objects.Comparable {
+func (list *LinkedList) Last() Objects.ObjectProtocol {
 	if list.IsEmpty() {
 		return nil
 	}
@@ -204,7 +204,7 @@ func (list *LinkedList) Unique() (unique *LinkedList) {
 		return nil
 	}
 	unique = new(LinkedList)
-	list.Traverse(func(val Objects.Comparable) {
+	list.Traverse(func(val Objects.ObjectProtocol) {
 		if unique.IsEmpty() {
 			unique.Push(val)
 		} else if !unique.Last().IsEqualTo(val) {
