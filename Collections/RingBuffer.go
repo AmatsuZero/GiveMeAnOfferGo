@@ -1,6 +1,8 @@
 package Collections
 
-import "GiveMeAnOfferGo/Objects"
+import (
+	"GiveMeAnOfferGo/Objects"
+)
 
 type RingBuffer struct {
 	array      []Objects.ObjectProtocol
@@ -44,4 +46,12 @@ func (buffer *RingBuffer) availableSpaceForWriting() int {
 
 func (buffer *RingBuffer) IsFull() bool {
 	return buffer.availableSpaceForWriting() == 0
+}
+
+func (buffer *RingBuffer) Get(at int) Objects.ObjectProtocol {
+	return buffer.array[at%len(buffer.array)]
+}
+
+func (buffer *RingBuffer) Set(at int, val Objects.ObjectProtocol) {
+	buffer.array[at%len(buffer.array)] = val
 }

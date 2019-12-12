@@ -1,4 +1,4 @@
-package datastructure
+package Collections
 
 import (
 	"github.com/spaolacci/murmur3"

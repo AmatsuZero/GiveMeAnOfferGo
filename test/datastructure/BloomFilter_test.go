@@ -1,12 +1,12 @@
 package datastructure
 
 import (
-	"GiveMeAnOfferGo/datastructure"
+	"GiveMeAnOfferGo/Collections"
 	"testing"
 )
 
 func TestBloomFilter(t *testing.T) {
-	bf := datastructure.NewBloomFilter(1024)
+	bf := Collections.NewBloomFilter(1024)
 	bf.Add([]byte("hello"))
 	bf.Add([]byte("world"))
 	bf.Add([]byte("sir"))

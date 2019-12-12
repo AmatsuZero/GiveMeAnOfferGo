@@ -35,6 +35,20 @@ func TestQueueArray(t *testing.T) {
 	}
 }
 
+func TestQueueRingBuffer(t *testing.T) {
+	queue := Collections.NewQueueRingBuffer(10)
+	queue.Enqueue(getString("Ray"))
+	queue.Enqueue(getString("Brain"))
+	queue.Enqueue(getString("Eric"))
+	fmt.Println(queue)
+	queue.Dequeue()
+	fmt.Println(queue)
+	fmt.Println(queue.Peek())
+	if queue.Length() != 2 {
+		t.Fail()
+	}
+}
+
 func getString(str string) *Objects.StringObject {
 	return &Objects.StringObject{GoString: &str}
 }

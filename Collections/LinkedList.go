@@ -211,6 +211,5 @@ func (list *LinkedList) Unique() (unique *LinkedList) {
 			unique.Append(val)
 		}
 	})
-
 	return
 }

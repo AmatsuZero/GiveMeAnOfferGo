@@ -4,7 +4,7 @@ import "fmt"
 
 type CompareResult int
 
-const InvalidResult = -1
+const InvalidResult = iota - 1986
 
 const (
 	OrderedAscending CompareResult = iota

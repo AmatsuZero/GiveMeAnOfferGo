@@ -89,3 +89,40 @@ func (qd *QueueLinkedList) String() string {
 func (qd *QueueLinkedList) Length() int {
 	return qd.list.Length()
 }
+
+type QueueRingBuffer struct {
+	ringBuffer *RingBuffer
+}
+
+func NewQueueRingBuffer(count int) *QueueRingBuffer {
+	return &QueueRingBuffer{
+		ringBuffer: NewBufferRing(count),
+	}
+}
+
+func (qr *QueueRingBuffer) IsEmpty() bool {
+	return qr.ringBuffer.IsEmpty()
+}
+
+func (qr *QueueRingBuffer) Peek() Objects.ObjectProtocol {
+	return qr.ringBuffer.Get(0)
+}
+
+func (qr *QueueRingBuffer) Enqueue(val Objects.ObjectProtocol) bool {
+	return qr.ringBuffer.Write(val)
+}
+
+func (qr *QueueRingBuffer) Dequeue() Objects.ObjectProtocol {
+	if qr.IsEmpty() {
+		return nil
+	}
+	return qr.ringBuffer.Read()
+}
+
+func (qr *QueueRingBuffer) Length() int {
+	return len(qr.ringBuffer.array)
+}
+
+func (qr *QueueRingBuffer) String() string {
+	return fmt.Sprintln(qr.ringBuffer)
+}
