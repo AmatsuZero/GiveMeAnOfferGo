@@ -1,6 +1,7 @@
-package Collections
+package Tree
 
 import (
+	"GiveMeAnOfferGo/Collections"
 	"GiveMeAnOfferGo/Objects"
 	"fmt"
 )
@@ -58,7 +59,7 @@ func (node *TreeNode) ForEachLevelOrder(visit func(node *TreeNode)) {
 		return
 	}
 	visit(node)
-	queue := NewQueueLinedList()
+	queue := Collections.NewQueueLinedList()
 	for _, v := range node.Children {
 		queue.Enqueue(v)
 	}
