@@ -59,7 +59,9 @@ func (dl *DoublyLinkedList) Remove(node *DoublyLinkedListNode) Objects.ObjectPro
 		dl.Head = next
 	}
 
-	next.Previous = prev
+	if next != nil {
+		next.Previous = prev
+	}
 
 	if next == nil {
 		dl.Tail = prev
