@@ -2,6 +2,7 @@ package Collections
 
 import (
 	"GiveMeAnOfferGo/Objects"
+	"fmt"
 )
 
 type RingBuffer struct {
@@ -48,10 +49,24 @@ func (buffer *RingBuffer) IsFull() bool {
 	return buffer.availableSpaceForWriting() == 0
 }
 
-func (buffer *RingBuffer) Get(at int) Objects.ObjectProtocol {
-	return buffer.array[at%len(buffer.array)]
+func (buffer *RingBuffer) String() string {
+	str := fmt.Sprintf("=== RingBuffer: %p\n", buffer)
+	if !buffer.IsEmpty() {
+		buffer.ForEach(func(index int, val Objects.ObjectProtocol) {
+			str += fmt.Sprintf("[%d]:%v\n", index, val)
+		})
+	}
+	str += "=== end\n"
+	return str
 }
 
-func (buffer *RingBuffer) Set(at int, val Objects.ObjectProtocol) {
-	buffer.array[at%len(buffer.array)] = val
+func (buffer *RingBuffer) ForEach(traverse func(index int, val Objects.ObjectProtocol)) {
+	if traverse == nil || buffer.IsEmpty() {
+		return
+	}
+	index := 0
+	for i := buffer.readIndex; i < buffer.writeIndex; i++ {
+		traverse(index, buffer.array[i])
+		index++
+	}
 }

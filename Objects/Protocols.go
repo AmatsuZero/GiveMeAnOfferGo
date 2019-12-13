@@ -22,7 +22,16 @@ type Comparable interface {
 }
 
 type ObjectProtocol interface {
-	Comparable
 	fmt.Stringer
 	IsNil() bool
+}
+
+type ComparableObject interface {
+	Comparable
+	ObjectProtocol
+}
+
+type EquatableObject interface {
+	Equatable
+	ObjectProtocol
 }

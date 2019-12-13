@@ -6,11 +6,11 @@ import (
 )
 
 type Node struct {
-	Value Objects.ObjectProtocol
+	Value Objects.ComparableObject
 	Next  *Node
 }
 
-func NewNode(value Objects.ObjectProtocol, next *Node) *Node {
+func NewNode(value Objects.ComparableObject, next *Node) *Node {
 	return &Node{
 		Value: value,
 		Next:  next,
@@ -21,7 +21,7 @@ func (node *Node) String() string {
 	if node.Next == nil {
 		return fmt.Sprint(node.Value)
 	}
-	return fmt.Sprintf("%v -> %v ", node.Value, node.Next)
+	return fmt.Sprintf("%v ComparableObject> %v ", node.Value, node.Next)
 }
 
 type LinkedList struct {
@@ -40,7 +40,7 @@ func (list *LinkedList) String() string {
 	return fmt.Sprintf("%v", list.Head)
 }
 
-func (list *LinkedList) Push(value Objects.ObjectProtocol) {
+func (list *LinkedList) Push(value Objects.ComparableObject) {
 	list.copyNodes()
 	list.Head = NewNode(value, list.Head)
 	if list.Tail == nil {
@@ -48,7 +48,7 @@ func (list *LinkedList) Push(value Objects.ObjectProtocol) {
 	}
 }
 
-func (list *LinkedList) Append(value Objects.ObjectProtocol) {
+func (list *LinkedList) Append(value Objects.ComparableObject) {
 	list.copyNodes()
 	if list.IsEmpty() {
 		list.Push(value)
@@ -71,7 +71,7 @@ func (list *LinkedList) NodeAt(index int) *Node {
 	return currentNode
 }
 
-func (list *LinkedList) Insert(value Objects.ObjectProtocol, after *Node) *Node {
+func (list *LinkedList) Insert(value Objects.ComparableObject, after *Node) *Node {
 	list.copyNodes()
 	if list.Tail == after {
 		list.Append(value)
@@ -81,7 +81,7 @@ func (list *LinkedList) Insert(value Objects.ObjectProtocol, after *Node) *Node 
 	return after.Next
 }
 
-func (list *LinkedList) Pop() Objects.ObjectProtocol {
+func (list *LinkedList) Pop() Objects.ComparableObject {
 	list.copyNodes()
 	defer func() {
 		list.Head = list.Head.Next
@@ -92,7 +92,7 @@ func (list *LinkedList) Pop() Objects.ObjectProtocol {
 	return list.Head.Value
 }
 
-func (list *LinkedList) RemoveLast() Objects.ObjectProtocol {
+func (list *LinkedList) RemoveLast() Objects.ComparableObject {
 	list.copyNodes()
 	if list.Head == nil {
 		return nil
@@ -115,7 +115,7 @@ func (list *LinkedList) RemoveLast() Objects.ObjectProtocol {
 	return current.Value
 }
 
-func (list *LinkedList) RemoveAfter(node *Node) Objects.ObjectProtocol {
+func (list *LinkedList) RemoveAfter(node *Node) Objects.ComparableObject {
 	list.copyNodes()
 	defer func() {
 		if node.Next == list.Tail {
@@ -153,18 +153,20 @@ func (list *LinkedList) Copy() *LinkedList {
 	return newList
 }
 
-func (list *LinkedList) Traverse(block func(val Objects.ObjectProtocol)) {
+func (list *LinkedList) ForEach(block func(index int, val Objects.ComparableObject)) {
 	if block == nil || list.IsEmpty() {
 		return
 	}
 	current := list.Head
+	i := 0
 	for current != nil {
-		block(current.Value)
+		block(i, current.Value)
 		current = current.Next
+		i++
 	}
 }
 
-func (list *LinkedList) ReverseTraverse(block func(val Objects.ObjectProtocol)) {
+func (list *LinkedList) ReverseTraverse(block func(val Objects.ComparableObject)) {
 	if block == nil || list.IsEmpty() {
 		return
 	}
@@ -178,13 +180,13 @@ func (list *LinkedList) ReverseTraverse(block func(val Objects.ObjectProtocol)) 
 }
 
 func (list *LinkedList) Length() (length int) {
-	list.Traverse(func(val Objects.ObjectProtocol) {
+	list.ForEach(func(i int, val Objects.ComparableObject) {
 		length += 1
 	})
 	return
 }
 
-func (list *LinkedList) MiddleValue() Objects.ObjectProtocol {
+func (list *LinkedList) MiddleValue() Objects.ComparableObject {
 	if list.IsEmpty() {
 		return nil
 	}
@@ -192,7 +194,7 @@ func (list *LinkedList) MiddleValue() Objects.ObjectProtocol {
 	return list.NodeAt(index).Value
 }
 
-func (list *LinkedList) Last() Objects.ObjectProtocol {
+func (list *LinkedList) Last() Objects.ComparableObject {
 	if list.IsEmpty() {
 		return nil
 	}
@@ -204,7 +206,7 @@ func (list *LinkedList) Unique() (unique *LinkedList) {
 		return nil
 	}
 	unique = new(LinkedList)
-	list.Traverse(func(val Objects.ObjectProtocol) {
+	list.ForEach(func(i int, val Objects.ComparableObject) {
 		if unique.IsEmpty() {
 			unique.Push(val)
 		} else if !unique.Last().IsEqualTo(val) {
