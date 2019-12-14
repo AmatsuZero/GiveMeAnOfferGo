@@ -17,12 +17,12 @@ func TestCreateATree(t *testing.T) {
 
 func TestDFSForEach(t *testing.T) {
 	tree := makeTree()
-	tree.ForEachDFS(func(node *Tree.TreeNode) {
+	tree.ForEachDFS(func(node *Tree.Node) {
 		fmt.Println(node.Value)
 	})
 }
 
-func makeTree() *Tree.TreeNode {
+func makeTree() *Tree.Node {
 	beverages := Tree.NewTreeNode(getString("Beverages"))
 	hot := Tree.NewTreeNode(getString("hot"))
 	cold := Tree.NewTreeNode(getString("cold"))
@@ -58,7 +58,7 @@ func makeTree() *Tree.TreeNode {
 
 func TestLevelOrderTraverse(t *testing.T) {
 	tree := makeTree()
-	tree.ForEachLevelOrder(func(node *Tree.TreeNode) {
+	tree.ForEachLevelOrder(func(node *Tree.Node) {
 		fmt.Println(node)
 	})
 }

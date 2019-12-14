@@ -15,60 +15,60 @@ func NewBinaryNode(val Objects.ComparableObject) *BinaryTreeNode {
 	return &BinaryTreeNode{Value: val}
 }
 
-func (btn *BinaryTreeNode) String() string {
-	return btn.diagram(btn, "", "", "")
+func (node *BinaryTreeNode) String() string {
+	return diagram(node, "", "", "")
 }
 
-func (btn *BinaryTreeNode) diagram(node *BinaryTreeNode, top string, root string, bottom string) string {
+func diagram(node *BinaryTreeNode, top string, root string, bottom string) string {
 	if node == nil {
 		return root + "nil\n"
 	}
 	if node.LeftChild == nil && node.RightChild == nil {
 		return root + fmt.Sprintf("%v\n", node.Value)
 	}
-	return btn.diagram(node.RightChild, top+" ", top+"┌──", top+"│ ") +
+	return diagram(node.RightChild, top+" ", top+"┌──", top+"│ ") +
 		root +
 		fmt.Sprintf("%v\n", node.Value) +
-		btn.diagram(node.LeftChild, bottom+"│ ", bottom+"└──", bottom+" ")
+		diagram(node.LeftChild, bottom+"│ ", bottom+"└──", bottom+" ")
 }
 
-func (btn *BinaryTreeNode) ForEachInOrder(visit func(val Objects.ComparableObject)) {
+func (node *BinaryTreeNode) ForEachInOrder(visit func(val Objects.ComparableObject)) {
 	if visit == nil {
 		return
 	}
-	if btn.LeftChild != nil {
-		btn.LeftChild.ForEachInOrder(visit)
+	if node.LeftChild != nil {
+		node.LeftChild.ForEachInOrder(visit)
 	}
-	visit(btn.Value)
-	if btn.RightChild != nil {
-		btn.RightChild.ForEachInOrder(visit)
-	}
-}
-
-func (btn *BinaryTreeNode) ForEachPreOrder(visit func(val Objects.ComparableObject)) {
-	if visit == nil {
-		return
-	}
-	visit(btn.Value)
-	if btn.LeftChild != nil {
-		btn.LeftChild.ForEachPreOrder(visit)
-	}
-	if btn.RightChild != nil {
-		btn.RightChild.ForEachPreOrder(visit)
+	visit(node.Value)
+	if node.RightChild != nil {
+		node.RightChild.ForEachInOrder(visit)
 	}
 }
 
-func (btn *BinaryTreeNode) ForEachPostOrder(visit func(val Objects.ComparableObject)) {
+func (node *BinaryTreeNode) ForEachPreOrder(visit func(val Objects.ComparableObject)) {
 	if visit == nil {
 		return
 	}
-	if btn.LeftChild != nil {
-		btn.LeftChild.ForEachPostOrder(visit)
+	visit(node.Value)
+	if node.LeftChild != nil {
+		node.LeftChild.ForEachPreOrder(visit)
 	}
-	if btn.RightChild != nil {
-		btn.RightChild.ForEachPostOrder(visit)
+	if node.RightChild != nil {
+		node.RightChild.ForEachPreOrder(visit)
 	}
-	visit(btn.Value)
+}
+
+func (node *BinaryTreeNode) ForEachPostOrder(visit func(val Objects.ComparableObject)) {
+	if visit == nil {
+		return
+	}
+	if node.LeftChild != nil {
+		node.LeftChild.ForEachPostOrder(visit)
+	}
+	if node.RightChild != nil {
+		node.RightChild.ForEachPostOrder(visit)
+	}
+	visit(node.Value)
 }
 
 func HeightOfTree(node *BinaryTreeNode) int {
@@ -84,6 +84,13 @@ func HeightOfTree(node *BinaryTreeNode) int {
 	}
 }
 
+func (node *BinaryTreeNode) min() *BinaryTreeNode {
+	if node.LeftChild == nil {
+		return node
+	}
+	return node.LeftChild.min()
+}
+
 //func Serialize(node *BinaryTreeNode) (array []*Objects.ComparableObject) {
 //	array = make([]*Objects.ComparableObject, 0)
 //	if node == nil {
@@ -94,3 +101,21 @@ func HeightOfTree(node *BinaryTreeNode) int {
 //	})
 //	return
 //}
+
+func (node *BinaryTreeNode) IsBinarySearchTree() bool {
+	return isBinarySearchTree(node, nil, nil)
+}
+
+func isBinarySearchTree(tree *BinaryTreeNode, min Objects.ComparableObject, max Objects.ComparableObject) bool {
+	if tree == nil {
+		return true
+	}
+	if min != nil && tree.Value.Compare(min) != Objects.OrderedAscending {
+		return false
+	} else if max != nil && tree.Value.Compare(max) == Objects.OrderedDescending {
+		return false
+	}
+
+	return isBinarySearchTree(tree.LeftChild, min, tree.Value) &&
+		isBinarySearchTree(tree.RightChild, tree.Value, max)
+}
