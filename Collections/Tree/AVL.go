@@ -3,6 +3,7 @@ package Tree
 import (
 	"GiveMeAnOfferGo/Objects"
 	"fmt"
+	"math"
 )
 
 type AVLNode struct {
@@ -72,6 +73,13 @@ func (avl *AVLNode) ForEachPostOrder(visit func(val Objects.ComparableObject)) {
 	visit(avl.Value)
 }
 
+func (avl *AVLNode) Min() *AVLNode {
+	if avl.LeftChild == nil {
+		return avl
+	}
+	return avl.LeftChild.Min()
+}
+
 func (avl *AVLNode) BalanceFactor() int {
 	return avl.LeftHeight() - avl.RightHeight()
 }
@@ -88,4 +96,137 @@ func (avl *AVLNode) RightHeight() int {
 		return -1
 	}
 	return avl.RightChild.Height
+}
+
+type AVLTree struct {
+	Root *AVLNode
+}
+
+func (avl *AVLTree) leftRotate(node *AVLNode) *AVLNode {
+	if node == nil {
+		return nil
+	}
+	pivot := node.RightChild
+	node.RightChild = pivot.LeftChild
+	pivot.LeftChild = node
+	node.Height = int(math.Max(float64(node.LeftHeight()), float64(node.RightHeight())) + 1)
+	pivot.Height = int(math.Max(float64(pivot.LeftHeight()), float64(pivot.RightHeight())) + 1)
+	return pivot
+}
+
+func (avl *AVLTree) rightRotate(node *AVLNode) *AVLNode {
+	pivot := node.LeftChild
+	node.LeftChild = pivot.RightChild
+	pivot.RightChild = node
+	node.Height = int(math.Max(float64(node.LeftHeight()), float64(node.RightHeight())) + 1)
+	pivot.Height = int(math.Max(float64(pivot.LeftHeight()), float64(pivot.RightHeight())) + 1)
+	return pivot
+}
+
+func (avl *AVLTree) RightLeftRotate(node *AVLNode) *AVLNode {
+	if node == nil || node.RightChild == nil {
+		return node
+	}
+	node.RightChild = avl.rightRotate(node.RightChild)
+	return avl.leftRotate(node)
+}
+
+func (avl *AVLTree) LeftRightRotate(node *AVLNode) *AVLNode {
+	if node == nil || node.LeftChild == nil {
+		return node
+	}
+	node.LeftChild = avl.leftRotate(node.LeftChild)
+	return avl.rightRotate(node)
+}
+
+func (avl *AVLTree) balanced(node *AVLNode) *AVLNode {
+	if node == nil {
+		return node
+	}
+	switch node.BalanceFactor() {
+	case 2:
+		if node.LeftChild != nil && node.LeftChild.BalanceFactor() == -1 {
+			return avl.LeftRightRotate(node)
+		} else {
+			return avl.rightRotate(node)
+		}
+	case -2:
+		if node.RightChild != nil && node.RightChild.BalanceFactor() == 1 {
+			return avl.RightLeftRotate(node)
+		} else {
+			return avl.leftRotate(node)
+		}
+	default:
+		return node
+	}
+}
+
+func (avl *AVLTree) Insert(value Objects.ComparableObject) {
+	avl.Root = avl.insert(avl.Root, value)
+}
+
+func (avl *AVLTree) insert(node *AVLNode, value Objects.ComparableObject) *AVLNode {
+	if node == nil {
+		return NewAVLNode(value)
+	}
+	if value.Compare(node.Value) == Objects.OrderedAscending {
+		node.LeftChild = avl.insert(node.LeftChild, value)
+	} else {
+		node.RightChild = avl.insert(node.RightChild, value)
+	}
+	balancedNode := avl.balanced(node)
+	balancedNode.Height = int(math.Max(float64(balancedNode.LeftHeight()), float64(balancedNode.RightHeight())) + 1)
+	return balancedNode
+}
+
+func (avl *AVLTree) String() string {
+	if avl.Root == nil {
+		return "empty tree"
+	}
+	return fmt.Sprint(avl.Root)
+}
+
+func (avl *AVLTree) Contains(value Objects.ComparableObject) bool {
+	current := avl.Root
+	for current != nil {
+		if current.Value.IsEqualTo(value) {
+			return true
+		}
+		if value.Compare(current.Value) == Objects.OrderedAscending {
+			current = current.LeftChild
+		} else {
+			current = current.RightChild
+		}
+	}
+	return false
+}
+
+func (avl *AVLTree) Remove(value Objects.ComparableObject) {
+	avl.Root = avl.remove(avl.Root, value)
+}
+
+func (avl *AVLTree) remove(node *AVLNode, value Objects.ComparableObject) *AVLNode {
+	if node == nil {
+		return nil
+	}
+	if value.IsEqualTo(node.Value) {
+		if node.LeftChild == nil && node.RightChild == nil {
+			return nil
+		}
+		if node.LeftChild == nil {
+			return node.RightChild
+		}
+		if node.RightChild == nil {
+			return node.LeftChild
+		}
+		node.Value = node.RightChild.Min().Value
+		node.RightChild = avl.remove(node.RightChild, node.Value)
+	} else if value.Compare(node.Value) == Objects.OrderedAscending {
+		node.LeftChild = avl.remove(node.LeftChild, value)
+	} else {
+		node.RightChild = avl.remove(node.RightChild, value)
+	}
+	balancedNode := avl.balanced(node)
+	balancedNode.Height = int(math.Max(float64(balancedNode.LeftHeight()), float64(balancedNode.RightHeight())) + 1)
+	return balancedNode
 }
