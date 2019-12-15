@@ -17,17 +17,17 @@ func (bst *BinarySearchTree) String() string {
 }
 
 func (bst *BinarySearchTree) Insert(value Objects.ComparableObject) {
-	bst.Root = insert(bst.Root, value)
+	bst.Root = bst.insert(bst.Root, value)
 }
 
-func insert(node *BinaryTreeNode, value Objects.ComparableObject) *BinaryTreeNode {
+func (bst *BinarySearchTree) insert(node *BinaryTreeNode, value Objects.ComparableObject) *BinaryTreeNode {
 	if node == nil {
 		return NewBinaryNode(value)
 	}
 	if value.Compare(node.Value) == Objects.OrderedAscending {
-		node.LeftChild = insert(node.LeftChild, value)
+		node.LeftChild = bst.insert(node.LeftChild, value)
 	} else {
-		node.RightChild = insert(node.RightChild, value)
+		node.RightChild = bst.insert(node.RightChild, value)
 	}
 	return node
 }
@@ -48,10 +48,10 @@ func (bst *BinarySearchTree) Contains(value Objects.ComparableObject) (found boo
 }
 
 func (bst *BinarySearchTree) Remove(value Objects.ComparableObject) {
-	bst.Root = remove(bst.Root, value)
+	bst.Root = bst.remove(bst.Root, value)
 }
 
-func remove(node *BinaryTreeNode, value Objects.ComparableObject) *BinaryTreeNode {
+func (bst *BinarySearchTree) remove(node *BinaryTreeNode, value Objects.ComparableObject) *BinaryTreeNode {
 	if node == nil {
 		return nil
 	}
@@ -66,11 +66,11 @@ func remove(node *BinaryTreeNode, value Objects.ComparableObject) *BinaryTreeNod
 			return node.LeftChild
 		}
 		node.Value = node.RightChild.min().Value
-		node.RightChild = remove(node.RightChild, node.Value)
+		node.RightChild = bst.remove(node.RightChild, node.Value)
 	} else if value.Compare(node.Value) == Objects.OrderedAscending {
-		node.LeftChild = remove(node.LeftChild, value)
+		node.LeftChild = bst.remove(node.LeftChild, value)
 	} else {
-		node.RightChild = remove(node.RightChild, value)
+		node.RightChild = bst.remove(node.RightChild, value)
 	}
 	return node
 }
@@ -80,14 +80,14 @@ func (bst *BinarySearchTree) IsEqualTo(tree interface{}) bool {
 	if !ok {
 		return false
 	}
-	return isEqualTo(bst.Root, rhs.Root)
+	return bst.isEqualTo(bst.Root, rhs.Root)
 }
 
-func isEqualTo(node1 *BinaryTreeNode, node2 *BinaryTreeNode) bool {
+func (bst *BinarySearchTree) isEqualTo(node1 *BinaryTreeNode, node2 *BinaryTreeNode) bool {
 	if node1 == nil || node2 == nil {
 		return node1 == nil && node2 == nil
 	}
 	return node1.Value.IsEqualTo(node2.Value) &&
-		isEqualTo(node1.LeftChild, node2.LeftChild) &&
-		isEqualTo(node1.RightChild, node2.RightChild)
+		bst.isEqualTo(node1.LeftChild, node2.LeftChild) &&
+		bst.isEqualTo(node1.RightChild, node2.RightChild)
 }
