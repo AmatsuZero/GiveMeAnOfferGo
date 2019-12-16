@@ -35,3 +35,7 @@ type EquatableObject interface {
 	Equatable
 	ObjectProtocol
 }
+
+type Hashable interface {
+	HashValue() uint32
+}

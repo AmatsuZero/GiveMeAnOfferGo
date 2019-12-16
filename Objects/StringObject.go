@@ -2,6 +2,7 @@ package Objects
 
 import (
 	"fmt"
+	"hash/fnv"
 	"strings"
 )
 
@@ -63,4 +64,14 @@ func (s *StringObject) IsEqualTo(obj interface{}) bool {
 
 func (s *StringObject) IsNil() bool {
 	return s.GoString == nil
+}
+
+func (s *StringObject) HashValue() uint32 {
+	if s.GoString == nil {
+		return 0
+	}
+	str := *s.GoString
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(str))
+	return h.Sum32()
 }
