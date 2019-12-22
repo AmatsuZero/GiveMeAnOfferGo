@@ -66,6 +66,9 @@ func (number *NumberObject) Compare(obj interface{}) CompareResult {
 	if !ok {
 		return InvalidResult
 	}
+	if object == number {
+		return OrderedSame
+	}
 	lhs := number.FloatValue()
 	rhs := object.FloatValue()
 	if lhs < rhs {

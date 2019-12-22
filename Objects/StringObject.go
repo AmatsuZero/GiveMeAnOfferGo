@@ -35,6 +35,9 @@ func (s *StringObject) Compare(obj interface{}) CompareResult {
 	if !ok {
 		return InvalidResult
 	}
+	if s == object {
+		return OrderedSame
+	}
 	if s.GoString == nil && object.GoString == nil {
 		return OrderedSame
 	} else if s.GoString == nil || object.GoString == nil {

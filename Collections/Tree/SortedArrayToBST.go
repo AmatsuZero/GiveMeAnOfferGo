@@ -1,4 +1,6 @@
-package tree
+package Tree
+
+import "GiveMeAnOfferGo/Objects"
 
 /*
 将一个按照升序排列的有序数组，转换为一棵高度平衡二叉搜索树。
@@ -18,18 +20,18 @@ package tree
  -10  5
 */
 
-func SortedArrayToBST(nums []int) (root *TreeNode) {
+func SortedArrayToBST(nums []int) (root *BinaryTreeNode) {
 	return sortedArrayToBST(nums, 0, len(nums)-1)
 }
 
-func sortedArrayToBST(arr []int, start int, end int) (node *TreeNode) {
+func sortedArrayToBST(arr []int, start int, end int) (node *BinaryTreeNode) {
 	if start > end {
 		return
 	}
 
 	mid := start + (end-start)/2
-	node = &TreeNode{Val: arr[mid]}
-	node.Left = sortedArrayToBST(arr, start, mid-1)
-	node.Right = sortedArrayToBST(arr, mid+1, end)
+	node = &BinaryTreeNode{Value: Objects.NewNumberWithInt(arr[mid])}
+	node.LeftChild = sortedArrayToBST(arr, start, mid-1)
+	node.RightChild = sortedArrayToBST(arr, mid+1, end)
 	return
 }
