@@ -2,11 +2,13 @@ package tree
 
 import (
 	"GiveMeAnOfferGo/Collections/Tree"
+	"GiveMeAnOfferGo/test/Utils"
 	"fmt"
 	"testing"
 )
 
 func TestInsertionsInSequence(t *testing.T) {
+	getInt := Utils.GetInt
 	tree := new(Tree.AVLTree)
 	for i := 0; i < 15; i++ {
 		tree.Insert(getInt(i))
@@ -15,6 +17,7 @@ func TestInsertionsInSequence(t *testing.T) {
 }
 
 func TestRemoveAValue(t *testing.T) {
+	getInt := Utils.GetInt
 	tree := new(Tree.AVLTree)
 	tree.Insert(getInt(15))
 	tree.Insert(getInt(10))

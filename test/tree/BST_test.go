@@ -2,11 +2,13 @@ package tree
 
 import (
 	"GiveMeAnOfferGo/Collections/Tree"
+	"GiveMeAnOfferGo/test/Utils"
 	"fmt"
 	"testing"
 )
 
 func TestBST(t *testing.T) {
+	getInt := Utils.GetInt
 	bst := new(Tree.BinarySearchTree)
 	for i := 0; i < 5; i++ {
 		bst.Insert(getInt(i))
@@ -15,6 +17,7 @@ func TestBST(t *testing.T) {
 }
 
 func TestBSTContains(t *testing.T) {
+	getInt := Utils.GetInt
 	tree := makeBST()
 	if tree.Contains(getInt(5)) {
 		t.Log("Found 5")
@@ -24,6 +27,7 @@ func TestBSTContains(t *testing.T) {
 }
 
 func TestRemoveBSTNode(t *testing.T) {
+	getInt := Utils.GetInt
 	tree := makeBST()
 	fmt.Println("Tree Before removal:")
 	fmt.Println(tree)
@@ -33,6 +37,7 @@ func TestRemoveBSTNode(t *testing.T) {
 }
 
 func makeBST() *Tree.BinarySearchTree {
+	getInt := Utils.GetInt
 	bst := new(Tree.BinarySearchTree)
 	bst.Insert(getInt(3))
 	bst.Insert(getInt(1))
@@ -51,6 +56,7 @@ func TestIsBST(t *testing.T) {
 }
 
 func TestIsBSTEqual(t *testing.T) {
+	getInt := Utils.GetInt
 	bst := new(Tree.BinarySearchTree)
 	bst.Insert(getInt(3))
 	bst.Insert(getInt(1))

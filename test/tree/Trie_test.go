@@ -2,10 +2,12 @@ package tree
 
 import (
 	"GiveMeAnOfferGo/Collections/Tree"
+	"GiveMeAnOfferGo/test/Utils"
 	"testing"
 )
 
 func TestContains(t *testing.T) {
+	getString := Utils.GetString
 	trie := Tree.NewTrie()
 	trie.Insert(getString("cute"))
 	if trie.Contains(getString("cute")) {
@@ -14,6 +16,7 @@ func TestContains(t *testing.T) {
 }
 
 func TestRemove(t *testing.T) {
+	getString := Utils.GetString
 	trie := Tree.NewTrie()
 	trie.Insert(getString("cut"))
 	trie.Insert(getString("cute"))

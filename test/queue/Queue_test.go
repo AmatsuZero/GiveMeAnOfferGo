@@ -3,6 +3,7 @@ package queue
 import (
 	"GiveMeAnOfferGo/Collections"
 	"GiveMeAnOfferGo/Objects"
+	"GiveMeAnOfferGo/test/Utils"
 	"fmt"
 	"testing"
 )
@@ -60,6 +61,7 @@ func TestQueueStack(t *testing.T) {
 }
 
 func TestReveredQueueArray(t *testing.T) {
+	getInt := Utils.GetInt
 	queue := Collections.NewQueueArray()
 	queue.Enqueue(getInt(1))
 	queue.Enqueue(getInt(21))

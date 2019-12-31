@@ -3,11 +3,13 @@ package tree
 import (
 	"GiveMeAnOfferGo/Collections/Tree"
 	"GiveMeAnOfferGo/Objects"
+	"GiveMeAnOfferGo/test/Utils"
 	"fmt"
 	"testing"
 )
 
 func TestCreateATree(t *testing.T) {
+	getString := Utils.GetString
 	beverages := Tree.NewTreeNode(getString("Beverages"))
 	hot := Tree.NewTreeNode(getString("hot"))
 	cold := Tree.NewTreeNode(getString("cold"))
@@ -23,6 +25,7 @@ func TestDFSForEach(t *testing.T) {
 }
 
 func makeTree() *Tree.Node {
+	getString := Utils.GetString
 	beverages := Tree.NewTreeNode(getString("Beverages"))
 	hot := Tree.NewTreeNode(getString("hot"))
 	cold := Tree.NewTreeNode(getString("cold"))
@@ -64,6 +67,7 @@ func TestLevelOrderTraverse(t *testing.T) {
 }
 
 func TestSearchNode(t *testing.T) {
+	getString := Utils.GetString
 	tree := makeTree()
 	node := tree.Search(getString("ginger ale"))
 	fmt.Printf("Find node: \n%v\n", node)
@@ -108,15 +112,8 @@ func TestHeightOfTree(t *testing.T) {
 	}
 }
 
-func getString(str string) *Objects.StringObject {
-	return &Objects.StringObject{GoString: &str}
-}
-
-func getInt(num int) *Objects.NumberObject {
-	return Objects.NewNumberWithInt(num)
-}
-
 func makeBinaryTree() *Tree.BinaryTreeNode {
+	getInt := Utils.GetInt
 	zero := Tree.NewBinaryNode(getInt(0))
 	one := Tree.NewBinaryNode(getInt(1))
 	five := Tree.NewBinaryNode(getInt(5))

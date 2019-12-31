@@ -20,7 +20,7 @@ func NewHeap(sort func(obj1 Objects.ComparableObject, obj2 Objects.ComparableObj
 	}
 	if !heap.IsEmpty() {
 		for i := heap.Count()/2 - 1; i >= 0; i-- {
-			heap.siftDown(i)
+			heap.siftDown(i, len(elements))
 		}
 	}
 	return heap
@@ -59,25 +59,25 @@ func (heap *Heap) Remove() (popped Objects.ComparableObject) {
 	}
 	heap.elements[0], heap.elements[heap.Count()-1] = heap.elements[heap.Count()-1], heap.elements[0]
 	defer func() {
-		heap.siftDown(0)
+		heap.siftDown(0, heap.Count())
 	}()
 
 	popped, heap.elements = heap.elements[len(heap.elements)-1], heap.elements[:len(heap.elements)-1]
 	return
 }
 
-func (heap *Heap) siftDown(fromIndex int) {
+func (heap *Heap) siftDown(fromIndex int, size int) {
 	parent := fromIndex
 	for {
 		left := heap.LeftChildIndex(parent)
 		right := heap.RightChildIndex(parent)
 		candidate := parent
 
-		if left < heap.Count() && heap.sort(heap.elements[left], heap.elements[candidate]) {
+		if left < size && heap.sort(heap.elements[left], heap.elements[candidate]) {
 			candidate = left
 		}
 
-		if right < heap.Count() && heap.sort(heap.elements[right], heap.elements[candidate]) {
+		if right < size && heap.sort(heap.elements[right], heap.elements[candidate]) {
 			candidate = right
 		}
 
@@ -105,7 +105,7 @@ func (heap *Heap) RemoveAt(index int) (last Objects.ComparableObject) {
 	} else {
 		heap.elements[index], heap.elements[heap.Count()-1] = heap.elements[heap.Count()-1], heap.elements[index]
 		defer func() {
-			heap.siftDown(index)
+			heap.siftDown(index, heap.Count())
 			heap.siftUp(index)
 		}()
 		last, heap.elements = heap.elements[len(heap.elements)-1], heap.elements[:len(heap.elements)-1]
@@ -156,4 +156,16 @@ func (heap *Heap) String() string {
 		str += fmt.Sprintln(element)
 	}
 	return str
+}
+
+func (heap *Heap) Sorted() []Objects.ComparableObject {
+	if heap.IsEmpty() {
+		return heap.elements
+	}
+	newHeap := NewHeap(heap.sort, heap.elements)
+	for index := len(heap.elements) - 1; index >= 0; index-- {
+		newHeap.elements[0], newHeap.elements[index] = newHeap.elements[index], newHeap.elements[0]
+		newHeap.siftDown(0, index)
+	}
+	return newHeap.elements
 }

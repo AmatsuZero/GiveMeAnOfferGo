@@ -3,11 +3,13 @@ package tree
 import (
 	"GiveMeAnOfferGo/Collections"
 	"GiveMeAnOfferGo/Objects"
+	"GiveMeAnOfferGo/test/Utils"
 	"fmt"
 	"testing"
 )
 
 func TestBuildHeap(t *testing.T) {
+	getInt := Utils.GetInt
 	input := []Objects.ComparableObject{
 		getInt(1),
 		getInt(12),
