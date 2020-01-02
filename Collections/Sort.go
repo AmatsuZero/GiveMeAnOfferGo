@@ -208,3 +208,63 @@ func QuickSortHoare(array *[]Objects.Comparable, low int, high int) {
 		QuickSortHoare(array, p+1, high)
 	}
 }
+
+func MedianOfThree(array *[]Objects.Comparable, low int, high int) int {
+	a := *array
+	center := (low + high) / 2
+	if a[low].Compare(a[center]) == Objects.OrderedDescending {
+		a[low], a[center] = a[center], a[low]
+	}
+
+	if a[low].Compare(a[high]) == Objects.OrderedDescending {
+		a[low], a[high] = a[high], a[low]
+	}
+
+	if a[center].Compare(a[high]) == Objects.OrderedDescending {
+		a[center], a[high] = a[high], a[center]
+	}
+
+	return center
+}
+
+func QuickSortMedian(array *[]Objects.Comparable, low int, high int) {
+	a := *array
+	if low < high {
+		pivotIndex := MedianOfThree(array, low, high)
+		a[pivotIndex], a[high] = a[high], a[pivotIndex]
+		pivot := PartitionLomuto(array, low, high)
+		QuickSortLomuto(array, low, pivot-1)
+		QuickSortLomuto(array, pivot+1, high)
+	}
+}
+
+func PartitionDutchFlag(array *[]Objects.Comparable, low int, high int, pivotIndex int) (smaller int, larger int) {
+	a := *array
+	pivot := a[pivotIndex]
+	smaller = low
+	larger = high
+	equal := low
+	for equal <= larger {
+		ret := a[equal].Compare(pivot)
+		if ret == Objects.OrderedAscending {
+			a[smaller], a[equal] = a[equal], a[smaller]
+			smaller += 1
+			equal += 1
+		} else if ret == Objects.OrderedSame {
+			equal += 1
+		} else {
+			a[equal], a[larger] = a[larger], a[equal]
+			larger -= 1
+		}
+	}
+
+	return
+}
+
+func QuickSortDutchFlag(array *[]Objects.Comparable, low int, high int) {
+	if low < high {
+		middleFirst, middleLast := PartitionDutchFlag(array, low, high, high)
+		QuickSortDutchFlag(array, low, middleFirst-1)
+		QuickSortDutchFlag(array, middleLast+1, high)
+	}
+}

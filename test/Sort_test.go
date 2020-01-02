@@ -126,3 +126,43 @@ func TestQuickSortHoare(t *testing.T) {
 	Collections.QuickSortHoare(&array, 0, len(array)-1)
 	fmt.Println(array)
 }
+
+func TestQuickSortMedian(t *testing.T) {
+	array := []Objects.Comparable{
+		Utils.GetInt(12),
+		Utils.GetInt(0),
+		Utils.GetInt(3),
+		Utils.GetInt(9),
+		Utils.GetInt(2),
+		Utils.GetInt(21),
+		Utils.GetInt(18),
+		Utils.GetInt(27),
+		Utils.GetInt(1),
+		Utils.GetInt(5),
+		Utils.GetInt(8),
+		Utils.GetInt(-1),
+		Utils.GetInt(8),
+	}
+	Collections.QuickSortMedian(&array, 0, len(array)-1)
+	t.Log(array)
+}
+
+func TestQucikSortDutchFlag(t *testing.T) {
+	array := []Objects.Comparable{
+		Utils.GetInt(12),
+		Utils.GetInt(0),
+		Utils.GetInt(3),
+		Utils.GetInt(9),
+		Utils.GetInt(2),
+		Utils.GetInt(21),
+		Utils.GetInt(18),
+		Utils.GetInt(27),
+		Utils.GetInt(1),
+		Utils.GetInt(5),
+		Utils.GetInt(8),
+		Utils.GetInt(-1),
+		Utils.GetInt(8),
+	}
+	Collections.QuickSortDutchFlag(&array, 0, len(array)-1)
+	t.Log(array)
+}
