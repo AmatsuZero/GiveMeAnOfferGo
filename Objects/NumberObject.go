@@ -62,12 +62,17 @@ func (number *NumberObject) FloatValue() float64 {
 }
 
 func (number *NumberObject) Compare(obj interface{}) CompareResult {
-	object, ok := obj.(*NumberObject)
-	if !ok {
-		return InvalidResult
-	}
-	if object == number {
+	if obj == number {
 		return OrderedSame
+	}
+	object, ok := obj.(NumberObject)
+	if !ok {
+		tmp, ok := obj.(*NumberObject)
+		if ok {
+			object = *tmp
+		} else {
+			return InvalidResult
+		}
 	}
 	lhs := number.FloatValue()
 	rhs := object.FloatValue()

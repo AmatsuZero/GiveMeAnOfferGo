@@ -31,12 +31,17 @@ func (s *StringObject) String() string {
 }
 
 func (s *StringObject) Compare(obj interface{}) CompareResult {
-	object, ok := obj.(*StringObject)
-	if !ok {
-		return InvalidResult
-	}
-	if s == object {
+	if s == obj {
 		return OrderedSame
+	}
+	object, ok := obj.(StringObject)
+	if !ok {
+		tmp, ok := obj.(*StringObject)
+		if ok {
+			object = *tmp
+		} else {
+			return InvalidResult
+		}
 	}
 	if s.GoString == nil && object.GoString == nil {
 		return OrderedSame
