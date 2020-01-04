@@ -208,6 +208,9 @@ func (qs *QueueStack) Enqueue(element Objects.ObjectProtocol) bool {
 }
 
 func (qs *QueueStack) Dequeue() (popped Objects.ObjectProtocol) {
+	if qs.Length() == 0 {
+		return nil
+	}
 	if len(qs.leftStack) == 0 {
 		qs.leftStack = make([]Objects.ObjectProtocol, 0)
 		for i := len(qs.rightStack) - 1; i >= 0; i-- {

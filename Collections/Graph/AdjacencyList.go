@@ -1,6 +1,7 @@
 package Graph
 
 import (
+	"GiveMeAnOfferGo/Collections"
 	"GiveMeAnOfferGo/Objects"
 	"fmt"
 )
@@ -71,6 +72,28 @@ func (adjacencyList *AdjacencyList) String() (result string) {
 			}
 		}
 		result += fmt.Sprintf("%v ---> [ %v ]\n", vertex, edgeString)
+	}
+	return
+}
+
+func (adjacencyList *AdjacencyList) BreadthFirstSearch(source Vertex) (visited []Vertex) {
+	queue := Collections.NewQueueStack()
+	enqueued := map[Vertex]bool{}
+
+	queue.Enqueue(&source)
+	enqueued[source] = true
+	vertex := queue.Dequeue()
+	for vertex != nil {
+		obj := vertex.(*Vertex)
+		visited = append(visited, *obj)
+		for _, edge := range adjacencyList.Edges(*obj) {
+			_, ok := enqueued[edge.Destination]
+			if !ok {
+				queue.Enqueue(&edge.Destination)
+				enqueued[edge.Destination] = true
+			}
+		}
+		vertex = queue.Dequeue()
 	}
 	return
 }

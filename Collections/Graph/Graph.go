@@ -17,6 +17,10 @@ type Vertex struct {
 	Data  Objects.EquatableObject
 }
 
+func (vertex *Vertex) IsNil() bool {
+	return vertex.Data == nil
+}
+
 func (vertex *Vertex) IsEqualTo(obj interface{}) bool {
 	if obj == nil {
 		return false

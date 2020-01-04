@@ -1,6 +1,7 @@
 package Graph
 
 import (
+	"GiveMeAnOfferGo/Collections"
 	"GiveMeAnOfferGo/Objects"
 	"fmt"
 	"strings"
@@ -92,4 +93,26 @@ func (matrix *AdjacencyMatrix) String() string {
 	}
 	edgeDesc := strings.Join(grid, "\n")
 	return fmt.Sprintf("%v\n\n%v", verticesDesc, edgeDesc)
+}
+
+func (matrix *AdjacencyMatrix) BreadthFirstSearch(source Vertex) (visited []Vertex) {
+	queue := Collections.NewQueueStack()
+	enqueued := map[Vertex]bool{}
+
+	queue.Enqueue(&source)
+	enqueued[source] = true
+	vertex := queue.Dequeue()
+	for vertex != nil {
+		obj := vertex.(*Vertex)
+		visited = append(visited, *obj)
+		for _, edge := range matrix.Edges(*obj) {
+			_, ok := enqueued[edge.Destination]
+			if !ok {
+				queue.Enqueue(&edge.Destination)
+				enqueued[edge.Destination] = true
+			}
+		}
+		vertex = queue.Dequeue()
+	}
+	return
 }
