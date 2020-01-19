@@ -6,7 +6,11 @@ import (
 )
 
 func TestGetPermutation(t *testing.T) {
-	if array.GetPermutation(3,3) != "213" {
+	if array.GetPermutation(3, 3) != "213" {
+		t.Fail()
+	}
+
+	if array.GetPermutation(4, 9) != "2314" {
 		t.Fail()
 	}
 }
