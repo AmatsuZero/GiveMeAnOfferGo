@@ -1,7 +1,7 @@
 package depth_first_search
 
 import (
-	dfs "GiveMeAnOfferGo/depth-first-search"
+	dfs "github.com/AmatsuZero/GiveMeAnOfferGo/depth-first-search"
 	"testing"
 )
 

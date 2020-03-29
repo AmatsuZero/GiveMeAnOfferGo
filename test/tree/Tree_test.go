@@ -1,10 +1,10 @@
 package tree
 
 import (
-	"GiveMeAnOfferGo/Collections/Tree"
-	"GiveMeAnOfferGo/Objects"
-	"GiveMeAnOfferGo/test/Utils"
 	"fmt"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/Collections/Tree"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/Objects"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/test/Utils"
 	"testing"
 )
 

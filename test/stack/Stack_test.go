@@ -1,9 +1,9 @@
 package stack
 
 import (
-	"GiveMeAnOfferGo/Collections"
-	"GiveMeAnOfferGo/Objects"
 	"fmt"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/Collections"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/Objects"
 	"testing"
 )
 
@@ -19,11 +19,14 @@ func TestPop(t *testing.T) {
 }
 
 func TestIsBalancedParentheses(t *testing.T) {
-	obj := &Objects.StringObject{GoString: "h((e))llo(world)()"}
+	str := "h((e))llo(world)()"
+	obj := &Objects.StringObject{GoString: &str}
 	record := new(Collections.Stack)
 
-	left := getString("(")
-	right := getString(")")
+	start := "("
+	left := getString(&start)
+	end := ")"
+	right := getString(&end)
 
 	for _, s := range obj.ToObjectSlice() {
 		if s.IsEqualTo(left) {
@@ -37,7 +40,8 @@ func TestIsBalancedParentheses(t *testing.T) {
 		t.Fail()
 	}
 
-	obj = &Objects.StringObject{GoString: "(hello world"}
+	str2 := "(hello world"
+	obj = &Objects.StringObject{GoString: &str2}
 	record.RemoveAll()
 	for _, s := range obj.ToObjectSlice() {
 		if s.IsEqualTo(left) {
@@ -62,6 +66,6 @@ func getInt(i int) *Objects.NumberObject {
 	return Objects.NewNumberWithInt(i)
 }
 
-func getString(s string) *Objects.StringObject {
+func getString(s *string) *Objects.StringObject {
 	return &Objects.StringObject{GoString: s}
 }

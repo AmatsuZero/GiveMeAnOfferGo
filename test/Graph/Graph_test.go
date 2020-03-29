@@ -1,9 +1,9 @@
 package Graph
 
 import (
-	"GiveMeAnOfferGo/Collections/Graph"
-	"GiveMeAnOfferGo/test/Utils"
 	"fmt"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/Collections/Graph"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/test/Utils"
 	"testing"
 )
 

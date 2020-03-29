@@ -2,8 +2,8 @@
 package linkedlist
 
 import (
-	"GiveMeAnOfferGo/Collections"
-	"GiveMeAnOfferGo/Objects"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/Collections"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/Objects"
 )
 
 func MergeTwoLists(l1 *Collections.Node, l2 *Collections.Node) (head *Collections.Node) {

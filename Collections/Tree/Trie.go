@@ -1,6 +1,6 @@
 package Tree
 
-import "GiveMeAnOfferGo/Objects"
+import "github.com/AmatsuZero/GiveMeAnOfferGo/Objects"
 
 type TrieNode struct {
 	Key           Objects.Hashable

@@ -1,9 +1,9 @@
 package queue
 
 import (
-	"GiveMeAnOfferGo/Collections"
-	"GiveMeAnOfferGo/test/Utils"
 	"fmt"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/Collections"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/test/Utils"
 	"testing"
 )
 

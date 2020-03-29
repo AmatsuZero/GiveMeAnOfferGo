@@ -1,8 +1,8 @@
 package tree
 
 import (
-	"GiveMeAnOfferGo/Collections/Tree"
-	"GiveMeAnOfferGo/test/Utils"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/Collections/Tree"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/test/Utils"
 	"testing"
 )
 

@@ -1,6 +1,6 @@
 package Collections
 
-import "GiveMeAnOfferGo/Objects"
+import "github.com/AmatsuZero/GiveMeAnOfferGo/Objects"
 
 type PriorityQueue struct {
 	heap *Heap

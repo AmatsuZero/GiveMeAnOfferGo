@@ -1,7 +1,7 @@
 package stack
 
 import (
-	"GiveMeAnOfferGo/datastructure/stack"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/datastructure/stack"
 	"testing"
 )
 

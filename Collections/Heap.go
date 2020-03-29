@@ -1,8 +1,8 @@
 package Collections
 
 import (
-	"GiveMeAnOfferGo/Objects"
 	"fmt"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/Objects"
 )
 
 type Heap struct {

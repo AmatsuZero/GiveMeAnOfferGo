@@ -1,8 +1,8 @@
 package Graph
 
 import (
-	"GiveMeAnOfferGo/Objects"
 	"fmt"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/Objects"
 )
 
 type EdgeType int

@@ -1,7 +1,7 @@
 package math
 
 import (
-	"GiveMeAnOfferGo/math"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/math"
 	"testing"
 )
 

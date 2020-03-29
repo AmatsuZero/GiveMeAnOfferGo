@@ -1,8 +1,8 @@
 package Tree
 
 import (
-	"GiveMeAnOfferGo/Objects"
 	"fmt"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/Objects"
 	"math"
 )
 

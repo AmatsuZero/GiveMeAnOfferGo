@@ -1,9 +1,9 @@
 package Tree
 
 import (
-	"GiveMeAnOfferGo/Collections"
-	"GiveMeAnOfferGo/Objects"
 	"fmt"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/Collections"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/Objects"
 )
 
 type Node struct {

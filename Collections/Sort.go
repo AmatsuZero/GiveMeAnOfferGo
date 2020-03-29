@@ -1,7 +1,7 @@
 package Collections
 
 import (
-	"GiveMeAnOfferGo/Objects"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/Objects"
 )
 
 func BubbleSort(collections *[]Objects.Comparable) {

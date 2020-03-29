@@ -1,7 +1,7 @@
 package string
 
 import (
-	str "GiveMeAnOfferGo/string"
+	str "github.com/AmatsuZero/GiveMeAnOfferGo/string"
 	"testing"
 )
 

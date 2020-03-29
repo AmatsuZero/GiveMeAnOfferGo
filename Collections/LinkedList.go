@@ -1,8 +1,8 @@
 package Collections
 
 import (
-	"GiveMeAnOfferGo/Objects"
 	"fmt"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/Objects"
 )
 
 type Node struct {
@@ -22,6 +22,10 @@ func (node *Node) String() string {
 		return fmt.Sprint(node.Value)
 	}
 	return fmt.Sprintf("%v ComparableObject> %v ", node.Value, node.Next)
+}
+
+func (node *Node) IsEqual(target interface{}) bool {
+	return node.Value.Compare(target) == Objects.OrderedSame
 }
 
 type LinkedList struct {

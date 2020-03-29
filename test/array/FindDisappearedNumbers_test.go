@@ -1,7 +1,7 @@
 package array
 
 import (
-	"GiveMeAnOfferGo/array"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/array"
 	"reflect"
 	"testing"
 )

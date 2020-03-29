@@ -1,10 +1,10 @@
 package test
 
 import (
-	"GiveMeAnOfferGo/Collections"
-	"GiveMeAnOfferGo/Objects"
-	"GiveMeAnOfferGo/test/Utils"
 	"fmt"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/Collections"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/Objects"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/test/Utils"
 	"testing"
 )
 

@@ -1,7 +1,7 @@
 package dynamicprogramming
 
 import (
-	"GiveMeAnOfferGo/dynamicprogramming"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/dynamicprogramming"
 	"testing"
 )
 

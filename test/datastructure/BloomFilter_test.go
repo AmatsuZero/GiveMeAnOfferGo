@@ -1,7 +1,7 @@
 package datastructure
 
 import (
-	"GiveMeAnOfferGo/Collections"
+	"github.com/AmatsuZero/GiveMeAnOfferGo/Collections"
 	"testing"
 )
 
