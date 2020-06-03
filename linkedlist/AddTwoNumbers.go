@@ -1,5 +1,9 @@
 package linkedlist
 
+import (
+	. "github.com/AmatsuZero/GiveMeAnOfferGo/剑指Offer"
+)
+
 /*
 给出两个 非空 的链表用来表示两个非负的整数。其中，它们各自的位数是按照 逆序 的方式存储的，并且它们的每个节点只能存储 一位 数字。
 
@@ -13,11 +17,6 @@ package linkedlist
 输出：7 -> 0 -> 8
 原因：342 + 465 = 807
 */
-
-type ListNode struct {
-	Val  int
-	Next *ListNode
-}
 
 func AddTowNumbers(l1 *ListNode, l2 *ListNode) *ListNode {
 	dummyHead := &ListNode{Val: 0}
