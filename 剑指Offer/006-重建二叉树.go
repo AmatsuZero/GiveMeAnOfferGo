@@ -39,10 +39,10 @@ func Construct(preorder []int, inorder []int) (root *BinaryTreeNode) {
 	leftPreorderEnd := startPreorder + leftLength
 
 	if leftLength > 0 { // 构建左子树
-		root.Left = Construct(preorder[1:leftPreorderEnd], inorder[startInorder:rootInOrder])
+		root.Left = Construct(preorder[1:leftPreorderEnd+1], inorder[startInorder:rootInOrder])
 	}
 	if leftLength < endPreorder-startPreorder { // 构建右子树
-		root.Right = Construct(preorder[leftPreorderEnd+1:endPreorder], inorder[rootInOrder+1:endInorder+1])
+		root.Right = Construct(preorder[leftPreorderEnd+1:endPreorder+1], inorder[rootInOrder+1:endInorder+1])
 	}
 
 	return
