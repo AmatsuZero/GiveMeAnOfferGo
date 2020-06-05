@@ -68,3 +68,14 @@ func RemoveNode(pHead **ListNode, value int) (pToBeDeleted *ListNode) {
 func (node *ListNode) RemoveNode(value int) *ListNode {
 	return RemoveNode(&node, value)
 }
+
+func (node *ListNode) NodeAt(n uint) *ListNode {
+	head := node
+	for i := uint(0); i < n; i++ {
+		if head.Next == nil {
+			return nil
+		}
+		head = head.Next
+	}
+	return head
+}
