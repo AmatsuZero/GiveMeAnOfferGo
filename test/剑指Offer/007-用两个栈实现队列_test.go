@@ -8,7 +8,7 @@ import (
 )
 
 func TestCQueue(t *testing.T) {
-	queue := 剑指Offer.NewCQueue()
+	queue := &剑指Offer.CQueue{}
 	queue.AppendTail(10)
 	queue.AppendTail(12)
 	queue.AppendTail(13)
@@ -20,7 +20,7 @@ func TestCQueue(t *testing.T) {
 }
 
 func TestCStack(t *testing.T) {
-	stack := 剑指Offer.NewCStack()
+	stack := &剑指Offer.CStack{}
 	stack.Push(10)
 	stack.Push(11)
 	stack.Push(13)

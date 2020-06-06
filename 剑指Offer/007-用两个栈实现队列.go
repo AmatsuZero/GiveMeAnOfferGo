@@ -10,13 +10,6 @@ type CQueue struct {
 	stackR []int
 }
 
-func NewCQueue() *CQueue {
-	return &CQueue{
-		stackL: make([]int, 0),
-		stackR: make([]int, 0),
-	}
-}
-
 func (queue *CQueue) AppendTail(node int) {
 	queue.stackL = append(queue.stackL, node)
 }
@@ -44,13 +37,6 @@ func (queue *CQueue) DeleteHead() (poppedValue int) {
 type CStack struct {
 	queueL []int // 负责入栈
 	queueR []int // 负责出栈
-}
-
-func NewCStack() *CStack {
-	return &CStack{
-		queueL: make([]int, 0),
-		queueR: make([]int, 0),
-	}
 }
 
 func (stack *CStack) Push(value int) {

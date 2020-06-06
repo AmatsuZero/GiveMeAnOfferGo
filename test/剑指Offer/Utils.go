@@ -17,18 +17,7 @@ func RandomIntArray(len int) (output []int) {
 }
 
 func RandomIntList(length int) (pHead *ListNode) {
-	source := RandomIntArray(length)
-	if len(source) == 0 {
-		return
-	}
-	pHead = &ListNode{Val: source[0]}
-	if len(source) == 1 {
-		return
-	}
-	for i := 1; i < len(source); i++ {
-		pHead.AddToTail(source[i])
-	}
-	return
+	return NewListWithArray(RandomIntArray(length))
 }
 
 func RandomInRange(min int, max int) int {

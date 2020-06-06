@@ -69,13 +69,30 @@ func (node *ListNode) RemoveNode(value int) *ListNode {
 	return RemoveNode(&node, value)
 }
 
-func (node *ListNode) NodeAt(n uint) *ListNode {
+func (node *ListNode) NodeAt(n int) *ListNode {
+	if n < 0 {
+		return node.FindKthToTail(uint(-n))
+	}
 	head := node
-	for i := uint(0); i < n; i++ {
+	for i := 0; i < n; i++ {
 		if head.Next == nil {
 			return nil
 		}
 		head = head.Next
 	}
 	return head
+}
+
+func NewListWithArray(source []int) (pHead *ListNode) {
+	if len(source) == 0 {
+		return
+	}
+	pHead = &ListNode{Val: source[0]}
+	if len(source) == 1 {
+		return
+	}
+	for i := 1; i < len(source); i++ {
+		pHead.AddToTail(source[i])
+	}
+	return
 }

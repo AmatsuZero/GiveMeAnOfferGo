@@ -16,7 +16,7 @@ func TestDeleteNode(t *testing.T) {
 
 	// 删除尾节点
 	lhs = rhs
-	toBeDeleted = list.NodeAt(uint(len(rhs) - 1))
+	toBeDeleted = list.NodeAt(len(rhs) - 1)
 	list.DeleteNode(toBeDeleted)
 	rhs = list.IntArray()
 	assert.Equal(t, len(lhs)-len(rhs), 1)
