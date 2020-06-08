@@ -96,3 +96,9 @@ func NewListWithArray(source []int) (pHead *ListNode) {
 	}
 	return
 }
+
+type ComplexListNode struct {
+	Val     int
+	Next    *ComplexListNode
+	Sibling *ComplexListNode
+}
