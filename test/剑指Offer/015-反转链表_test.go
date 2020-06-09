@@ -1,12 +1,13 @@
 package 剑指Offer
 
 import (
+	"github.com/AmatsuZero/GiveMeAnOfferGo/剑指Offer"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestReverseList(t *testing.T) {
-	list := RandomIntList(10)
+	list := 剑指Offer.RandomIntList(10)
 	lhs := list.IntArray()
 	for left, right := 0, len(lhs)-1; left < right; left, right = left+1, right-1 {
 		lhs[left], lhs[right] = lhs[right], lhs[left]
@@ -15,7 +16,7 @@ func TestReverseList(t *testing.T) {
 	rhs := list.IntArray()
 	assert.Equal(t, lhs, rhs)
 
-	list = RandomIntList(1)
+	list = 剑指Offer.RandomIntList(1)
 	assert.NotPanics(t, func() {
 		list = list.Reverse()
 		t.Log(list)

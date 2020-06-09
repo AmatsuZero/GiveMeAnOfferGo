@@ -7,7 +7,7 @@ import (
 )
 
 func TestPrintListReverselyIteratively(t *testing.T) {
-	input := RandomIntList(10)
+	input := 剑指Offer.RandomIntList(10)
 	lhs := input.IntArray()
 	for left, right := 0, len(lhs)-1; left < right; left, right = left+1, right-1 {
 		lhs[left], lhs[right] = lhs[right], lhs[left]

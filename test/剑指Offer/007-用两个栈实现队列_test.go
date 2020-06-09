@@ -31,7 +31,7 @@ func TestCStack(t *testing.T) {
 }
 
 func TestQuickSort(t *testing.T) {
-	source := RandomIntArray(10)
-	QuickSort(&source)
+	source := 剑指Offer.RandomIntArray(10)
+	剑指Offer.QuickSort(&source)
 	assert.True(t, sort.IntsAreSorted(source))
 }

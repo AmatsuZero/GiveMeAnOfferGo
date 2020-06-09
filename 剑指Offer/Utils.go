@@ -1,9 +1,6 @@
 package 剑指Offer
 
-import (
-	. "github.com/AmatsuZero/GiveMeAnOfferGo/剑指Offer"
-	"math/rand"
-)
+import "math/rand"
 
 func RandomIntArray(len int) (output []int) {
 	if len <= 0 {
@@ -21,7 +18,7 @@ func RandomIntList(length int) (pHead *ListNode) {
 }
 
 func RandomInRange(min int, max int) int {
-	if min >= max {
+	if min > max {
 		panic("Check your Input!!!")
 	}
 	return min + rand.Intn(max-min+1) // a ≤ n ≤ b
