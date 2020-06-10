@@ -2,6 +2,10 @@ package 剑指Offer
 
 import "math/rand"
 
+const MaxUint = ^uint(0)
+const MaxInt = int(MaxUint >> 1)
+const MinInt = -MaxInt - 1
+
 func RandomIntArray(len int) (output []int) {
 	if len <= 0 {
 		return
