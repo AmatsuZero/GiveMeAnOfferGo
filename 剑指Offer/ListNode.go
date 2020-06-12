@@ -25,8 +25,10 @@ func AddToTail(pHead **ListNode, value int) {
 	}
 }
 
-func (node *ListNode) AddToTail(value int) {
-	AddToTail(&node, value)
+func (node *ListNode) AddToTail(value ...int) {
+	for _, v := range value {
+		AddToTail(&node, v)
+	}
 }
 
 func (node *ListNode) IntArray() []int {

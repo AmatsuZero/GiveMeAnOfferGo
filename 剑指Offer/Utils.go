@@ -1,6 +1,8 @@
 package 剑指Offer
 
-import "math/rand"
+import (
+	"math/rand"
+)
 
 const MaxUint = ^uint(0)
 const MaxInt = int(MaxUint >> 1)
