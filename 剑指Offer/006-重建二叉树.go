@@ -20,8 +20,8 @@ func Construct(preorder []int, inorder []int) (root *BinaryTreeNode) {
 	if startPreorder == endInorder {
 		if preorder[startPreorder] == inorder[startInorder] {
 			return root
-		} else {
-			panic("Invalid input")
+		} else { // 无效的输入
+			return nil
 		}
 	}
 
@@ -32,7 +32,7 @@ func Construct(preorder []int, inorder []int) (root *BinaryTreeNode) {
 	}
 
 	if rootInOrder == endInorder && inorder[rootInOrder] != rootValue {
-		panic("Invalid input")
+		return nil
 	}
 
 	leftLength := rootInOrder - startInorder
