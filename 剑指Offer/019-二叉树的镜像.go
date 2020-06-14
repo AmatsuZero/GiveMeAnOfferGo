@@ -4,6 +4,9 @@ package 剑指Offer
 请完成一个函数，输入一个二叉树，该函数输出它的镜像
 */
 func (node *BinaryTreeNode) MirrorRecursively() {
+	if node == nil {
+		return
+	}
 	if node.Left == nil && node.Right == nil {
 		return
 	}
@@ -23,6 +26,9 @@ func (node *BinaryTreeNode) MirrorRecursively() {
 这样在下次循环中就能交换它儿子结点的左右子树了。
 */
 func (node *BinaryTreeNode) MirrorIteratively() {
+	if node == nil {
+		return
+	}
 	stack := make([]*BinaryTreeNode, 0)
 	stack = append(stack, node)
 	for len(stack) > 0 {

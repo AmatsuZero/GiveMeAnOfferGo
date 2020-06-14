@@ -6,7 +6,7 @@ package 剑指Offer
 */
 
 func (node *ListNode) FindKthToTail(k uint) *ListNode {
-	if k == 0 { // 从1开始，输入0，没有意义
+	if k == 0 || node == nil { // 从1开始，输入0，没有意义
 		return nil
 	}
 	head := node
@@ -34,7 +34,7 @@ func (node *ListNode) FindKthToTail(k uint) *ListNode {
 如果结点总数是偶数，返回中间两个结点的任意一个
 */
 func (node *ListNode) MidNode() *ListNode {
-	if node.Next == nil {
+	if node == nil || node.Next == nil {
 		return node
 	}
 	// 慢指针一次前进一步
@@ -56,7 +56,7 @@ func (node *ListNode) MidNode() *ListNode {
 是否是环形结构
 */
 func (node *ListNode) IsCircleList() bool {
-	if node.Next == nil {
+	if node == nil || node.Next == nil {
 		return false
 	}
 	// 慢指针一次前进一步

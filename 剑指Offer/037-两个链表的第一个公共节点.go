@@ -1,6 +1,9 @@
 package 剑指Offer
 
 func (node *ListNode) Len() (length int) {
+	if node == nil {
+		return
+	}
 	for head := node; head != nil; head = head.Next {
 		length++
 	}

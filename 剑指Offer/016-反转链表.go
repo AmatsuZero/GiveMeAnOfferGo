@@ -4,6 +4,9 @@ package 剑指Offer
 题目：定义一个函数，输入一个链表的头结点，反转该链表并输出反转后链表的头结点
 */
 func (node *ListNode) Reverse() (reversedHead *ListNode) {
+	if node == nil {
+		return
+	}
 	var prev *ListNode = nil
 	pNode := node
 	for pNode != nil {

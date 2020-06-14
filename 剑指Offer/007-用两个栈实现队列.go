@@ -11,10 +11,16 @@ type CQueue struct {
 }
 
 func (queue *CQueue) AppendTail(node int) {
+	if queue == nil {
+		return
+	}
 	queue.stackL = append(queue.stackL, node)
 }
 
 func (queue *CQueue) DeleteHead() (poppedValue int) {
+	if queue == nil {
+		return
+	}
 	if len(queue.stackR) == 0 {
 		for len(queue.stackL) > 0 {
 			var top int

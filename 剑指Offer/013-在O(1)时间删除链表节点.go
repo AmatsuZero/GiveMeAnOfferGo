@@ -22,5 +22,8 @@ func DeleteNode(pListHead, pToBeDeleted *ListNode) {
 }
 
 func (node *ListNode) DeleteNode(ptr *ListNode) {
+	if node == nil {
+		return
+	}
 	DeleteNode(node, ptr)
 }

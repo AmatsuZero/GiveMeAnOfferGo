@@ -6,6 +6,9 @@ package 剑指Offer
 */
 
 func (node *ComplexListNode) Clone() *ComplexListNode {
+	if node == nil {
+		return nil
+	}
 	node.cloneNodes()
 	node.connectSiblingNodes()
 	return node.reconnectNodes()
@@ -13,6 +16,9 @@ func (node *ComplexListNode) Clone() *ComplexListNode {
 
 // 复制原始链表的任意结点N并创建新结点N'，再把N'链接到N的后面
 func (node *ComplexListNode) cloneNodes() {
+	if node == nil {
+		return
+	}
 	pNode := node
 	for pNode.Next != nil {
 		pCloned := &ComplexListNode{
@@ -26,6 +32,9 @@ func (node *ComplexListNode) cloneNodes() {
 
 // 如果原始链表上的结点N的m_pSibling指向S，则它对应的复制结点N'的m_pSibling指向S的下一结点S'
 func (node *ComplexListNode) connectSiblingNodes() {
+	if node == nil {
+		return
+	}
 	pNode := node
 	for node != nil {
 		pCloned := pNode.Next
@@ -38,6 +47,9 @@ func (node *ComplexListNode) connectSiblingNodes() {
 
 // 把第二步得到的链表拆分成两个链表，奇数位置上的结点组成原始链表，偶数位置上的结点组成复制出来的链表。
 func (node *ComplexListNode) reconnectNodes() *ComplexListNode {
+	if node == nil {
+		return nil
+	}
 	var pClonedHead, pClonedNode *ComplexListNode
 	pNode := node
 	if pNode != nil {

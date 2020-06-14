@@ -10,6 +10,9 @@ type StackWithMin struct {
 }
 
 func (stack *StackWithMin) Push(value int) {
+	if stack == nil {
+		return
+	}
 	stack.dataStack = append(stack.dataStack, value)
 	if len(stack.minStack) == 0 || stack.minStack[len(stack.minStack)-1] > value {
 		stack.minStack = append(stack.minStack, value)
@@ -19,6 +22,9 @@ func (stack *StackWithMin) Push(value int) {
 }
 
 func (stack *StackWithMin) Pop() (popped int) {
+	if stack == nil {
+		return
+	}
 	if len(stack.minStack) == 0 || len(stack.dataStack) == 0 {
 		panic("Stack Is Empty")
 	}
@@ -28,6 +34,9 @@ func (stack *StackWithMin) Pop() (popped int) {
 }
 
 func (stack *StackWithMin) Min() (min int) {
+	if stack == nil {
+		return
+	}
 	if len(stack.minStack) == 0 || len(stack.dataStack) == 0 {
 		panic("Stack Is Empty")
 	}

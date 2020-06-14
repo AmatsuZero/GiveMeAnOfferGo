@@ -6,12 +6,18 @@ package 剑指Offer
 */
 
 func (node *BinaryTreeNode) FindPath(expectedNum int, block func(path []int)) {
+	if node != nil {
+		return
+	}
 	currentSum := 0
 	path := make([]int, 0)
 	node.findPath(expectedNum, &path, &currentSum, block)
 }
 
 func (node *BinaryTreeNode) findPath(expectedNum int, path *[]int, currentSum *int, block func(path []int)) {
+	if node == nil {
+		return
+	}
 	*currentSum += node.Value
 	*path = append(*path, node.Value)
 	// 如果是叶子节点，并且路径上节点的和等于输出的值
@@ -19,12 +25,8 @@ func (node *BinaryTreeNode) findPath(expectedNum int, path *[]int, currentSum *i
 		block(*path)
 	}
 	// 如果不是叶子节点，遍历子节点
-	if node.Left != nil {
-		node.Left.findPath(expectedNum, path, currentSum, block)
-	}
-	if node.Right != nil {
-		node.Right.findPath(expectedNum, path, currentSum, block)
-	}
+	node.Left.findPath(expectedNum, path, currentSum, block)
+	node.Right.findPath(expectedNum, path, currentSum, block)
 	// 返回到父节点之前，在路径上删除当前节点
 	// 并在 currentSum 中减去当前节点的值
 	*currentSum -= node.Value
