@@ -1,9 +1,10 @@
 package 剑指Offer
 
 import (
+	"testing"
+
 	"github.com/AmatsuZero/GiveMeAnOfferGo/剑指Offer"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestGetNumberOfK(t *testing.T) {

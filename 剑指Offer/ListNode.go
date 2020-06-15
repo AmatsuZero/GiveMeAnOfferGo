@@ -5,7 +5,7 @@ type ListNode struct {
 	Next *ListNode
 }
 
-func AddToTail(pHead **ListNode, value int) {
+func AddToTail(pHead **ListNode, value int) *ListNode {
 	pNew := &ListNode{
 		Val:  value,
 		Next: nil,
@@ -23,12 +23,14 @@ func AddToTail(pHead **ListNode, value int) {
 		}
 		pNode.Next = pNew
 	}
+	return pNew
 }
 
-func (node *ListNode) AddToTail(value ...int) {
+func (node *ListNode) AddToTail(value ...int) (newNode *ListNode) {
 	for _, v := range value {
-		AddToTail(&node, v)
+		newNode = AddToTail(&node, v)
 	}
+	return
 }
 
 func (node *ListNode) IntArray() []int {
