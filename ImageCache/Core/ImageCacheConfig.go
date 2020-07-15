@@ -1,5 +1,7 @@
 package Core
 
+import "reflect"
+
 type ImageCacheConfigExpireType int
 
 const (
@@ -14,17 +16,17 @@ const (
 )
 
 type ImageCacheConfig struct {
-	ShouldDisableRemoteBackup            bool
+	ShouldDisableRemoteBackup            bool // 远端同步，对应iCloud
 	ShouldCacheImageInMemory             bool
 	ShouldUseWeakMemoryCache             bool
 	ShouldRemoveExpiredDataWhenAvailable bool
 	DiskCacheReadingOption               DataReadingOption
 	DiskCacheWritingOption               DataWritingOption
 	MaxDiskAge                           float64
-	MaxMemoryCost                        uint64
+	MaxMemoryCount                       uint64
 	DiskCacheExpireType                  ImageCacheConfigExpireType
-	MemoryCache                          interface{}
-	DiskCache                            interface{}
+	MemoryCache                          reflect.Type // 实现 MemoryCache 协议的类型
+	DiskCache                            reflect.Type
 }
 
 const kDefaultCacheMaxDiskAge = 60 * 60 * 24 * 7 // 1 week
@@ -48,10 +50,10 @@ func NewImageCacheConfig() ImageCacheConfig {
 		DiskCacheReadingOption:               0,
 		DiskCacheWritingOption:               WritingAtomic,
 		MaxDiskAge:                           kDefaultCacheMaxDiskAge,
-		MaxMemoryCost:                        0,
+		MaxMemoryCount:                       0, // 表明没有限制
 		DiskCacheExpireType:                  ImageCacheConfigExpireTypeModificationDate,
-		MemoryCache:                          nil,
-		DiskCache:                            nil,
+		MemoryCache:                          reflect.TypeOf((*memoryCache)(nil)).Elem(),
+		DiskCache:                            reflect.TypeOf((*diskCache)(nil)).Elem(),
 	}
 }
 
@@ -64,9 +66,8 @@ func (config ImageCacheConfig) Copy() ImageCacheConfig {
 		DiskCacheReadingOption:               config.DiskCacheReadingOption,
 		DiskCacheWritingOption:               config.DiskCacheWritingOption,
 		MaxDiskAge:                           config.MaxDiskAge,
-		MaxMemoryCost:                        config.MaxMemoryCost,
 		DiskCacheExpireType:                  config.DiskCacheExpireType,
 		MemoryCache:                          config.MemoryCache,
-		DiskCache:                            config.DiskCacheExpireType,
+		DiskCache:                            config.DiskCache,
 	}
 }
