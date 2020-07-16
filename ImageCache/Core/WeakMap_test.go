@@ -1,7 +1,6 @@
-package ImageCache
+package Core
 
 import (
-	"github.com/AmatsuZero/GiveMeAnOfferGo/ImageCache/Core"
 	"github.com/stretchr/testify/assert"
 	"runtime"
 	"testing"
@@ -12,7 +11,7 @@ type Point3D struct {
 }
 
 func TestWeakMapS2W(t *testing.T) {
-	wm := Core.NewWeakMap(Core.WeakMapStrongToWeak)
+	wm := NewWeakMap(WeakMapStrongToWeak)
 	pt := &Point3D{1, 2, 3}
 	key := 1
 	wm.Set(key, pt)

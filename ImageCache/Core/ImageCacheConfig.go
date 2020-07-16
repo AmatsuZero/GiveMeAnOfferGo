@@ -1,6 +1,14 @@
 package Core
 
-import "reflect"
+import (
+	"gopkg.in/djherbis/times.v1"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"reflect"
+	"sort"
+	"time"
+)
 
 type ImageCacheConfigExpireType int
 
@@ -14,6 +22,37 @@ const (
 	// When the image cache is created, modified, renamed, file attribute updated (like permission, xattr)  it will update this value
 	ImageCacheConfigExpireTypeChangeDate
 )
+
+func (expireType ImageCacheConfigExpireType) AccessFilesInDir(dir string) (files []os.FileInfo, err error) {
+	files, err = ioutil.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	// 按照类型，排序
+	sort.Slice(files, func(i, j int) bool {
+		lhs := filepath.Join(dir, files[i].Name())
+		rhs := filepath.Join(dir, files[j].Name())
+		return expireType.getReferenceDate(lhs).Second() > expireType.getReferenceDate(rhs).Second()
+	})
+	return
+}
+
+func (expireType ImageCacheConfigExpireType) getReferenceDate(path string) time.Time {
+	switch expireType {
+	case ImageCacheConfigExpireTypeAccessDate:
+		t, _ := times.Stat(path)
+		return t.AccessTime()
+	case ImageCacheConfigExpireTypeCreationDate:
+		t, _ := times.Stat(path)
+		return t.BirthTime()
+	case ImageCacheConfigExpireTypeChangeDate:
+		t, _ := times.Stat(path)
+		return t.ChangeTime()
+	default:
+		t, _ := times.Stat(path)
+		return t.ChangeTime()
+	}
+}
 
 type ImageCacheConfig struct {
 	ShouldDisableRemoteBackup            bool // 远端同步，对应iCloud
@@ -37,7 +76,7 @@ func init() {
 	defaultImageCache = NewImageCacheConfig()
 }
 
-func DefaultImageCache() ImageCacheConfig {
+func DefaultImageCacheConfig() ImageCacheConfig {
 	return defaultImageCache
 }
 
