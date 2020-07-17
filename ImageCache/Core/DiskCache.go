@@ -6,16 +6,18 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
+	"time"
 )
 
-const kDiskCacheExtendedAttributeName = "com.daubert.imageCache"
+const kDiskCacheExtendedAttributeName = "com.daubert.ImageCache"
 
 type DishCache interface {
 	GetCachePath() string
 	GetCacheConfig() *ImageCacheConfig
 	ContainDataForKey(key string) bool
 	GetDataForKey(key string) []byte
-	SetDataForKey(key string, data []byte)
+	SetDataForKey(key string, data []byte) error
 	GetExtendedDataForKey(key string) []byte
 	SetExtendedDataForKey(key string, data []byte)
 	RemoveDataForKey(key string)
@@ -108,22 +110,23 @@ func (cache *diskCache) GetTotalSize() (size int64) {
 	return
 }
 
-func (cache *diskCache) SetDataForKey(key string, data []byte) {
-	if len(key) == 0 || data == nil || len(cache.GetCachePath()) == 0 {
-		return
+func (cache *diskCache) SetDataForKey(key string, data []byte) error {
+	if cache == nil || len(key) == 0 || data == nil || len(cache.GetCachePath()) == 0 {
+		return fmt.Errorf("check Input: %v", cache)
 	}
 	// 检查目录是否存在, 不存在，则创建
 	if _, err := os.Stat(cache.GetCachePath()); os.IsNotExist(err) {
 		err = os.MkdirAll(cache.GetCachePath(), os.ModeDir)
 		if err != nil {
-			return
+			return err
 		}
 	}
 	path := cache.GetCachePathForKey(key)
-	_ = ioutil.WriteFile(path, data, os.ModePerm)
+	err := ioutil.WriteFile(path, data, os.ModePerm)
 	if cache.Config.ShouldDisableRemoteBackup { // 暂无对应处理
 
 	}
+	return err
 }
 
 func (cache *diskCache) ContainDataForKey(key string) bool {
@@ -176,5 +179,46 @@ func (cache *diskCache) RemoveAllData() {
 }
 
 func (cache *diskCache) RemoveExpiredData() {
-
+	files, err := cache.Config.DiskCacheExpireType.AccessFilesInDir(cache.GetCachePath())
+	if err != nil {
+		return
+	}
+	currentCacheSize := int64(0)
+	cacheKeys := make([]string, 0)
+	cacheFiles := map[string]os.FileInfo{}
+	for _, file := range files {
+		if file.IsDir() || file.Sys() == nil { // 跳过文件夹和没有描述的
+			continue
+		}
+		path := filepath.Join(cache.GetCachePath(), file.Name())
+		if cache.Config.MaxDiskAge > 0 { // 移除过期的
+			t := cache.Config.DiskCacheExpireType.getReferenceDate(path)
+			if time.Now().Sub(t).Seconds() >= cache.Config.MaxDiskAge {
+				_ = os.Remove(path)
+				continue
+			}
+		}
+		// 保存缓存文件引用，用于计算总大小
+		currentCacheSize += file.Size()
+		cacheFiles[path] = file
+		cacheKeys = append(cacheKeys, path)
+	}
+	// 如果磁盘缓存大小超过限制，则从最旧的开始删除
+	if cache.Config.MaxDiskSize > 0 && currentCacheSize > cache.Config.MaxDiskSize {
+		// 期望大小是去掉一半
+		desiredCacheSize := cache.Config.MaxDiskSize / 2
+		sort.Slice(cacheKeys, func(i, j int) bool { // 按照时间排序
+			lhs := cache.Config.DiskCacheExpireType.getReferenceDate(cacheKeys[i])
+			rhs := cache.Config.DiskCacheExpireType.getReferenceDate(cacheKeys[j])
+			return lhs.UnixNano() < rhs.UnixNano()
+		})
+		for _, path := range cacheKeys {
+			if err := os.Remove(path); err == nil {
+				currentCacheSize -= cacheFiles[path].Size()
+			}
+			if currentCacheSize <= desiredCacheSize {
+				break
+			}
+		}
+	}
 }

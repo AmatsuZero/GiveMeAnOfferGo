@@ -1,12 +1,13 @@
 package Core
 
 import (
+	"github.com/hashicorp/golang-lru/simplelru"
 	"gopkg.in/djherbis/times.v1"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"reflect"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -56,32 +57,35 @@ func (expireType ImageCacheConfigExpireType) getReferenceDate(path string) time.
 
 type ImageCacheConfig struct {
 	ShouldDisableRemoteBackup            bool // 远端同步，对应iCloud
-	ShouldCacheImageInMemory             bool
+	ShouldCacheImageInMemory             bool // 是否启用内存缓存
 	ShouldUseWeakMemoryCache             bool
 	ShouldRemoveExpiredDataWhenAvailable bool
 	DiskCacheReadingOption               DataReadingOption
 	DiskCacheWritingOption               DataWritingOption
-	MaxDiskAge                           float64
+	MaxDiskAge                           float64 // 磁盘缓存时间，默认一周
+	MaxDiskSize                          int64   // 磁盘缓存大小设置，默认为0，表示不限制
 	MaxMemoryCount                       uint64
 	DiskCacheExpireType                  ImageCacheConfigExpireType
-	MemoryCache                          reflect.Type // 实现 MemoryCache 协议的类型
-	DiskCache                            reflect.Type
+	MemoryCacheCreationFn                func(config *ImageCacheConfig, cb simplelru.EvictCallback) (MemoryCache, error)
+	DiskCacheCreationFn                  func(config *ImageCacheConfig, path string) DishCache
 }
 
 const kDefaultCacheMaxDiskAge = 60 * 60 * 24 * 7 // 1 week
 
-var defaultImageCache ImageCacheConfig
+var defaultImageCacheConfig *ImageCacheConfig
+var imageCacheConfigOnce sync.Once
 
-func init() {
-	defaultImageCache = NewImageCacheConfig()
+func GetDefaultImageCacheConfig() *ImageCacheConfig {
+	imageCacheConfigOnce.Do(func() {
+		if defaultImageCacheConfig != nil {
+			defaultImageCacheConfig = NewImageCacheConfig()
+		}
+	})
+	return defaultImageCacheConfig
 }
 
-func DefaultImageCacheConfig() ImageCacheConfig {
-	return defaultImageCache
-}
-
-func NewImageCacheConfig() ImageCacheConfig {
-	return ImageCacheConfig{
+func NewImageCacheConfig() *ImageCacheConfig {
+	config := &ImageCacheConfig{
 		ShouldDisableRemoteBackup:            true,
 		ShouldCacheImageInMemory:             true,
 		ShouldUseWeakMemoryCache:             true,
@@ -90,14 +94,23 @@ func NewImageCacheConfig() ImageCacheConfig {
 		DiskCacheWritingOption:               WritingAtomic,
 		MaxDiskAge:                           kDefaultCacheMaxDiskAge,
 		MaxMemoryCount:                       0, // 表明没有限制
+		MaxDiskSize:                          0, // 表示没有限制
 		DiskCacheExpireType:                  ImageCacheConfigExpireTypeModificationDate,
-		MemoryCache:                          reflect.TypeOf((*memoryCache)(nil)).Elem(),
-		DiskCache:                            reflect.TypeOf((*diskCache)(nil)).Elem(),
 	}
+	config.MemoryCacheCreationFn = func(config *ImageCacheConfig, cb simplelru.EvictCallback) (MemoryCache, error) {
+		return newMemoryCacheWithConfig(config, cb)
+	}
+	config.DiskCacheCreationFn = func(config *ImageCacheConfig, path string) DishCache {
+		return newDiskCache(config, path)
+	}
+	return config
 }
 
-func (config ImageCacheConfig) Copy() ImageCacheConfig {
-	return ImageCacheConfig{
+func (config *ImageCacheConfig) Copy() *ImageCacheConfig {
+	if config == nil {
+		return nil
+	}
+	return &ImageCacheConfig{
 		ShouldDisableRemoteBackup:            config.ShouldDisableRemoteBackup,
 		ShouldCacheImageInMemory:             config.ShouldCacheImageInMemory,
 		ShouldUseWeakMemoryCache:             config.ShouldUseWeakMemoryCache,
@@ -105,8 +118,9 @@ func (config ImageCacheConfig) Copy() ImageCacheConfig {
 		DiskCacheReadingOption:               config.DiskCacheReadingOption,
 		DiskCacheWritingOption:               config.DiskCacheWritingOption,
 		MaxDiskAge:                           config.MaxDiskAge,
+		MaxDiskSize:                          config.MaxDiskSize,
 		DiskCacheExpireType:                  config.DiskCacheExpireType,
-		MemoryCache:                          config.MemoryCache,
-		DiskCache:                            config.DiskCache,
+		MemoryCacheCreationFn:                config.MemoryCacheCreationFn,
+		DiskCacheCreationFn:                  config.DiskCacheCreationFn,
 	}
 }
