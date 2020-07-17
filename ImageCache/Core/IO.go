@@ -20,7 +20,7 @@ const (
 func setExtendedAttribute(name, path string, vale []byte, follow, overwrite bool) error {
 	flags := 0
 	if !overwrite {
-		flags = xattr.XATTR_CREATE
+		flags = 0x0002 // windows 下没有 xattr.XATTR_CREATE，直接用数字代替
 	}
 	if follow {
 		return xattr.SetWithFlags(path, name, vale, flags)

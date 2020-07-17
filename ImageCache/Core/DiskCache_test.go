@@ -1,31 +1,23 @@
 package Core
 
 import (
+	"context"
+	"github.com/reactivex/rxgo/v2"
 	"testing"
 )
 
 func TestMoveDir(t *testing.T) {
-	outer := Outer{Name: "wc"}
-	outer.TestFunc = func() *Inner {
-		return NewInner(outer)
+	result := false
+	isExecuting := true
+	ob := rxgo.Create([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
+		result = true
+		isExecuting = false
+		next <- rxgo.Of(true)
+	}}).First()
+	ob.Run()
+	t.Log("None blocking")
+	for isExecuting {
+
 	}
-	inner := outer.TestFunc()
-	t.Log(inner)
-}
-
-type Inner struct {
-	Name  string
-	Outer Outer
-}
-
-type Outer struct {
-	TestFunc func() *Inner
-	Name     string
-}
-
-func NewInner(outer Outer) *Inner {
-	return &Inner{
-		Name:  outer.Name,
-		Outer: outer,
-	}
+	t.Log(result)
 }

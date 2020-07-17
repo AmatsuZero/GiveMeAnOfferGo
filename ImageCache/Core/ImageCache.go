@@ -3,7 +3,6 @@ package Core
 import (
 	"context"
 	"github.com/reactivex/rxgo/v2"
-	"image"
 	"os"
 	"path/filepath"
 	"sync"
@@ -26,7 +25,7 @@ type ImageCacheCheckCompletionBlock func(isInCache bool)
 type ImageCacheQueryDataCompletionBlock func(data []byte)
 type ImageCacheCalculateSizeBlock func(fileCount, totalSize uint64)
 type ImageCacheAdditionalCachePathBlock func(key string) string
-type ImageCacheQueryCompletionBlock func(image image.Image, data []byte, cacheType ImageCacheType)
+type ImageCacheQueryCompletionBlock func(data []byte, cacheType ImageCacheType)
 type ImageCacheContainsCompletionBlock func(containsCacheType ImageCacheType)
 type ImageNoParamsBlock func()
 
@@ -72,6 +71,13 @@ func (cache *ImageCache) QueryImage(key string, ops ImageCacheOptions, ctx WebIm
 func (cache *ImageCache) QueryImageWithCacheType(key string, ops ImageCacheOptions,
 	ctx WebImageContext, ct ImageCacheType, cb ImageCacheQueryCompletionBlock) WebImageOperation {
 	panic("implement me")
+}
+
+func (cache *ImageCache) ImageDataFromMemoryForKey(key string) []byte {
+	if cache == nil || cache.memoryCache == nil {
+		return nil
+	}
+	return cache.memoryCache.ObjectForKey(key).([]byte)
 }
 
 func (cache *ImageCache) StoreImage(data []byte, key string, ct ImageCacheType, cb ImageNoParamsBlock) {
@@ -120,6 +126,33 @@ func (cache *ImageCache) RemoveImageForKey(key string, cacheType ImageCacheType,
 
 func (cache *ImageCache) ContainsImageForKey(key string, cacheType ImageCacheType, cb ImageCacheContainsCompletionBlock) {
 	panic("implement me")
+}
+
+func (cache *ImageCache) DiskImageExistsWithKey(key string) bool {
+	item, err := rxgo.Create([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
+		next <- rxgo.Of(cache.diskImageExistsWithKey(key))
+	}}).First().Get()
+	if err != nil {
+		return false
+	}
+	return item.V.(bool)
+}
+
+func (cache *ImageCache) diskImageExistsWithKey(key string) bool {
+	if cache == nil || cache.diskCache == nil {
+		return false
+	}
+	return cache.diskCache.ContainDataForKey(key)
+}
+
+func (cache *ImageCache) DiskImageExistsWithKeyAsync(key string, cb ImageCacheCheckCompletionBlock) {
+	rxgo.Create([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
+		next <- rxgo.Of(cache.diskImageExistsWithKey(key))
+	}}).DoOnNext(func(i interface{}) {
+		if cb != nil {
+			cb(i.(bool))
+		}
+	})
 }
 
 func (cache *ImageCache) ClearWithCacheType(cacheType ImageCacheType, cb ImageNoParamsBlock) {
