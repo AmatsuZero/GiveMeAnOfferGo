@@ -7,17 +7,16 @@ import (
 )
 
 func TestMoveDir(t *testing.T) {
-	result := false
+	var cb ImageNoParamsBlock
 	isExecuting := true
-	ob := rxgo.Create([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
-		result = true
+	t.Log("out block")
+	rxgo.Concat([]rxgo.Observable{rxgo.Empty(), rxgo.Create([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
+		t.Log("in block")
 		isExecuting = false
 		next <- rxgo.Of(true)
-	}}).First()
-	ob.Run()
-	t.Log("None blocking")
+	}})}).DoOnCompleted(rxgo.CompletedFunc(cb))
 	for isExecuting {
 
 	}
-	t.Log(result)
+	t.Log("end")
 }

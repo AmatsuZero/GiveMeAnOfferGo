@@ -2,15 +2,13 @@ package Core
 
 import (
 	"context"
+	"fmt"
 	"github.com/reactivex/rxgo/v2"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
 )
-
-func BitsHas(options, flag BitsType) bool {
-	return options&flag != 0
-}
 
 type ImageCacheType int
 
@@ -47,8 +45,8 @@ const (
 )
 
 type ImageCacheProtocol interface {
-	QueryImage(key string, ops ImageCacheOptions, ctx WebImageContext, cb ImageCacheQueryCompletionBlock) WebImageOperation
-	QueryImageWithCacheType(key string, ops ImageCacheOptions,
+	QueryImageCache(key string, ops ImageCacheOptions, ctx WebImageContext, cb ImageCacheQueryCompletionBlock) WebImageOperation
+	QueryImageCacheWithCacheType(key string, ops ImageCacheOptions,
 		ctx WebImageContext, ct ImageCacheType, cb ImageCacheQueryCompletionBlock) WebImageOperation
 	StoreImage(data []byte, key string, ct ImageCacheType, cb ImageNoParamsBlock)
 	RemoveImageForKey(key string, cacheType ImageCacheType, cb ImageNoParamsBlock)
@@ -64,20 +62,67 @@ type ImageCache struct {
 	AdditionalCachePathBlock ImageCacheAdditionalCachePathBlock
 }
 
-func (cache *ImageCache) QueryImage(key string, ops ImageCacheOptions, ctx WebImageContext, cb ImageCacheQueryCompletionBlock) WebImageOperation {
+func (cache *ImageCache) QueryImageCache(key string, ops ImageCacheOptions, ctx WebImageContext, cb ImageCacheQueryCompletionBlock) WebImageOperation {
 	panic("implement me")
 }
 
-func (cache *ImageCache) QueryImageWithCacheType(key string, ops ImageCacheOptions,
+func (cache *ImageCache) QueryImageCacheWithCacheType(key string, ops ImageCacheOptions,
 	ctx WebImageContext, ct ImageCacheType, cb ImageCacheQueryCompletionBlock) WebImageOperation {
-	panic("implement me")
+	if cache == nil || len(key) == 0 || ct == ImageCacheTypeNone {
+		if cb != nil {
+			cb(nil, ImageCacheTypeNone)
+		}
+		return nil
+	}
+	memoryData := cache.memoryCache.GetObjectForKey(key).([]byte)
+	if ct == ImageCacheTypeMemory && BitsHas(BitsType(ops), BitsType(ImageCacheQueryMemoryData)) {
+		if cb != nil {
+			cb(memoryData, ImageCacheTypeMemory)
+		}
+		return nil
+	}
+	type query struct {
+		t ImageCacheType
+		d []byte
+	}
+	shouldQuerySync := (memoryData != nil && BitsHas(BitsType(ops), BitsType(ImageCacheQueryMemoryDataSync))) ||
+		(memoryData == nil && BitsHas(BitsType(ops), BitsType(ImageCacheQueryDiskDataSync)))
+	ob := rxgo.Create([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
+		data := query{}
+		if memoryData != nil {
+			data.t = ImageCacheTypeMemory
+			data.d = memoryData
+		} else {
+			diskData, err := cache.getDiskImageDataBySearchingAllPathsForKey(key)
+			if err == nil && cache.memoryCache != nil && cache.config.ShouldCacheImageInMemory {
+				cache.StoreImageDataToMemory(diskData, key)
+			}
+			data.t = ImageCacheTypeDisk
+			data.d = diskData
+		}
+		next <- rxgo.Item{V: data}
+	}})
+	ob.DoOnNext(func(i interface{}) {
+		if cb == nil {
+			return
+		}
+		q := i.(query)
+		if shouldQuerySync {
+			cb(q.d, q.t)
+		} else {
+			go func() {
+				cb(q.d, q.t)
+			}()
+		}
+	})
+	return newWebImageOperation(ob)
 }
 
 func (cache *ImageCache) ImageDataFromMemoryForKey(key string) []byte {
 	if cache == nil || cache.memoryCache == nil {
 		return nil
 	}
-	return cache.memoryCache.ObjectForKey(key).([]byte)
+	return cache.memoryCache.GetObjectForKey(key).([]byte)
 }
 
 func (cache *ImageCache) StoreImage(data []byte, key string, ct ImageCacheType, cb ImageNoParamsBlock) {
@@ -91,20 +136,19 @@ func (cache *ImageCache) StoreImage(data []byte, key string, ct ImageCacheType, 
 	}
 	if ct == ImageCacheTypeMemory || ct == ImageCacheTypeAll {
 		if cache.config.ShouldCacheImageInMemory {
-			cache.StoreImageToMemory(data, key)
+			cache.StoreImageDataToMemory(data, key)
 		}
 	}
 	if ct == ImageCacheTypeDisk || ct == ImageCacheTypeAll {
-		cache.StoreImageToDisk(data, key)
+		cache.StoreImageDataToDisk(data, key)
 	}
 }
 
-func (cache *ImageCache) StoreImageToDisk(data []byte, key string) {
-	disposed := cache.storeImageToDisk(data, key).Run()
-	<-disposed
+func (cache *ImageCache) StoreImageDataToDisk(data []byte, key string) {
+	<-cache.storeImageToDisk(data, key).Run()
 }
 
-func (cache *ImageCache) StoreImageToMemory(data []byte, key string) {
+func (cache *ImageCache) StoreImageDataToMemory(data []byte, key string) {
 	if cache.memoryCache == nil {
 		return
 	}
@@ -121,11 +165,93 @@ func (cache *ImageCache) storeImageToDisk(data []byte, key string) rxgo.Observab
 }
 
 func (cache *ImageCache) RemoveImageForKey(key string, cacheType ImageCacheType, cb ImageNoParamsBlock) {
-	panic("implement me")
+	if cache == nil {
+		if cb != nil {
+			cb()
+		}
+		return
+	}
+	switch cacheType {
+	case ImageCacheTypeMemory:
+		cache.removeCacheDataFromMemory(key).DoOnCompleted(rxgo.CompletedFunc(cb))
+	case ImageCacheTypeDisk:
+		cache.removeCacheDataFromDisk(key).DoOnCompleted(rxgo.CompletedFunc(cb))
+	case ImageCacheTypeAll:
+		rxgo.Concat([]rxgo.Observable{
+			cache.removeCacheDataFromMemory(key),
+			cache.removeCacheDataFromDisk(key),
+		}).DoOnCompleted(rxgo.CompletedFunc(cb))
+	case ImageCacheTypeNone:
+		if cb != nil {
+			cb()
+		}
+	}
+}
+
+func (cache *ImageCache) RemoveCacheDataFromMemory(key string) {
+	<-cache.removeCacheDataFromMemory(key).Run()
+}
+
+func (cache *ImageCache) removeCacheDataFromMemory(key string) rxgo.Observable {
+	if cache == nil || cache.memoryCache == nil || len(key) == 0 {
+		return rxgo.Empty()
+	}
+	return rxgo.Create([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
+		next <- rxgo.Of(cache.memoryCache.RemoveObjectForKey(key))
+	}})
+}
+
+func (cache *ImageCache) RemoveCacheDataFromDisk(key string) {
+	<-cache.removeCacheDataFromDisk(key).Run()
+}
+
+func (cache *ImageCache) removeCacheDataFromDisk(key string) rxgo.Observable {
+	if cache == nil || cache.diskCache == nil || len(key) == 0 {
+		return rxgo.Empty()
+	}
+	return rxgo.Create([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
+		next <- rxgo.Of(cache.diskCache.RemoveDataForKey(key) == nil)
+	}})
 }
 
 func (cache *ImageCache) ContainsImageForKey(key string, cacheType ImageCacheType, cb ImageCacheContainsCompletionBlock) {
-	panic("implement me")
+	if cb == nil {
+		return
+	}
+	if cache == nil {
+		cb(ImageCacheTypeNone)
+		return
+	}
+	switch cacheType {
+	case ImageCacheTypeNone:
+		cb(ImageCacheTypeNone)
+	case ImageCacheTypeMemory:
+		isInMemory := cache.ImageDataFromMemoryForKey(key) != nil
+		if isInMemory {
+			cb(ImageCacheTypeMemory)
+		} else {
+			cb(ImageCacheTypeNone)
+		}
+	case ImageCacheTypeDisk:
+		// 检查磁盘缓存是否有
+		cache.DiskImageExistsWithKeyAsync(key, func(isInCache bool) {
+			if isInCache {
+				cb(ImageCacheTypeDisk)
+			} else {
+				cb(ImageCacheTypeNone)
+			}
+		})
+	case ImageCacheTypeAll:
+		cache.ContainsImageForKey(key, ImageCacheTypeMemory, func(containsCacheType ImageCacheType) {
+			if containsCacheType == ImageCacheTypeMemory {
+				cb(containsCacheType)
+			} else {
+				cache.ContainsImageForKey(key, ImageCacheTypeDisk, cb)
+			}
+		})
+	default:
+		cb(ImageCacheTypeNone)
+	}
 }
 
 func (cache *ImageCache) DiskImageExistsWithKey(key string) bool {
@@ -145,6 +271,27 @@ func (cache *ImageCache) diskImageExistsWithKey(key string) bool {
 	return cache.diskCache.ContainDataForKey(key)
 }
 
+func (cache *ImageCache) CalculateSizeWithCompletionBlock(cb ImageCacheCalculateSizeBlock) {
+	count := uint64(0)
+	size := uint64(0)
+	if cache == nil || cache.diskCache == nil {
+		if cb != nil {
+			cb(count, size)
+		}
+		return
+	}
+	rxgo.Create([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
+		count = cache.diskCache.GetTotalCount()
+		next <- rxgo.Of(count)
+		size = uint64(cache.diskCache.GetTotalSize())
+		next <- rxgo.Of(size)
+	}}).DoOnCompleted(func() {
+		if cb != nil {
+			cb(count, size)
+		}
+	})
+}
+
 func (cache *ImageCache) DiskImageExistsWithKeyAsync(key string, cb ImageCacheCheckCompletionBlock) {
 	rxgo.Create([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
 		next <- rxgo.Of(cache.diskImageExistsWithKey(key))
@@ -156,7 +303,67 @@ func (cache *ImageCache) DiskImageExistsWithKeyAsync(key string, cb ImageCacheCh
 }
 
 func (cache *ImageCache) ClearWithCacheType(cacheType ImageCacheType, cb ImageNoParamsBlock) {
-	panic("implement me")
+	if cache != nil {
+		if cb != nil {
+			cb()
+		}
+		return
+	}
+	switch cacheType {
+	case ImageCacheTypeMemory:
+		cache.clearMemoryCache().DoOnCompleted(rxgo.CompletedFunc(cb))
+	case ImageCacheTypeDisk:
+		cache.clearDiskCache().DoOnCompleted(rxgo.CompletedFunc(cb))
+	case ImageCacheTypeAll:
+		rxgo.Concat([]rxgo.Observable{
+			cache.clearMemoryCache(),
+			cache.clearDiskCache(),
+		}).DoOnCompleted(rxgo.CompletedFunc(cb))
+	default:
+		if cb != nil {
+			cb()
+		}
+	}
+}
+
+func (cache *ImageCache) ClearMemoryCache() {
+	<-cache.clearMemoryCache().Run()
+}
+
+func (cache *ImageCache) clearMemoryCache() rxgo.Observable {
+	if cache == nil || cache.memoryCache == nil {
+		return rxgo.Empty()
+	}
+	return rxgo.Create([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
+		cache.memoryCache.RemoveAllObjects()
+		next <- rxgo.Of(true)
+	}})
+}
+
+func (cache *ImageCache) ClearDiskCache(cb ImageNoParamsBlock) {
+	ob := cache.clearDiskCache()
+	ob.DoOnCompleted(rxgo.CompletedFunc(cb))
+}
+
+func (cache *ImageCache) clearDiskCache() rxgo.Observable {
+	if cache == nil || cache.diskCache == nil {
+		return rxgo.Empty()
+	}
+	return rxgo.Create([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
+		cache.diskCache.RemoveAllData()
+		next <- rxgo.Of(true)
+	}})
+}
+
+func (cache *ImageCache) DeleteOldFilesWithCompletionBlock(cb ImageNoParamsBlock) {
+	rxgo.Create([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
+		if cache == nil || cache.diskCache == nil {
+			next <- rxgo.Of(true)
+		} else {
+			cache.diskCache.RemoveExpiredData()
+			next <- rxgo.Of(true)
+		}
+	}}).DoOnCompleted(rxgo.CompletedFunc(cb))
 }
 
 func (cache *ImageCache) GetImageCacheConfig() *ImageCacheConfig {
@@ -171,8 +378,37 @@ func (cache *ImageCache) GetDiskCache() DishCache {
 	return cache.diskCache
 }
 
+func (cache *ImageCache) GetDiskImageData(key string) ([]byte, error) {
+	item, err := rxgo.Create([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
+		data, err := cache.getDiskImageDataBySearchingAllPathsForKey(key)
+		next <- rxgo.Item{
+			V: data,
+			E: err,
+		}
+	}}).First().Get()
+	if err != nil {
+		return nil, err
+	}
+	return item.V.([]byte), nil
+}
+
 func (cache *ImageCache) GetDiskCachePath() string {
 	return cache.diskCachePath
+}
+
+func (cache *ImageCache) getDiskImageDataBySearchingAllPathsForKey(key string) ([]byte, error) {
+	if cache == nil || cache.diskCache == nil || len(key) == 0 {
+		return nil, fmt.Errorf("check Input")
+	}
+	data, err := cache.diskCache.GetDataForKey(key)
+	if err != nil {
+		return nil, err
+	}
+	if cache.AdditionalCachePathBlock != nil {
+		path := cache.AdditionalCachePathBlock(key)
+		data, err = ioutil.ReadFile(path)
+	}
+	return data, err
 }
 
 func (cache *ImageCache) onMemoryCacheEjection(key interface{}, value interface{}) {

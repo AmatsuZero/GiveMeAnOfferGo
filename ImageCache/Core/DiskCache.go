@@ -16,11 +16,11 @@ type DishCache interface {
 	GetCachePath() string
 	GetCacheConfig() *ImageCacheConfig
 	ContainDataForKey(key string) bool
-	GetDataForKey(key string) []byte
+	GetDataForKey(key string) ([]byte, error)
 	SetDataForKey(key string, data []byte) error
 	GetExtendedDataForKey(key string) []byte
 	SetExtendedDataForKey(key string, data []byte)
-	RemoveDataForKey(key string)
+	RemoveDataForKey(key string) error
 	RemoveAllData()
 	RemoveExpiredData()
 	GetCachePathForKey(key string) string
@@ -135,10 +135,9 @@ func (cache *diskCache) ContainDataForKey(key string) bool {
 	return !os.IsNotExist(err)
 }
 
-func (cache *diskCache) GetDataForKey(key string) []byte {
+func (cache *diskCache) GetDataForKey(key string) ([]byte, error) {
 	path := cache.GetCachePathForKey(key)
-	data, _ := ioutil.ReadFile(path)
-	return data
+	return ioutil.ReadFile(path)
 }
 
 func (cache *diskCache) GetExtendedDataForKey(key string) []byte {
@@ -162,12 +161,12 @@ func (cache *diskCache) SetExtendedDataForKey(key string, data []byte) {
 	}
 }
 
-func (cache *diskCache) RemoveDataForKey(key string) {
+func (cache *diskCache) RemoveDataForKey(key string) error {
 	if len(key) == 0 {
-		return
+		return fmt.Errorf("key is Empty")
 	}
 	path := cache.GetCachePathForKey(key)
-	_ = os.Remove(path)
+	return os.Remove(path)
 }
 
 func (cache *diskCache) RemoveAllData() {

@@ -7,9 +7,9 @@ import (
 
 type MemoryCache interface {
 	GetImageCacheConfig() *ImageCacheConfig
-	ObjectForKey(key interface{}) interface{}
-	SetObjectWithKey(key, value interface{})
-	RemoveObjectForKey(key interface{})
+	GetObjectForKey(key interface{}) interface{}
+	SetObjectWithKey(key, value interface{}) bool
+	RemoveObjectForKey(key interface{}) bool
 	RemoveAllObjects()
 }
 
@@ -42,7 +42,7 @@ func (cache *memoryCache) GetImageCacheConfig() *ImageCacheConfig {
 	return cache.Config
 }
 
-func (cache *memoryCache) ObjectForKey(key interface{}) interface{} {
+func (cache *memoryCache) GetObjectForKey(key interface{}) interface{} {
 	val, ok := cache.Get(key)
 	if !cache.Config.ShouldUseWeakMemoryCache {
 		return val
@@ -58,22 +58,23 @@ func (cache *memoryCache) ObjectForKey(key interface{}) interface{} {
 	return nil
 }
 
-func (cache *memoryCache) SetObjectWithKey(key, value interface{}) {
+func (cache *memoryCache) SetObjectWithKey(key, value interface{}) bool {
 	if cache.Config.MaxMemoryCount == 0 && cache.Len() == cache.totalCostLimit { // 没有限制，重新分配空间
 		cache.totalCostLimit *= 2
 		cache.Resize(cache.totalCostLimit)
 	}
-	cache.Add(key, value)
+	return cache.Add(key, value)
 }
 
-func (cache *memoryCache) RemoveObjectForKey(key interface{}) {
-	cache.Remove(key)
+func (cache *memoryCache) RemoveObjectForKey(key interface{}) (ret bool) {
+	ret = cache.Remove(key)
 	if !cache.Config.ShouldUseWeakMemoryCache || key == nil {
-		return
+		return false
 	}
 	cache.mutex.Lock()
 	cache.weakMap.Remove(key)
 	cache.mutex.Unlock()
+	return
 }
 
 func (cache *memoryCache) RemoveAllObjects() {
