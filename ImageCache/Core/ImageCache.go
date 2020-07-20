@@ -2,7 +2,6 @@ package Core
 
 import (
 	"context"
-	"fmt"
 	"github.com/reactivex/rxgo/v2"
 	"io/ioutil"
 	"os"
@@ -27,10 +26,6 @@ type ImageCacheQueryCompletionBlock func(data []byte, cacheType ImageCacheType)
 type ImageCacheContainsCompletionBlock func(containsCacheType ImageCacheType)
 type ImageNoParamsBlock func()
 
-func ImageCacheDecodeImageData(imageData []byte, cacheKey string, options ImageCacheOptions, context WebImageContext) {
-
-}
-
 type ImageCacheOptions BitsType
 
 const (
@@ -45,9 +40,9 @@ const (
 )
 
 type ImageCacheProtocol interface {
-	QueryImageCache(key string, ops ImageCacheOptions, ctx WebImageContext, cb ImageCacheQueryCompletionBlock) WebImageOperation
+	QueryImageCache(key string, ops ImageCacheOptions, ctx ImageContext, cb ImageCacheQueryCompletionBlock) WebImageOperation
 	QueryImageCacheWithCacheType(key string, ops ImageCacheOptions,
-		ctx WebImageContext, ct ImageCacheType, cb ImageCacheQueryCompletionBlock) WebImageOperation
+		ctx ImageContext, ct ImageCacheType, cb ImageCacheQueryCompletionBlock) WebImageOperation
 	StoreImage(data []byte, key string, ct ImageCacheType, cb ImageNoParamsBlock)
 	RemoveImageForKey(key string, cacheType ImageCacheType, cb ImageNoParamsBlock)
 	ContainsImageForKey(key string, cacheType ImageCacheType, cb ImageCacheContainsCompletionBlock)
@@ -62,12 +57,12 @@ type ImageCache struct {
 	AdditionalCachePathBlock ImageCacheAdditionalCachePathBlock
 }
 
-func (cache *ImageCache) QueryImageCache(key string, ops ImageCacheOptions, ctx WebImageContext, cb ImageCacheQueryCompletionBlock) WebImageOperation {
+func (cache *ImageCache) QueryImageCache(key string, ops ImageCacheOptions, ctx ImageContext, cb ImageCacheQueryCompletionBlock) WebImageOperation {
 	panic("implement me")
 }
 
 func (cache *ImageCache) QueryImageCacheWithCacheType(key string, ops ImageCacheOptions,
-	ctx WebImageContext, ct ImageCacheType, cb ImageCacheQueryCompletionBlock) WebImageOperation {
+	ctx ImageContext, ct ImageCacheType, cb ImageCacheQueryCompletionBlock) WebImageOperation {
 	if cache == nil || len(key) == 0 || ct == ImageCacheTypeNone {
 		if cb != nil {
 			cb(nil, ImageCacheTypeNone)
@@ -110,9 +105,7 @@ func (cache *ImageCache) QueryImageCacheWithCacheType(key string, ops ImageCache
 		if shouldQuerySync {
 			cb(q.d, q.t)
 		} else {
-			go func() {
-				cb(q.d, q.t)
-			}()
+			go cb(q.d, q.t)
 		}
 	})
 	return newWebImageOperation(ob)
@@ -255,9 +248,7 @@ func (cache *ImageCache) ContainsImageForKey(key string, cacheType ImageCacheTyp
 }
 
 func (cache *ImageCache) DiskImageExistsWithKey(key string) bool {
-	item, err := rxgo.Create([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
-		next <- rxgo.Of(cache.diskImageExistsWithKey(key))
-	}}).First().Get()
+	item, err := rxgo.JustItem(cache.diskImageExistsWithKey(key)).Get()
 	if err != nil {
 		return false
 	}
@@ -398,7 +389,7 @@ func (cache *ImageCache) GetDiskCachePath() string {
 
 func (cache *ImageCache) getDiskImageDataBySearchingAllPathsForKey(key string) ([]byte, error) {
 	if cache == nil || cache.diskCache == nil || len(key) == 0 {
-		return nil, fmt.Errorf("check Input")
+		return nil, InvalidParamError
 	}
 	data, err := cache.diskCache.GetDataForKey(key)
 	if err != nil {

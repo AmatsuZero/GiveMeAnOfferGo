@@ -1,27 +1,331 @@
 package Core
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"github.com/reactivex/rxgo/v2"
+	"io"
+	"net/http"
+	"net/url"
+	"reflect"
+	"strconv"
+	"sync"
+	"time"
 )
+
+type ImageDownloaderProgressBlock func(receivedSize, expectedSize int64, targetURL *url.URL)
+type ImageDownloaderCompletedBlock func(data []byte, err error, finished bool)
+
+var (
+	ImageOperationCancelError  error
+	ImageOperationInvalidError error
+)
+
+func init() {
+	ImageOperationCancelError = fmt.Errorf("operation cancelled by user before sending the request")
+	ImageOperationInvalidError = fmt.Errorf("task can't be initialized")
+}
 
 type WebImageOperation interface {
 	Cancel()
 }
 
 type webImageOperation struct {
-	cancel rxgo.Disposable
-	ctx    context.Context
+	cancel     rxgo.Disposable
+	task       rxgo.Observable
+	ctx        context.Context
+	IsCanceled bool
+	IsRunning  bool
+	IsFinished bool
 }
 
 func (op *webImageOperation) Cancel() {
+	if op == nil || op.cancel == nil || op.IsCanceled {
+		return
+	}
 	op.cancel()
 }
 
+func (op *webImageOperation) Start() {
+	if op == nil || op.task == nil {
+		return
+	}
+	ctx, cancel := op.task.Connect()
+	op.IsRunning = true
+	op.cancel = cancel
+	op.ctx = ctx
+	go func(ctx context.Context) {
+		select {
+		case <-ctx.Done():
+			op.IsRunning = false
+			op.IsCanceled = true
+		default:
+			op.IsRunning = true
+			op.IsCanceled = false
+		}
+	}(ctx)
+}
+
 func newWebImageOperation(task rxgo.Observable) *webImageOperation {
-	ctx, cancel := task.Connect()
-	return &webImageOperation{
-		cancel: cancel,
-		ctx:    ctx,
+	return &webImageOperation{task: task}
+}
+
+type ImageDownloadOperation interface {
+	Cancel(token interface{}) bool
+	AddHandlersForProgressAndCompletion(
+		progressCb ImageDownloaderProgressBlock,
+		completion ImageDownloaderCompletedBlock) interface{}
+}
+
+type kCallbacksDictionary map[string]interface{}
+
+const kProgressCallbackKey = "progress"
+const kCompletedCallbackKey = "completed"
+
+type imageDownloadOperation struct {
+	webImageOperation
+	req            *http.Request
+	client         *http.Client
+	options        ImageDownloaderOptions
+	context        ImageContext
+	callbackBlocks []kCallbacksDictionary
+	lock           sync.Mutex
+	isFinished     bool
+	cachedData     []byte
+	total          int64 // Total # of bytes transferred
+	expectedSize   int64
+	taskErr        error
+}
+
+func (op *imageDownloadOperation) Cancel(token interface{}) (shouldCancel bool) {
+	if op == nil || token == nil {
+		return false
+	}
+	op.lock.Lock()
+	tmpCallbacks := op.callbackBlocks[:0]
+	for _, cb := range op.callbackBlocks {
+		if !reflect.DeepEqual(cb, token) {
+			tmpCallbacks = append(tmpCallbacks, cb)
+		}
+	}
+	shouldCancel = len(tmpCallbacks) == 0
+	op.lock.Unlock()
+	if shouldCancel {
+		op.cancel() // 取消最后一个正在运行中的任务，并唤醒最后一个回调
+	} else {
+		op.lock.Lock()
+		defer op.lock.Unlock()
+		op.callbackBlocks = tmpCallbacks
+		t, ok := token.(kCallbacksDictionary)
+		if !ok {
+			return
+		}
+		cb, ok := t[kCompletedCallbackKey]
+		if !ok {
+			return
+		}
+		block, ok := cb.(ImageDownloaderCompletedBlock)
+		if !ok {
+			return
+		}
+		go block(nil, ImageOperationCancelError, true)
+	}
+	return
+}
+
+func (op *imageDownloadOperation) AddHandlersForProgressAndCompletion(
+	progressCb ImageDownloaderProgressBlock,
+	completionCb ImageDownloaderCompletedBlock) interface{} {
+	if op == nil {
+		return nil
+	}
+	callbacks := kCallbacksDictionary{}
+	if progressCb != nil {
+		callbacks[kProgressCallbackKey] = progressCb
+	}
+	if completionCb != nil {
+		callbacks[kCompletedCallbackKey] = completionCb
+	}
+	op.lock.Lock()
+	op.callbackBlocks = append(op.callbackBlocks, callbacks)
+	op.lock.Unlock()
+	return callbacks
+}
+
+func (op *imageDownloadOperation) callbacksForKey(key string) []interface{} {
+	if op == nil {
+		return nil
+	}
+	callbacks := make([]interface{}, 0)
+	op.lock.Lock()
+	for _, cb := range op.callbackBlocks {
+		if fn, ok := cb[key]; ok {
+			callbacks = append(callbacks, fn)
+		}
+	}
+	op.lock.Unlock()
+	return callbacks
+}
+
+func (op *imageDownloadOperation) cancel() {
+	if op == nil {
+		return
+	}
+	op.lock.Lock()
+	op.cancelInternal()
+	op.lock.Unlock()
+}
+
+func (op *imageDownloadOperation) cancelInternal() {
+	if op == nil || op.isFinished {
+		return
+	}
+	if op.task != nil {
+		op.webImageOperation.Cancel()
+		if op.IsRunning {
+			op.IsRunning = false
+		}
+		if !op.isFinished {
+			op.isFinished = true
+		}
+	} else {
+		op.callCompletionBlocksWithError(ImageOperationCancelError)
+	}
+	op.reset()
+}
+
+func (op *imageDownloadOperation) Start() {
+	if op == nil {
+		return
+	}
+	if op.IsCanceled {
+		op.isFinished = true
+		op.callCompletionBlocksWithError(ImageOperationCancelError)
+		op.reset()
+		return
+	}
+	if op.client == nil {
+		op.client = &http.Client{
+			Timeout: time.Second * 15,
+		}
+	}
+	if BitsHas(BitsType(op.options), BitsType(ImageDownloaderIgnoreCachedResponse)) {
+		resp, ok := getURLCache().GetCachedResponseForRequest(op.req)
+		if ok {
+			op.cachedData = resp.BodyData
+		}
+	}
+	op.task = rxgo.Create([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
+		data, err := op.download()
+		next <- rxgo.Item{
+			V: data,
+			E: err,
+		}
+	}})
+	op.task.DoOnCompleted(op.done)
+	op.webImageOperation.Start()
+}
+
+func (op *imageDownloadOperation) download() (data []byte, err error) {
+	defer func() {
+		op.cachedData = data
+		op.taskErr = err
+	}()
+	if op == nil || op.req == nil {
+		err = ImageOperationInvalidError
+		return
+	}
+	// Head 请求，获取大小
+	headResp, err := op.client.Head(op.req.URL.String())
+	if err != nil {
+		return
+	}
+	defer func() {
+		_ = headResp.Body.Close()
+	}()
+	size, err := strconv.Atoi(headResp.Header.Get("Content-Length"))
+	if err != nil {
+		return
+	}
+	op.expectedSize = int64(size)
+	// 进度0开始
+	_, err = op.Write(nil)
+	resp, err := op.client.Do(op.req)
+	if err != nil {
+		return
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	var dst bytes.Buffer
+	src := io.TeeReader(resp.Body, op)
+	_, err = io.Copy(&dst, src)
+	// 放入缓存
+	getURLCache().AddCache(op.req, resp)
+	return dst.Bytes(), err
+}
+
+func (op *imageDownloadOperation) Write(p []byte) (n int, err error) {
+	n = len(p)
+	op.total += int64(n)
+	for _, cb := range op.callbacksForKey(kProgressCallbackKey) {
+		block, ok := cb.(ImageDownloaderProgressBlock)
+		if !ok {
+			continue
+		}
+		block(op.total, op.expectedSize, op.req.URL)
+	}
+	return
+}
+
+func (op *imageDownloadOperation) reset() {
+	if op == nil {
+		return
+	}
+	op.lock.Lock()
+	defer op.lock.Unlock()
+	op.callbackBlocks = op.callbackBlocks[:0]
+	op.task = nil
+	op.client = nil
+	op.total = 0
+	op.expectedSize = 0
+	op.cachedData = nil
+	op.taskErr = nil
+}
+
+func (op *imageDownloadOperation) done() {
+	if op == nil {
+		return
+	}
+	op.isFinished = true
+	op.IsRunning = false
+	op.callCompletionBlocksWithImageData(op.cachedData, op.taskErr, true)
+	op.reset()
+}
+
+func (op *imageDownloadOperation) callCompletionBlocksWithError(err error) {
+	op.callCompletionBlocksWithImageData(nil, err, true)
+}
+
+func (op *imageDownloadOperation) callCompletionBlocksWithImageData(data []byte, err error, finished bool) {
+	if op == nil {
+		return
+	}
+	rxgo.Just(op.callbacksForKey(kCompletedCallbackKey))().DoOnNext(func(i interface{}) {
+		if block, ok := i.(ImageDownloaderCompletedBlock); ok {
+			block(data, err, finished)
+		}
+	})
+}
+
+func newImageDownloadOperation(req *http.Request, client *http.Client,
+	options ImageDownloaderOptions, ctx ImageContext) *imageDownloadOperation {
+	return &imageDownloadOperation{
+		req:            req,
+		client:         client,
+		options:        options,
+		context:        ctx,
+		callbackBlocks: make([]kCallbacksDictionary, 0),
 	}
 }

@@ -112,7 +112,7 @@ func (cache *diskCache) GetTotalSize() (size int64) {
 
 func (cache *diskCache) SetDataForKey(key string, data []byte) error {
 	if cache == nil || len(key) == 0 || data == nil || len(cache.GetCachePath()) == 0 {
-		return fmt.Errorf("check Input: %v", cache)
+		return InvalidParamError
 	}
 	// 检查目录是否存在, 不存在，则创建
 	if _, err := os.Stat(cache.GetCachePath()); os.IsNotExist(err) {
@@ -163,7 +163,7 @@ func (cache *diskCache) SetExtendedDataForKey(key string, data []byte) {
 
 func (cache *diskCache) RemoveDataForKey(key string) error {
 	if len(key) == 0 {
-		return fmt.Errorf("key is Empty")
+		return InvalidParamError
 	}
 	path := cache.GetCachePathForKey(key)
 	return os.Remove(path)
