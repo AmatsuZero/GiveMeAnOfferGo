@@ -33,11 +33,11 @@ func init() {
 	ImageOperationCacheNoModified = fmt.Errorf("download response status code is 304 not modified and ignored")
 }
 
-type WebImageOperation interface {
+type WebImageOperationProtocol interface {
 	Cancel()
 }
 
-type webImageOperation struct {
+type WebImageOperation struct {
 	cancel     rxgo.Disposable
 	task       rxgo.Observable
 	ctx        context.Context
@@ -46,14 +46,14 @@ type webImageOperation struct {
 	IsFinished bool
 }
 
-func (op *webImageOperation) Cancel() {
+func (op *WebImageOperation) Cancel() {
 	if op == nil || op.cancel == nil || op.IsCanceled {
 		return
 	}
 	op.cancel()
 }
 
-func (op *webImageOperation) Start() {
+func (op *WebImageOperation) Start() {
 	if op == nil || op.task == nil {
 		return
 	}
@@ -73,15 +73,18 @@ func (op *webImageOperation) Start() {
 	}(ctx)
 }
 
-func newWebImageOperation(task rxgo.Observable) *webImageOperation {
-	return &webImageOperation{task: task}
+func newWebImageOperation(task rxgo.Observable) *WebImageOperation {
+	return &WebImageOperation{task: task}
 }
 
-type ImageDownloadOperation interface {
+type ImageDownloadOperationProtocol interface {
 	Cancel(token interface{}) bool
 	AddHandlersForProgressAndCompletion(
 		progressCb ImageDownloaderProgressBlock,
 		completion ImageDownloaderCompletedBlock) interface{}
+	GetResponse() *http.Response
+	GetRequest() *http.Request
+	Start()
 }
 
 type kCallbacksDictionary map[string]interface{}
@@ -89,8 +92,8 @@ type kCallbacksDictionary map[string]interface{}
 const kProgressCallbackKey = "progress"
 const kCompletedCallbackKey = "completed"
 
-type imageDownloadOperation struct {
-	webImageOperation
+type ImageDownloadOperation struct {
+	WebImageOperation
 	req              *http.Request
 	client           *http.Client
 	options          ImageDownloaderOptions
@@ -107,7 +110,21 @@ type imageDownloadOperation struct {
 	response         *http.Response
 }
 
-func (op *imageDownloadOperation) Cancel(token interface{}) (shouldCancel bool) {
+func (op *ImageDownloadOperation) GetRequest() *http.Request {
+	if op == nil || op.req == nil {
+		return nil
+	}
+	return op.req
+}
+
+func (op *ImageDownloadOperation) GetResponse() *http.Response {
+	if op == nil || op.response == nil {
+		return nil
+	}
+	return op.response
+}
+
+func (op *ImageDownloadOperation) Cancel(token interface{}) (shouldCancel bool) {
 	if op == nil || token == nil {
 		return false
 	}
@@ -143,7 +160,7 @@ func (op *imageDownloadOperation) Cancel(token interface{}) (shouldCancel bool) 
 	return
 }
 
-func (op *imageDownloadOperation) AddHandlersForProgressAndCompletion(
+func (op *ImageDownloadOperation) AddHandlersForProgressAndCompletion(
 	progressCb ImageDownloaderProgressBlock,
 	completionCb ImageDownloaderCompletedBlock) interface{} {
 	if op == nil {
@@ -162,7 +179,7 @@ func (op *imageDownloadOperation) AddHandlersForProgressAndCompletion(
 	return callbacks
 }
 
-func (op *imageDownloadOperation) callbacksForKey(key string) []interface{} {
+func (op *ImageDownloadOperation) callbacksForKey(key string) []interface{} {
 	if op == nil {
 		return nil
 	}
@@ -177,7 +194,7 @@ func (op *imageDownloadOperation) callbacksForKey(key string) []interface{} {
 	return callbacks
 }
 
-func (op *imageDownloadOperation) cancel() {
+func (op *ImageDownloadOperation) cancel() {
 	if op == nil {
 		return
 	}
@@ -186,12 +203,12 @@ func (op *imageDownloadOperation) cancel() {
 	op.lock.Unlock()
 }
 
-func (op *imageDownloadOperation) cancelInternal() {
+func (op *ImageDownloadOperation) cancelInternal() {
 	if op == nil || op.isFinished {
 		return
 	}
 	if op.task != nil {
-		op.webImageOperation.Cancel()
+		op.WebImageOperation.Cancel()
 		if op.IsRunning {
 			op.IsRunning = false
 		}
@@ -204,7 +221,7 @@ func (op *imageDownloadOperation) cancelInternal() {
 	op.reset()
 }
 
-func (op *imageDownloadOperation) Start() {
+func (op *ImageDownloadOperation) Start() {
 	if op == nil {
 		return
 	}
@@ -233,10 +250,10 @@ func (op *imageDownloadOperation) Start() {
 		}
 	}})
 	op.task.DoOnCompleted(op.done)
-	op.webImageOperation.Start()
+	op.WebImageOperation.Start()
 }
 
-func (op *imageDownloadOperation) download() (data []byte, err error) {
+func (op *ImageDownloadOperation) download() (data []byte, err error) {
 	defer func() {
 		op.cachedData = data
 		op.taskErr = err
@@ -263,7 +280,7 @@ func (op *imageDownloadOperation) download() (data []byte, err error) {
 }
 
 // Head 请求，获取大小, 验证 response
-func (op *imageDownloadOperation) headRequest() (int, error) {
+func (op *ImageDownloadOperation) headRequest() (int, error) {
 	if op == nil || op.req == nil {
 		return 0, ImageOperationInvalidError
 	}
@@ -293,7 +310,7 @@ func (op *imageDownloadOperation) headRequest() (int, error) {
 	return strconv.Atoi(headResp.Header.Get("Content-Length"))
 }
 
-func (op *imageDownloadOperation) Write(p []byte) (n int, err error) {
+func (op *ImageDownloadOperation) Write(p []byte) (n int, err error) {
 	n = len(p)
 	op.total += int64(n)
 	for _, cb := range op.callbacksForKey(kProgressCallbackKey) {
@@ -306,7 +323,7 @@ func (op *imageDownloadOperation) Write(p []byte) (n int, err error) {
 	return
 }
 
-func (op *imageDownloadOperation) reset() {
+func (op *ImageDownloadOperation) reset() {
 	if op == nil {
 		return
 	}
@@ -322,7 +339,7 @@ func (op *imageDownloadOperation) reset() {
 	op.response = nil
 }
 
-func (op *imageDownloadOperation) done() {
+func (op *ImageDownloadOperation) done() {
 	if op == nil {
 		return
 	}
@@ -336,11 +353,11 @@ func (op *imageDownloadOperation) done() {
 	op.reset()
 }
 
-func (op *imageDownloadOperation) callCompletionBlocksWithError(err error) {
+func (op *ImageDownloadOperation) callCompletionBlocksWithError(err error) {
 	op.callCompletionBlocksWithImageData(nil, err, true)
 }
 
-func (op *imageDownloadOperation) callCompletionBlocksWithImageData(data []byte, err error, finished bool) {
+func (op *ImageDownloadOperation) callCompletionBlocksWithImageData(data []byte, err error, finished bool) {
 	if op == nil {
 		return
 	}
@@ -351,8 +368,8 @@ func (op *imageDownloadOperation) callCompletionBlocksWithImageData(data []byte,
 	})
 }
 
-func newImageDownloadOperation(req *http.Request, client *http.Client,
-	options ImageDownloaderOptions, ctx ImageContext) *imageDownloadOperation {
+func NewImageDownloadOperation(req *http.Request, client *http.Client,
+	options ImageDownloaderOptions, ctx ImageContext) *ImageDownloadOperation {
 	var modifier ImageDownloaderResponseModifier
 	if v, ok := ctx[kImageContextDownloadResponseModifier]; ok {
 		cb, ok := v.(ImageDownloaderResponseModifier)
@@ -367,7 +384,7 @@ func newImageDownloadOperation(req *http.Request, client *http.Client,
 			decryption = cb
 		}
 	}
-	return &imageDownloadOperation{
+	return &ImageDownloadOperation{
 		req:              req,
 		client:           client,
 		options:          options,

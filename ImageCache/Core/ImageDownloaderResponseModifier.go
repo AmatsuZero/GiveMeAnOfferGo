@@ -27,13 +27,11 @@ func newImageDownloaderResponseModifier(statusCode int, version string, headers 
 		if response == nil {
 			return response
 		}
-		newHeader := response.Header.Clone()
 		for k := range headers {
-			newHeader.Set(k, headers.Get(k))
+			response.Header.Set(k, headers.Get(k))
 		}
 		response.StatusCode = statusCode
 		response.Proto = version
-		response.Header = newHeader
 		return response
 	})
 }

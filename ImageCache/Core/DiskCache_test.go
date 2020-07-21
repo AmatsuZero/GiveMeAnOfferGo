@@ -1,27 +1,41 @@
 package Core
 
 import (
-	"net/http"
-	"net/url"
+	"fmt"
+	"github.com/reactivex/rxgo/v2"
 	"testing"
+	"time"
 )
 
 func TestMoveDir(t *testing.T) {
-	isExecuting := true
-	req, _ := http.NewRequest("GET", "http://img.chewen.com/pics/2011/09/29/4112011092915584230_b.jpg", nil)
-	op := &imageDownloadOperation{req: req}
-	op.AddHandlersForProgressAndCompletion(func(receivedSize, expectedSize int64, targetURL *url.URL) {
-		t.Logf("Read %d bytes for a total of %d\n", receivedSize, expectedSize)
-	}, func(data []byte, err error, finished bool) {
-		isExecuting = false
-		if err != nil {
-			t.Fail()
-		} else {
-			t.Logf("done: %v", len(data))
-		}
-	})
-	op.Start()
-	for isExecuting {
+	ch := make(chan rxgo.Item)
+	go func() {
+		ch <- rxgo.Of(1)
+		ch <- rxgo.Of(2)
+		ch <- rxgo.Of(3)
+		close(ch)
+	}()
+	// Create a Connectable Observable
+	observable := rxgo.FromChannel(ch, rxgo.WithPublishStrategy())
 
-	}
+	// Create the first Observer
+	observable.DoOnNext(func(i interface{}) {
+		fmt.Printf("First observer: %d\n", i)
+	})
+
+	disposed, cancel := observable.Connect()
+
+	// Create the second Observer
+	observable.DoOnNext(func(i interface{}) {
+		fmt.Printf("Second observer: %d\n", i)
+	})
+
+	go func() {
+		// Do something
+		time.Sleep(time.Second)
+		// Then cancel the subscription
+		cancel()
+	}()
+	// Wait for the subscription to be disposed
+	<-disposed.Done()
 }
