@@ -30,6 +30,14 @@ type ImageContext map[string]interface{}
 
 var InvalidParamError error
 
+const (
+	kImageContextSetImageOperationKey     = "setImageOperationKey"
+	kImageContextCustomManager            = "customManager"
+	kImageContextImageCache               = "imageCache"
+	kImageContextDownloadResponseModifier = "downloadResponseModifier"
+	kImageContextDownloadDecryptor        = "downloadDecryptor"
+)
+
 func init() {
 	InvalidParamError = fmt.Errorf("check input")
 }

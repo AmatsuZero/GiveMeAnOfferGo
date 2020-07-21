@@ -18,13 +18,19 @@ type ImageDownloaderProgressBlock func(receivedSize, expectedSize int64, targetU
 type ImageDownloaderCompletedBlock func(data []byte, err error, finished bool)
 
 var (
-	ImageOperationCancelError  error
-	ImageOperationInvalidError error
+	ImageOperationCancelError                    error
+	ImageOperationInvalidError                   error
+	ImageOperationInvalidResponseError           error
+	ImageOperationInvalidDownloadStatusCodeError error
+	ImageOperationCacheNoModified                error
 )
 
 func init() {
 	ImageOperationCancelError = fmt.Errorf("operation cancelled by user before sending the request")
 	ImageOperationInvalidError = fmt.Errorf("task can't be initialized")
+	ImageOperationInvalidResponseError = fmt.Errorf("download marked as failed because response is nil")
+	ImageOperationInvalidDownloadStatusCodeError = fmt.Errorf("download marked as failed because response status code is not in 200-400")
+	ImageOperationCacheNoModified = fmt.Errorf("download response status code is 304 not modified and ignored")
 }
 
 type WebImageOperation interface {
@@ -85,17 +91,20 @@ const kCompletedCallbackKey = "completed"
 
 type imageDownloadOperation struct {
 	webImageOperation
-	req            *http.Request
-	client         *http.Client
-	options        ImageDownloaderOptions
-	context        ImageContext
-	callbackBlocks []kCallbacksDictionary
-	lock           sync.Mutex
-	isFinished     bool
-	cachedData     []byte
-	total          int64 // Total # of bytes transferred
-	expectedSize   int64
-	taskErr        error
+	req              *http.Request
+	client           *http.Client
+	options          ImageDownloaderOptions
+	context          ImageContext
+	callbackBlocks   []kCallbacksDictionary
+	lock             sync.Mutex
+	isFinished       bool
+	cachedData       []byte
+	total            int64 // Total # of bytes transferred
+	expectedSize     int64
+	taskErr          error
+	responseModifier ImageDownloaderResponseModifier // 用来修改原来的相应体
+	decryption       ImageDownloaderDecryptor        // 用来解密图像数据
+	response         *http.Response
 }
 
 func (op *imageDownloadOperation) Cancel(token interface{}) (shouldCancel bool) {
@@ -232,25 +241,11 @@ func (op *imageDownloadOperation) download() (data []byte, err error) {
 		op.cachedData = data
 		op.taskErr = err
 	}()
-	if op == nil || op.req == nil {
-		err = ImageOperationInvalidError
-		return
-	}
-	// Head 请求，获取大小
-	headResp, err := op.client.Head(op.req.URL.String())
-	if err != nil {
-		return
-	}
-	defer func() {
-		_ = headResp.Body.Close()
-	}()
-	size, err := strconv.Atoi(headResp.Header.Get("Content-Length"))
+	size, err := op.headRequest()
 	if err != nil {
 		return
 	}
 	op.expectedSize = int64(size)
-	// 进度0开始
-	_, err = op.Write(nil)
 	resp, err := op.client.Do(op.req)
 	if err != nil {
 		return
@@ -261,9 +256,41 @@ func (op *imageDownloadOperation) download() (data []byte, err error) {
 	var dst bytes.Buffer
 	src := io.TeeReader(resp.Body, op)
 	_, err = io.Copy(&dst, src)
+	op.response = resp
 	// 放入缓存
 	getURLCache().AddCache(op.req, resp)
 	return dst.Bytes(), err
+}
+
+// Head 请求，获取大小, 验证 response
+func (op *imageDownloadOperation) headRequest() (int, error) {
+	if op == nil || op.req == nil {
+		return 0, ImageOperationInvalidError
+	}
+	headResp, err := op.client.Head(op.req.URL.String())
+	if err != nil {
+		return 0, err
+	}
+	defer func() {
+		_ = headResp.Body.Close()
+	}()
+	if op.responseModifier != nil {
+		headResp = op.responseModifier.ModifiedResponseWithResponse(headResp)
+		if headResp == nil {
+			return 0, ImageOperationInvalidResponseError
+		}
+	}
+	statusCode := headResp.StatusCode
+	statusCodeValid := statusCode >= 200 && statusCode < 400
+	if !statusCodeValid {
+		return 0, ImageOperationInvalidDownloadStatusCodeError
+	}
+	if statusCode == 304 && len(op.cachedData) == 0 {
+		return 0, ImageOperationCacheNoModified
+	}
+	// 进度 0 开始
+	_, err = op.Write(nil)
+	return strconv.Atoi(headResp.Header.Get("Content-Length"))
 }
 
 func (op *imageDownloadOperation) Write(p []byte) (n int, err error) {
@@ -292,6 +319,7 @@ func (op *imageDownloadOperation) reset() {
 	op.expectedSize = 0
 	op.cachedData = nil
 	op.taskErr = nil
+	op.response = nil
 }
 
 func (op *imageDownloadOperation) done() {
@@ -300,7 +328,11 @@ func (op *imageDownloadOperation) done() {
 	}
 	op.isFinished = true
 	op.IsRunning = false
-	op.callCompletionBlocksWithImageData(op.cachedData, op.taskErr, true)
+	data, err := op.cachedData, op.taskErr
+	if data != nil && op.decryption != nil {
+		data, err = op.decryption.DecryptedWithResponse(data, op.response)
+	}
+	op.callCompletionBlocksWithImageData(data, err, true)
 	op.reset()
 }
 
@@ -321,11 +353,27 @@ func (op *imageDownloadOperation) callCompletionBlocksWithImageData(data []byte,
 
 func newImageDownloadOperation(req *http.Request, client *http.Client,
 	options ImageDownloaderOptions, ctx ImageContext) *imageDownloadOperation {
+	var modifier ImageDownloaderResponseModifier
+	if v, ok := ctx[kImageContextDownloadResponseModifier]; ok {
+		cb, ok := v.(ImageDownloaderResponseModifier)
+		if ok {
+			modifier = cb
+		}
+	}
+	var decryption ImageDownloaderDecryptor
+	if v, ok := ctx[kImageContextDownloadDecryptor]; ok {
+		cb, ok := v.(ImageDownloaderDecryptor)
+		if ok {
+			decryption = cb
+		}
+	}
 	return &imageDownloadOperation{
-		req:            req,
-		client:         client,
-		options:        options,
-		context:        ctx,
-		callbackBlocks: make([]kCallbacksDictionary, 0),
+		req:              req,
+		client:           client,
+		options:          options,
+		context:          ctx,
+		callbackBlocks:   make([]kCallbacksDictionary, 0),
+		responseModifier: modifier,
+		decryption:       decryption,
 	}
 }
