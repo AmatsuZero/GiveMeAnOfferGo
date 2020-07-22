@@ -108,7 +108,7 @@ func (cache *ImageCache) QueryImageCacheWithCacheType(key string, ops ImageCache
 			go cb(q.d, q.t)
 		}
 	})
-	return newWebImageOperation(ob)
+	return NewWebImageOperation(ob)
 }
 
 func (cache *ImageCache) ImageDataFromMemoryForKey(key string) []byte {

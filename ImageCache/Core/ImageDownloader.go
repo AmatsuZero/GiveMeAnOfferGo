@@ -9,7 +9,7 @@ import (
 type ImageDownloaderOptions BitsType
 
 const (
-	mageDownloaderLowPriority ImageDownloaderOptions = 1 << iota
+	ImageDownloaderLowPriority ImageDownloaderOptions = 1 << iota
 	ImageDownloaderProgressiveLoad
 	ImageDownloaderUseNSURLCache
 	ImageDownloaderIgnoreCachedResponse
@@ -65,7 +65,7 @@ func (token *ImageDownloadToken) Cancel() {
 	if token == nil || token.isCanceled || token.downloadOperation == nil {
 		return
 	}
-	token.downloadOperation.Cancel(token.downloadOperationToken)
+	token.downloadOperation.CancelWithToken(token.downloadOperationToken)
 	token.downloadOperationToken = nil
 }
 
@@ -79,6 +79,7 @@ type ImageDownloader struct {
 	httpHeaderLock       sync.Mutex
 	client               *http.Client
 	httpHeaders          map[string]string
+	downloadQueue        *ImageDownloadQueue
 }
 
 func (downloader *ImageDownloader) CreateDownloaderOperation(url string, ctx ImageContext, options ImageDownloaderOptions) (ImageDownloadOperationProtocol, error) {
@@ -147,10 +148,24 @@ func (downloader *ImageDownloader) CreateDownloaderOperation(url string, ctx Ima
 	if decryptor != nil {
 		contextDict[kImageContextDownloadResponseModifier] = decryptor
 	}
+	if BitsHas(BitsType(options), BitsType(ImageDownloaderHighPriority)) {
+		op.SetOperationPriority(WebImageOperationPriorityHigh)
+	} else if BitsHas(BitsType(options), BitsType(ImageDownloaderLowPriority)) {
+		op.SetOperationPriority(WebImageOperationPriorityLow)
+	}
 	if downloader.GetConfig() != nil && downloader.GetConfig().ExecutionOrder == SDWebImageDownloaderLIFOExecutionOrder {
-
+		for _, pendingOp := range downloader.downloadQueue.GetOperations() {
+			pendingOp.SetDependency(op)
+		}
 	}
 	return op, nil
+}
+
+func (downloader *ImageDownloader) CancelAllDownloads() {
+	if downloader == nil || downloader.downloadQueue == nil {
+		return
+	}
+	downloader.downloadQueue.CancelAllOperations()
 }
 
 func (downloader *ImageDownloader) GetConfig() *ImageDownloaderConfig {
@@ -189,8 +204,9 @@ func NewImageDownloaderWithConfig(config *ImageDownloaderConfig) *ImageDownloade
 		client = http.DefaultClient
 	}
 	return &ImageDownloader{
-		config:      config.Copy(),
-		httpHeaders: headers,
-		client:      client,
+		config:        config.Copy(),
+		httpHeaders:   headers,
+		client:        client,
+		downloadQueue: NewImageDownloadQueue(config.MaxConcurrentDownloads),
 	}
 }
