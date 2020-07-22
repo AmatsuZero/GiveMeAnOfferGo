@@ -23,7 +23,8 @@ var (
 	ImageOperationInvalidError                   error
 	ImageOperationInvalidResponseError           error
 	ImageOperationInvalidDownloadStatusCodeError error
-	ImageOperationCacheNoModified                error
+	ImageOperationCacheNoModifiedError           error
+	ImageOperationInvalidURLError                error
 )
 
 func init() {
@@ -31,7 +32,8 @@ func init() {
 	ImageOperationInvalidError = fmt.Errorf("task can't be initialized")
 	ImageOperationInvalidResponseError = fmt.Errorf("download marked as failed because response is nil")
 	ImageOperationInvalidDownloadStatusCodeError = fmt.Errorf("download marked as failed because response status code is not in 200-400")
-	ImageOperationCacheNoModified = fmt.Errorf("download response status code is 304 not modified and ignored")
+	ImageOperationCacheNoModifiedError = fmt.Errorf("download response status code is 304 not modified and ignored")
+	ImageOperationInvalidURLError = fmt.Errorf("image url is nil")
 }
 
 type WebImageOperationPriority int
@@ -42,6 +44,8 @@ const (
 	WebImageOperationPriorityHigh
 )
 
+type WebImageOperationCompletionFunc func(op WebImageOperationProtocol)
+
 type WebImageOperationProtocol interface {
 	Objects.ComparableObject
 	Start()
@@ -51,19 +55,40 @@ type WebImageOperationProtocol interface {
 	GetIsCanceled() bool
 	SetOperationPriority(priority WebImageOperationPriority)
 	GetOperationPriority() WebImageOperationPriority
-	SetDependency(dep WebImageOperationProtocol)
-	GetDependency() WebImageOperationProtocol
+	AddDependency(dep WebImageOperationProtocol)
+	GetDependencies() []WebImageOperationProtocol
+	RemoveDependency(dep WebImageOperationProtocol)
+	SetCompletionFunc(block WebImageOperationCompletionFunc)
+	// Internal method
+	setCompletionFunc(block WebImageOperationCompletionFunc)
 }
 
 type WebImageOperation struct {
-	cancel     rxgo.Disposable
-	task       rxgo.Observable
-	ctx        context.Context
-	isCanceled bool
-	isRunning  bool
-	isFinished bool
-	priority   WebImageOperationPriority
-	dependency WebImageOperationProtocol
+	cancel                  rxgo.Disposable
+	task                    rxgo.Observable
+	ctx                     context.Context
+	isCanceled              bool
+	isRunning               bool
+	isFinished              bool
+	priority                WebImageOperationPriority
+	dependencies            []WebImageOperationProtocol
+	depLock                 sync.Mutex
+	completionBlock         WebImageOperationCompletionFunc
+	internalCompletionBlock WebImageOperationCompletionFunc
+}
+
+func (op *WebImageOperation) setCompletionFunc(block WebImageOperationCompletionFunc) {
+	if op == nil {
+		return
+	}
+	op.internalCompletionBlock = block
+}
+
+func (op *WebImageOperation) SetCompletionFunc(block WebImageOperationCompletionFunc) {
+	if op == nil {
+		return
+	}
+	op.completionBlock = block
 }
 
 func (op *WebImageOperation) IsEqualTo(obj interface{}) bool {
@@ -104,21 +129,49 @@ func (op *WebImageOperation) IsNil() bool {
 }
 
 func (op *WebImageOperation) String() string {
-	return fmt.Sprintf("IsRunning: %v", op.GetIsRunning())
+	return fmt.Sprintf("%v: %v", reflect.TypeOf(op), &op)
 }
 
-func (op *WebImageOperation) SetDependency(dep WebImageOperationProtocol) {
+func (op *WebImageOperation) AddDependency(dep WebImageOperationProtocol) {
+	if op == nil || dep == nil || op.isRunning {
+		return
+	}
+	dep.setCompletionFunc(func(dep WebImageOperationProtocol) {
+		op.RemoveDependency(dep)
+	})
+	op.depLock.Lock()
+	op.dependencies = append(op.dependencies, dep)
+	op.depLock.Unlock()
+}
+
+func (op *WebImageOperation) RemoveDependency(dep WebImageOperationProtocol) {
 	if op == nil {
 		return
 	}
-	op.dependency = dep
+	op.depLock.Lock()
+	for i, d := range op.dependencies {
+		if d.IsEqualTo(dep) {
+			op.dependencies = append(op.dependencies[:i], op.dependencies[i+1:]...)
+			break
+		}
+	}
+	op.depLock.Unlock()
 }
 
-func (op *WebImageOperation) GetDependency() WebImageOperationProtocol {
+func (op *WebImageOperation) GetDependencies() []WebImageOperationProtocol {
 	if op == nil {
 		return nil
 	}
-	return op.dependency
+	op.depLock.Lock()
+	deps := op.dependencies[:0]
+	for _, dep := range op.dependencies {
+		if !dep.GetIsFinished() { // 清除已经结束的任务
+			deps = append(deps, dep)
+		}
+	}
+	op.dependencies = deps
+	op.depLock.Unlock()
+	return deps
 }
 
 func (op *WebImageOperation) GetOperationPriority() WebImageOperationPriority {
@@ -167,14 +220,19 @@ func (op *WebImageOperation) Start() {
 	if op == nil {
 		return
 	}
-	dep := op.GetDependency()
-	if op != nil { // 检查是否有依赖
-		go func() {
-			for !dep.GetIsFinished() {
-			} // 等到任务结束或被取消
-			op.start()
-		}()
+	go func() {
+		for op.HasAnyDependency() {
+		} // 检查是否有依赖
+		op.start()
+		fmt.Printf("%v started\n", op)
+	}()
+}
+
+func (op *WebImageOperation) HasAnyDependency() bool {
+	if op == nil {
+		return false
 	}
+	return len(op.GetDependencies()) > 0
 }
 
 func (op *WebImageOperation) start() {
@@ -190,19 +248,37 @@ func (op *WebImageOperation) start() {
 			select {
 			case <-ctx.Done():
 				if op.GetIsFinished() {
+					op.complete()
 					return
 				}
 				op.isRunning = false
 				op.isCanceled = true
 				op.isFinished = true
+				op.complete()
 				return
 			}
 		}
 	}(ctx)
 }
 
+func (op *WebImageOperation) complete() {
+	if op == nil {
+		return
+	}
+	if op.completionBlock != nil {
+		op.completionBlock(op)
+	}
+	if op.internalCompletionBlock != nil {
+		op.internalCompletionBlock(op) // 内部调用，用来清理一些内部依赖逻辑
+	}
+}
+
 func NewWebImageOperation(task rxgo.Observable) *WebImageOperation {
-	return &WebImageOperation{task: task, priority: WebImageOperationPriorityNormal}
+	return &WebImageOperation{
+		task:         task,
+		priority:     WebImageOperationPriorityNormal,
+		dependencies: make([]WebImageOperationProtocol, 0),
+	}
 }
 
 type ImageDownloadOperationProtocol interface {
@@ -343,10 +419,10 @@ func (op *ImageDownloadOperation) cancelInternal() {
 	}
 	op.reset()
 	if op.GetIsRunning() {
-		op.isRunning = false
+		op.WebImageOperation.isRunning = false
 	}
 	if !op.isFinished {
-		op.isFinished = true
+		op.WebImageOperation.isFinished = true
 	}
 }
 
@@ -432,7 +508,7 @@ func (op *ImageDownloadOperation) headRequest() (int, error) {
 		return 0, ImageOperationInvalidDownloadStatusCodeError
 	}
 	if statusCode == 304 && len(op.cachedData) == 0 {
-		return 0, ImageOperationCacheNoModified
+		return 0, ImageOperationCacheNoModifiedError
 	}
 	// 进度 0 开始
 	_, err = op.Write(nil)
@@ -479,8 +555,8 @@ func (op *ImageDownloadOperation) done() {
 	op.callCompletionBlocksWithImageData(data, err, true)
 	op.WebImageOperation.Cancel() // 需要显示的调用 Cancel， 以防 Pending 调用
 	op.reset()
-	op.isRunning = false
-	op.isFinished = true
+	op.WebImageOperation.isRunning = false
+	op.WebImageOperation.isFinished = true
 }
 
 func (op *ImageDownloadOperation) callCompletionBlocksWithError(err error) {
@@ -523,8 +599,16 @@ func NewImageDownloadOperation(req *http.Request, client *http.Client,
 		responseModifier: modifier,
 		decryption:       decryption,
 	}
-	op.WebImageOperation = &WebImageOperation{
-		priority: WebImageOperationPriorityNormal,
-	}
+	op.WebImageOperation = NewWebImageOperation(nil)
 	return op
+}
+
+func (op *ImageDownloadOperation) IsEqualTo(obj interface{}) bool {
+	if op == nil || obj == nil {
+		return false
+	}
+	if op == obj {
+		return true
+	}
+	return op.WebImageOperation.IsEqualTo(obj)
 }

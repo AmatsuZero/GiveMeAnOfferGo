@@ -2,7 +2,6 @@ package Core
 
 import (
 	"context"
-	"fmt"
 	"github.com/reactivex/rxgo/v2"
 	"testing"
 	"time"
@@ -63,16 +62,5 @@ func TestMoveDir(t *testing.T) {
 
 	for isExecuting {
 
-	}
-}
-
-func createRange() []int {
-	fmt.Println("Called")
-	return []int{1, 2, 3, 4, 5, 6}
-}
-
-func TestPerformance(t *testing.T) {
-	for _, num := range createRange() {
-		t.Log(num)
 	}
 }

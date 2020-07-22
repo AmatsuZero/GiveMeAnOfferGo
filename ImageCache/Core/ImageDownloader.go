@@ -1,7 +1,6 @@
 package Core
 
 import (
-	"github.com/reactivex/rxgo/v2"
 	"net/http"
 	"sync"
 )
@@ -24,27 +23,13 @@ const (
 )
 
 type ImageDownloadToken struct {
-	req                    *http.Request
-	resp                   *http.Response
-	isCanceled             bool
 	downloadOperationToken interface{}
 	downloadOperation      ImageDownloadOperationProtocol
 	lock                   sync.Mutex
 }
 
-func newImageDownloadTokenWithObserver(respOb rxgo.Observable, op ImageDownloadOperationProtocol) *ImageDownloadToken {
-	token := &ImageDownloadToken{downloadOperation: op}
-	respOb.Filter(func(i interface{}) bool {
-		op, ok := i.(ImageDownloadOperationProtocol)
-		if !ok {
-			return ok
-		}
-		return op == token.downloadOperation
-	}).DoOnNext(func(i interface{}) {
-		op, _ := i.(ImageDownloadOperationProtocol)
-		token.resp = op.GetResponse()
-	})
-	return token
+func newImageDownloadTokenWithObserver(op ImageDownloadOperationProtocol) *ImageDownloadToken {
+	return &ImageDownloadToken{downloadOperation: op}
 }
 
 func (token *ImageDownloadToken) GetRequest() *http.Request {
@@ -55,14 +40,14 @@ func (token *ImageDownloadToken) GetRequest() *http.Request {
 }
 
 func (token *ImageDownloadToken) GetResponse() *http.Response {
-	if token == nil || token.resp == nil {
+	if token == nil {
 		return nil
 	}
-	return token.resp
+	return token.downloadOperation.GetResponse()
 }
 
 func (token *ImageDownloadToken) Cancel() {
-	if token == nil || token.isCanceled || token.downloadOperation == nil {
+	if token == nil || token.downloadOperation == nil || token.downloadOperation.GetIsCanceled() {
 		return
 	}
 	token.downloadOperation.CancelWithToken(token.downloadOperationToken)
@@ -80,6 +65,7 @@ type ImageDownloader struct {
 	client               *http.Client
 	httpHeaders          map[string]string
 	downloadQueue        *ImageDownloadQueue
+	urlOperations        map[string]ImageDownloadOperationProtocol
 }
 
 func (downloader *ImageDownloader) CreateDownloaderOperation(url string, ctx ImageContext, options ImageDownloaderOptions) (ImageDownloadOperationProtocol, error) {
@@ -155,10 +141,83 @@ func (downloader *ImageDownloader) CreateDownloaderOperation(url string, ctx Ima
 	}
 	if downloader.GetConfig() != nil && downloader.GetConfig().ExecutionOrder == SDWebImageDownloaderLIFOExecutionOrder {
 		for _, pendingOp := range downloader.downloadQueue.GetOperations() {
-			pendingOp.SetDependency(op)
+			pendingOp.AddDependency(op)
 		}
 	}
 	return op, nil
+}
+
+func (downloader *ImageDownloader) SetValueForHTTPField(value, field string) {
+	if downloader == nil {
+		return
+	}
+	downloader.httpHeaderLock.Lock()
+	downloader.httpHeaders[field] = value
+	downloader.httpHeaderLock.Unlock()
+}
+
+func (downloader *ImageDownloader) GetValueForField(field string) (val string) {
+	if downloader == nil || len(downloader.httpHeaders) == 0 {
+		return
+	}
+	downloader.httpHeaderLock.Lock()
+	val = downloader.httpHeaders[field]
+	downloader.httpHeaderLock.Unlock()
+	return
+}
+
+func (downloader *ImageDownloader) DownloadImage(
+	url string,
+	options ImageDownloaderOptions,
+	ctx ImageContext,
+	progressCb ImageDownloaderProgressBlock,
+	completionCb ImageDownloaderCompletedBlock) *ImageDownloadToken {
+	if downloader == nil {
+		return nil
+	}
+	if len(url) == 0 {
+		if completionCb != nil {
+			completionCb(nil, ImageOperationInvalidURLError, true)
+		}
+		return nil
+	}
+	downloader.operationLock.Lock()
+	operation, ok := downloader.urlOperations[url]
+	var err error
+	var token interface{}
+	if !ok || operation.GetIsFinished() || operation.GetIsCanceled() { // 确保已经完成或者取消的任务移除
+		operation, err = downloader.CreateDownloaderOperation(url, ctx, options)
+		if err != nil {
+			downloader.operationLock.Unlock()
+			if completionCb != nil {
+				completionCb(nil, err, true)
+			}
+			return nil
+		}
+		operation.SetCompletionFunc(func(op WebImageOperationProtocol) {
+			downloader.operationLock.Lock()
+			delete(downloader.urlOperations, url)
+			downloader.operationLock.Unlock()
+		})
+		downloader.urlOperations[url] = operation
+		token = operation.AddHandlersForProgressAndCompletion(progressCb, completionCb)
+		downloader.downloadQueue.AddOperation(operation)
+	} else {
+		token = operation.AddHandlersForProgressAndCompletion(progressCb, completionCb)
+		if !operation.GetIsRunning() {
+			if BitsHas(BitsType(options), BitsType(ImageDownloaderHighPriority)) {
+				operation.SetOperationPriority(WebImageOperationPriorityHigh)
+			} else if BitsHas(BitsType(options), BitsType(ImageDownloaderLowPriority)) {
+				operation.SetOperationPriority(WebImageOperationPriorityLow)
+			} else {
+				operation.SetOperationPriority(WebImageOperationPriorityNormal)
+			}
+		}
+	}
+	downloader.operationLock.Unlock()
+	downloadToken := newImageDownloadTokenWithObserver(operation)
+	downloadToken.downloadOperationToken = token
+	return downloadToken
 }
 
 func (downloader *ImageDownloader) CancelAllDownloads() {
@@ -208,5 +267,6 @@ func NewImageDownloaderWithConfig(config *ImageDownloaderConfig) *ImageDownloade
 		httpHeaders:   headers,
 		client:        client,
 		downloadQueue: NewImageDownloadQueue(config.MaxConcurrentDownloads),
+		urlOperations: map[string]ImageDownloadOperationProtocol{},
 	}
 }
