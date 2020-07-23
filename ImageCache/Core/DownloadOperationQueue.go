@@ -5,6 +5,7 @@ import (
 	"github.com/AmatsuZero/GiveMeAnOfferGo/Collections"
 	"github.com/AmatsuZero/GiveMeAnOfferGo/Objects"
 	"github.com/reactivex/rxgo/v2"
+	"sync"
 )
 
 type ImageDownloadQueue struct {
@@ -12,9 +13,10 @@ type ImageDownloadQueue struct {
 	tasks            chan rxgo.Item
 	ob               rxgo.Observable
 	cancel           rxgo.Disposable
-	ctx              context.Context
+	Context          context.Context
 	cancelTokens     map[ImageDownloadOperationProtocol]interface{}
 	maxConcurrentNum int
+	queueLock        sync.Mutex
 }
 
 func NewImageDownloadQueue(maxConcurrentNum int) *ImageDownloadQueue {
@@ -32,7 +34,7 @@ func NewImageDownloadQueue(maxConcurrentNum int) *ImageDownloadQueue {
 		tasks:            tasks,
 		ob:               ob,
 		cancelTokens:     map[ImageDownloadOperationProtocol]interface{}{},
-		ctx:              ctx,
+		Context:          ctx,
 		cancel:           cancel,
 		maxConcurrentNum: maxConcurrentNum,
 	}
@@ -42,6 +44,7 @@ func (queue *ImageDownloadQueue) CancelAllOperations() {
 	if queue == nil {
 		return
 	}
+	queue.queueLock.Lock()
 	for !queue.priorityQueue.IsEmpty() {
 		task := queue.priorityQueue.Dequeue().(ImageDownloadOperationProtocol)
 		token, ok := queue.cancelTokens[task]
@@ -49,6 +52,8 @@ func (queue *ImageDownloadQueue) CancelAllOperations() {
 			task.CancelWithToken(token)
 		}
 	}
+	queue.cancelTokens = map[ImageDownloadOperationProtocol]interface{}{} // 清空
+	queue.queueLock.Unlock()
 	queue.cancel()
 }
 
@@ -57,6 +62,8 @@ func (queue *ImageDownloadQueue) GetOperations() (ops []ImageDownloadOperationPr
 		return ops
 	}
 	ops = make([]ImageDownloadOperationProtocol, 0, len(queue.cancelTokens))
+	queue.queueLock.Lock()
+	defer queue.queueLock.Unlock()
 	for k := range queue.cancelTokens {
 		ops = append(ops, k)
 	}
@@ -67,14 +74,18 @@ func (queue *ImageDownloadQueue) AddOperation(op ImageDownloadOperationProtocol)
 	if queue == nil || op == nil {
 		return
 	}
-	queue.priorityQueue.Enqueue(op)
-	task := queue.priorityQueue.Dequeue().(ImageDownloadOperationProtocol)
-	// 任务完成时，移除任务
-	token := task.AddHandlersForProgressAndCompletion(nil, func(data []byte, err error, finished bool) {
-		delete(queue.cancelTokens, task)
+	queue.queueLock.Lock()
+	defer queue.queueLock.Unlock()
+	token := op.AddHandlersForProgressAndCompletion(nil, func(data []byte, err error, finished bool) {
+		delete(queue.cancelTokens, op) // 任务完成时，移除任务
 	})
-	queue.cancelTokens[task] = token
-	go func(task ImageDownloadOperationProtocol) {
+	queue.cancelTokens[op] = token
+	queue.priorityQueue.Enqueue(op)
+	go func() {
+		task := queue.priorityQueue.Dequeue()
+		if task == nil {
+			return
+		}
 		queue.tasks <- rxgo.Of(task)
-	}(task)
+	}()
 }

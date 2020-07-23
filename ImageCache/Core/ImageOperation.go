@@ -193,6 +193,7 @@ func (op *WebImageOperation) Cancel() {
 		return
 	}
 	op.cancel()
+	op.complete()
 }
 
 func (op *WebImageOperation) GetIsCanceled() bool {
@@ -447,7 +448,9 @@ func (op *ImageDownloadOperation) Start() {
 			op.cachedData = resp.BodyData
 		}
 	}
-	op.task = rxgo.Create([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
+	op.task = rxgo.Defer([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
+		for !op.isRunning {
+		}
 		data, err := op.download()
 		next <- rxgo.Item{
 			V: data,
