@@ -19,22 +19,13 @@ type ImageDownloaderProgressBlock func(receivedSize, expectedSize int64, targetU
 type ImageDownloaderCompletedBlock func(data []byte, err error, finished bool)
 
 var (
-	ImageOperationCancelError                    error
-	ImageOperationInvalidError                   error
-	ImageOperationInvalidResponseError           error
-	ImageOperationInvalidDownloadStatusCodeError error
-	ImageOperationCacheNoModifiedError           error
-	ImageOperationInvalidURLError                error
-)
-
-func init() {
-	ImageOperationCancelError = fmt.Errorf("operation cancelled by user before sending the request")
-	ImageOperationInvalidError = fmt.Errorf("task can't be initialized")
-	ImageOperationInvalidResponseError = fmt.Errorf("download marked as failed because response is nil")
+	ImageOperationCancelError                    = fmt.Errorf("operation cancelled by user before sending the request")
+	ImageOperationInvalidError                   = fmt.Errorf("task can't be initialized")
+	ImageOperationInvalidResponseError           = fmt.Errorf("download marked as failed because response is nil")
 	ImageOperationInvalidDownloadStatusCodeError = fmt.Errorf("download marked as failed because response status code is not in 200-400")
-	ImageOperationCacheNoModifiedError = fmt.Errorf("download response status code is 304 not modified and ignored")
-	ImageOperationInvalidURLError = fmt.Errorf("image url is nil")
-}
+	ImageOperationCacheNoModifiedError           = fmt.Errorf("download response status code is 304 not modified and ignored")
+	ImageOperationInvalidURLError                = fmt.Errorf("image url is nil")
+)
 
 type WebImageOperationPriority int
 
