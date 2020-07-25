@@ -41,8 +41,7 @@ const (
 
 type ImageCacheProtocol interface {
 	QueryImageCache(key string, ops ImageCacheOptions, ctx ImageContext, cb ImageCacheQueryCompletionBlock) WebImageOperationProtocol
-	QueryImageCacheWithCacheType(key string, ops ImageCacheOptions,
-		ctx ImageContext, ct ImageCacheType, cb ImageCacheQueryCompletionBlock) WebImageOperationProtocol
+	QueryImageCacheWithCacheType(key string, ops ImageOptions, ctx ImageContext, ct ImageCacheType, cb ImageCacheQueryCompletionBlock) WebImageOperationProtocol
 	StoreImage(data []byte, key string, ct ImageCacheType, cb ImageNoParamsBlock)
 	RemoveImageForKey(key string, cacheType ImageCacheType, cb ImageNoParamsBlock)
 	ContainsImageForKey(key string, cacheType ImageCacheType, cb ImageCacheContainsCompletionBlock)
@@ -61,8 +60,7 @@ func (cache *ImageCache) QueryImageCache(key string, ops ImageCacheOptions, ctx 
 	panic("implement me")
 }
 
-func (cache *ImageCache) QueryImageCacheWithCacheType(key string, ops ImageCacheOptions,
-	ctx ImageContext, ct ImageCacheType, cb ImageCacheQueryCompletionBlock) WebImageOperationProtocol {
+func (cache *ImageCache) QueryImageCacheWithCacheType(key string, ops ImageOptions, ctx ImageContext, ct ImageCacheType, cb ImageCacheQueryCompletionBlock) WebImageOperationProtocol {
 	if cache == nil || len(key) == 0 || ct == ImageCacheTypeNone {
 		if cb != nil {
 			cb(nil, ImageCacheTypeNone)

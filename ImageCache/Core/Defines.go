@@ -28,7 +28,11 @@ func BitsHas(options, flag BitsType) bool {
 
 type ImageContext map[string]interface{}
 
-var InvalidParamError error
+var (
+	InvalidParamError     = fmt.Errorf("check input")
+	ImageBlackListedError = fmt.Errorf("image url is blacklisted")
+	ImageInvalidURLError  = fmt.Errorf("image url is nil")
+)
 
 const (
 	kImageContextSetImageOperationKey     = "setImageOperationKey"
@@ -36,11 +40,9 @@ const (
 	kImageContextImageCache               = "imageCache"
 	kImageContextDownloadResponseModifier = "downloadResponseModifier"
 	kImageContextDownloadDecryptor        = "downloadDecryptor"
+	kbImageContextCacheKeyFilter          = "imageCacheKeyFilter"
+	kbImageContextOriginalQueryCacheType  = "originalQueryCacheType"
 )
-
-func init() {
-	InvalidParamError = fmt.Errorf("check input")
-}
 
 type URLCache struct {
 	*lru.Cache
@@ -93,3 +95,32 @@ func getURLCache() *URLCache {
 	}
 	return kDefaultURLCache
 }
+
+type ImageOptions BitsType
+
+const (
+	ImageRetryFailed ImageOptions = 1 << iota
+	ImageLowPriority
+	ImageProgressiveLoad
+	ImageRefreshCached
+	ImageContinueInBackground
+	ImageHandleCookies
+	ImageAllowInvalidSSLCertificates
+	ImageHighPriority
+	ImageDelayPlaceholder
+	ImageTransformAnimatedImage
+	ImageAvoidAutoSetImage
+	ImageScaleDownLargeImages
+	ImageQueryMemoryData
+	ImageQueryMemoryDataSync
+	ImageQueryDiskDataSync
+	ImageFromCacheOnly
+	ImageFromLoaderOnly
+	ImageForceTransition
+	ImageAvoidDecodeImage
+	ImageDecodeFirstFrameOnly
+	ImagePreloadAllFrames
+	ImageMatchAnimatedImageClass
+	ImageWaitStoreCache
+	ImageTransformVectorImage
+)
