@@ -16,6 +16,11 @@ var (
 	kInvalidParamError = fmt.Errorf("invalid param")
 )
 
+const (
+	kFakeWebUA = "mozilla/5.0 (windows nt 10.0; win64; x64) applewebkit/537.36 (khtml, like gecko) chrome/83.0.4103.116 safari/537.36 opr/69.0.3686.77"
+	kFakeRefer = "https://www.bilibili.com"
+)
+
 type BadResponseError struct {
 	Code    int
 	Message string
@@ -62,10 +67,11 @@ func (bq baseRequest) IsParamsValid() bool {
 }
 
 func (bq baseRequest) fetch(client *http.Client, req *http.Request, opts ...rxgo.Option) rxgo.Observable {
+	if client == nil {
+		client = http.DefaultClient
+	}
 	return rxgo.Defer([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
-		if client == nil {
-			client = http.DefaultClient
-		}
+		req = req.WithContext(ctx)
 		resp, err := client.Do(req)
 		if err != nil {
 			next <- rxgo.Error(err)

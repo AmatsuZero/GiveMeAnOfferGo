@@ -7,6 +7,7 @@ import (
 	"github.com/reactivex/rxgo/v2"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 )
 
@@ -103,6 +104,64 @@ func (request VideoStreamRequest) queryItems(query url.Values) url.Values {
 	return query
 }
 
+type VideoSegments struct {
+	Order      int // 分段序号
+	Length     int
+	Size       int // 单位为Byte
+	Ahead      string
+	Vhead      string
+	Url        string   // 视频流url
+	BackupUrl  []string `json:"backup_url"`
+	retryCount int      // 标志当前重试次数
+	targetPath string   // 要写入的路径
+}
+
+func (segments VideoSegments) Request() (req *http.Request, err error) {
+	if segments.retryCount > len(segments.BackupUrl) {
+		return nil, fmt.Errorf("can not retry")
+	}
+	if segments.retryCount == 0 {
+		req, err = http.NewRequest("GET", segments.Url, nil)
+	} else {
+		req, err = http.NewRequest("GET", segments.BackupUrl[segments.retryCount-1], nil)
+	}
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", kFakeWebUA)
+	req.Header.Set("Refer", kFakeRefer)
+	return
+}
+
+func (segments VideoSegments) IsParamsValid() bool {
+	if segments.retryCount == 0 {
+		return len(segments.Url) > 0
+	}
+	return len(segments.BackupUrl[segments.retryCount-1]) > 0
+}
+
+func (segments *VideoSegments) Fetch(client *http.Client, opts ...rxgo.Option) rxgo.Observable {
+	if client == nil {
+		client = http.DefaultClient
+	}
+	return rxgo.Defer([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
+		req, err := segments.Request()
+		if err != nil {
+			next <- rxgo.Error(err)
+			return
+		}
+		req = req.WithContext(ctx)
+		resp, err := client.Do(req)
+		next <- rxgo.Item{
+			V: resp,
+			E: err,
+		}
+	}}).Retry(len(segments.BackupUrl), func(err error) bool {
+		segments.retryCount++
+		return true
+	})
+}
+
 type VideoStreamInfo struct {
 	BaseResponse
 	Data struct {
@@ -118,15 +177,7 @@ type VideoStreamInfo struct {
 		VideoCodecid      int                     `json:"video_codecid"`
 		SeekParam         string                  `json:"seek_param"`
 		SeekType          string                  `json:"seek_type"`
-		Durl              []struct {
-			Order     int // 分段序号
-			Length    int
-			Size      int // 单位为Byte
-			Ahead     string
-			Vhead     string
-			Url       string   // 视频流url
-			BackupUrl []string `json:"backup_url"`
-		}
+		Durl              []VideoSegments
 	}
 }
 
@@ -134,6 +185,27 @@ func (info VideoStreamInfo) SupportFormats() []string {
 	return strings.Split(info.Data.AcceptFormat, ",")
 }
 
-func (info VideoStreamInfo) Download(client *http.Client, opts ...rxgo.Option) rxgo.Observable {
-	return rxgo.Empty()
+func (info VideoStreamInfo) Download(path string, client *http.Client, opts ...rxgo.Option) rxgo.Disposed {
+	source := make([]VideoSegments, 0, len(info.Data.Durl))
+	_ = copy(source, info.Data.Durl)
+	sort.Slice(source, func(i, j int) bool {
+		return source[i].Order < source[j].Order
+	})
+	ob := rxgo.Just(source)().Map(func(ctx context.Context, i interface{}) (interface{}, error) {
+		segment := i.(VideoSegments)
+		segment.targetPath = path
+		return info.downloadSegment(&segment, client, ctx)
+	})
+	ob.DoOnNext(func(i interface{}) {
+
+	})
+	return ob.Run(opts...)
+}
+
+func (info VideoStreamInfo) downloadSegment(seg *VideoSegments, client *http.Client, ctx context.Context) (string, error) {
+	ob := seg.Fetch(client, rxgo.WithContext(ctx))
+	ob.DoOnNext(func(i interface{}) {
+
+	})
+	return "", nil
 }

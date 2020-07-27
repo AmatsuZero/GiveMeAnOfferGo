@@ -16,6 +16,8 @@ func TestGetVideoInfo(t *testing.T) {
 	item, err := req.Fetch(client).First().Get()
 	if err != nil {
 		t.Fatal(err)
+	} else if item.E != nil {
+		t.Fatal(item.E)
 	}
 	assert.NotNil(t, item.V)
 }
@@ -29,6 +31,8 @@ func TestGetVideoDesc(t *testing.T) {
 	item, err := req.Fetch(client).First().Get()
 	if err != nil {
 		t.Fatal(err)
+	} else if item.E != nil {
+		t.Fatal(item.E)
 	}
 	assert.NotNil(t, item.V)
 }
@@ -42,6 +46,8 @@ func TestFetchVideoPageList(t *testing.T) {
 	item, err := req.Fetch(client).First().Get()
 	if err != nil {
 		t.Fatal(err)
+	} else if item.E != nil {
+		t.Fatal(item.E)
 	}
 	assert.NotNil(t, item.V)
 }
@@ -57,6 +63,12 @@ func TestFetchVideoStreamSingle(t *testing.T) {
 	item, err := req.Fetch(client).First().Get()
 	if err != nil {
 		t.Fatal(err)
+	} else if item.E != nil {
+		t.Fatal(item.E)
 	}
 	assert.NotNil(t, item.V)
+}
+
+func TestDownloadSegment(t *testing.T) {
+
 }
