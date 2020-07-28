@@ -1,8 +1,6 @@
 package bilibili_api
 
 import (
-	"context"
-	"github.com/reactivex/rxgo/v2"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"testing"
@@ -92,17 +90,27 @@ func TestDownloadSegment(t *testing.T) {
 	t.Log(item.V)
 }
 
-func TestReduce(t *testing.T) {
-	ob := rxgo.Range(0, 100).Reduce(func(ctx context.Context, acc interface{}, elem interface{}) (interface{}, error) {
-		var ret []int
-		if acc == nil {
-			ret = make([]int, 0)
-		} else {
-			ret = acc.([]int)
-		}
-		ret = append(ret, elem.(int))
-		return ret, nil
-	})
-	item, _ := ob.Get()
+func TestDownloadByVideoInfo(t *testing.T) {
+	req := VideoInfoRequest{}
+	req.Aid = "85440373"
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	item, err := req.Fetch(client).First().Get()
+	if err != nil {
+		t.Fatal(err)
+	} else if item.E != nil {
+		t.Fatal(item.E)
+	}
+	info := item.V.(VideoInfo)
+	path := "/Users/jiangzhenhua/Desktop/download.flv"
+	item, err = info.Download(path, client, func(progress float64) {
+		t.Logf("下载进度 %f", progress*100)
+	}).Get()
+	if err != nil {
+		t.Fatal(err)
+	} else if item.E != nil {
+		t.Fatal(item.E)
+	}
 	t.Log(item.V)
 }

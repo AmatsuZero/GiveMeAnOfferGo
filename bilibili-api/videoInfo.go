@@ -3,6 +3,7 @@ package bilibili_api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/reactivex/rxgo/v2"
 	"net/http"
 	"net/url"
@@ -157,10 +158,13 @@ func (info VideoInfo) IsReprint() bool {
 	return info.Data.Copyright == 2
 }
 
-func (info VideoInfo) Download() {
+func (info VideoInfo) Download(to string, client *http.Client, progressCB func(progress float64), opts ...rxgo.Option) rxgo.OptionalSingle {
 	req := VideoStreamRequest{}
 	req.Bvid = info.Data.Bvid
-	req.Avid = info.Data.Aid
+	req.Avid = fmt.Sprintf("%d", info.Data.Aid)
+	req.Cid = fmt.Sprintf("%d", info.Data.Cid)
+	req.ProgressCb = progressCB
+	return req.Download(to, client, opts...)
 }
 
 type VideoOwner struct {
@@ -290,6 +294,18 @@ const (
 	MemberTypeMonthly
 	MemberTypeYearly
 )
+
+func (t MembershipType) String() string {
+	switch t {
+	case MemberTypeMonthly:
+		return "月度会员"
+	case MemberTypeYearly:
+		return "年度会员"
+	case MemberTypeNone:
+		return "非会员"
+	}
+	return "未知"
+}
 
 type VIPInfo struct {
 	MemberShip MembershipType `json:"type"`
