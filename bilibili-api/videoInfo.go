@@ -157,6 +157,12 @@ func (info VideoInfo) IsReprint() bool {
 	return info.Data.Copyright == 2
 }
 
+func (info VideoInfo) Download() {
+	req := VideoStreamRequest{}
+	req.Bvid = info.Data.Bvid
+	req.Avid = info.Data.Aid
+}
+
 type VideoOwner struct {
 	Mid  int    // Up主 uid
 	Name string // Up主昵称

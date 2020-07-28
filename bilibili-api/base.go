@@ -16,6 +16,11 @@ var (
 	kInvalidParamError = fmt.Errorf("invalid param")
 )
 
+// https://ixday.github.io/post/golang-cancel-copy/
+type readerFunc func(p []byte) (n int, err error)
+
+func (rf readerFunc) Read(p []byte) (n int, err error) { return rf(p) }
+
 const (
 	kFakeWebUA = "mozilla/5.0 (windows nt 10.0; win64; x64) applewebkit/537.36 (khtml, like gecko) chrome/83.0.4103.116 safari/537.36 opr/69.0.3686.77"
 	kFakeRefer = "https://www.bilibili.com"
