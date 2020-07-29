@@ -73,16 +73,16 @@ func (bq baseRequest) IsParamsValid() bool {
 	return false
 }
 
-func (bq baseRequest) fetch(client *http.Client, req *http.Request, opts ...rxgo.Option) rxgo.Observable {
+func (bq *baseRequest) fetch(client *http.Client, req *http.Request, opts ...rxgo.Option) rxgo.Observable {
 	if client == nil {
 		client = http.DefaultClient
+	}
+	if bq.Session == nil {
+		bq.Session = kDefaultSession
 	}
 	return rxgo.Defer([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
 		req = req.WithContext(ctx)
 		s := bq.Session
-		if s == nil {
-			s = kDefaultSession
-		}
 		if s != nil {
 			cookies := s.Cookies(req.URL)
 			for _, c := range cookies {
@@ -94,6 +94,8 @@ func (bq baseRequest) fetch(client *http.Client, req *http.Request, opts ...rxgo
 			next <- rxgo.Error(err)
 			return
 		}
+		kDefaultSession.SetCookies(resp.Request.URL, resp.Cookies())
+		_ = kDefaultSession.Serialize(kDefaultSessionPath)
 		next <- rxgo.Of(resp)
 	}}, opts...).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
 		var info BaseResponse
@@ -133,4 +135,9 @@ func (bq baseRequest) Fetch(client *http.Client, opts ...rxgo.Option) rxgo.Obser
 
 func (bq baseRequest) queryItems(query url.Values) url.Values {
 	return query
+}
+
+type Downloadable interface {
+	SetProgressFunc(cb func(progress float64))
+	Download(to string, client *http.Client, opts ...rxgo.Option) rxgo.OptionalSingle
 }

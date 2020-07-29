@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -160,6 +161,7 @@ type Session struct {
 	Data       interface{}
 	jar        *cookiejar.Jar
 	CookiePath string
+	lock       sync.Mutex
 }
 
 func NewSession(path string) (s *Session) {
@@ -213,7 +215,16 @@ func (s *Session) SetCookies(u *url.URL, cookies []*http.Cookie) {
 }
 
 func (s *Session) Cookies(u *url.URL) []*http.Cookie {
-	return s.jar.Cookies(u)
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	allCookies := s.jar.AllCookies()
+	cookies := allCookies[:0]
+	for _, c := range allCookies {
+		if strings.HasSuffix(u.Host, c.Domain) && c.Path == "/" {
+			cookies = append(cookies, c)
+		}
+	}
+	return cookies
 }
 
 func (s *Session) Serialize(path string) error {

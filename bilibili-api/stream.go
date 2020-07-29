@@ -63,7 +63,7 @@ type VideoStreamRequest struct {
 	Resolution  VideoStreamResolution
 	ShouldUse4K bool
 	CompleteCb  func(err error)
-	ProgressCb  func(progress float64)
+	progressCb  func(progress float64)
 }
 
 func (request VideoStreamRequest) IsParamsValid() bool {
@@ -97,6 +97,10 @@ func (request VideoStreamRequest) Fetch(client *http.Client, opts ...rxgo.Option
 	})
 }
 
+func (request *VideoStreamRequest) SetProgressFunc(cb func(progress float64)) {
+	request.progressCb = cb
+}
+
 func (request VideoStreamRequest) Download(to string, client *http.Client, opts ...rxgo.Option) rxgo.OptionalSingle {
 	defaultClient := http.DefaultClient // 这里改用没有超时的默认 Client，避免任务被 Cancel
 	tmpDir := ""
@@ -115,7 +119,7 @@ func (request VideoStreamRequest) Download(to string, client *http.Client, opts 
 			}
 		}
 		info := item.V.(VideoStreamInfo)
-		info.progressCB = request.ProgressCb
+		info.progressCB = request.progressCb
 		return info.download(tmpDir, defaultClient, opts...)
 	})
 
@@ -232,6 +236,10 @@ func (segments *VideoSegments) Fetch(client *http.Client, opts ...rxgo.Option) r
 		}
 		req = req.WithContext(ctx)
 		resp, err := client.Do(req)
+		if err == nil {
+			kDefaultSession.SetCookies(resp.Request.URL, resp.Cookies())
+			_ = kDefaultSession.Serialize(kDefaultSessionPath)
+		}
 		next <- rxgo.Item{
 			V: resp,
 			E: err,

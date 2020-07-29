@@ -4,6 +4,8 @@ import (
 	"github.com/AmatsuZero/GiveMeAnOfferGo/bilibili-api"
 	"github.com/stretchr/testify/assert"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -65,14 +67,15 @@ func TestFetchVideoStreamSingle(t *testing.T) {
 }
 
 func TestDownloadSegment(t *testing.T) {
-	path := "/Users/jiangzhenhua/Desktop/download.flv"
+	path, _ := os.UserHomeDir()
+	path = filepath.Join(path, "Desktop", "download.flv")
 	req := bilibili_api.VideoStreamRequest{
 		Bvid: "BV117411r7R1",
 		Cid:  "146044693",
 	}
-	req.ProgressCb = func(progress float64) {
+	req.SetProgressFunc(func(progress float64) {
 		t.Logf("下载进度 %f", progress*100)
-	}
+	})
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
@@ -98,10 +101,12 @@ func TestDownloadByVideoInfo(t *testing.T) {
 		t.Fatal(item.E)
 	}
 	info := item.V.(bilibili_api.VideoInfo)
-	path := "/Users/jiangzhenhua/Desktop/download.flv"
-	item, err = info.Download(path, client, func(progress float64) {
+	info.SetProgressFunc(func(progress float64) {
 		t.Logf("下载进度 %f", progress*100)
-	}).Get()
+	})
+	path, _ := os.UserHomeDir()
+	path = filepath.Join(path, "Desktop", "download.flv")
+	item, err = info.Download(path, client).Get()
 	if err != nil {
 		t.Fatal(err)
 	} else if item.E != nil {
@@ -120,5 +125,21 @@ func TestLogin(t *testing.T) {
 }
 
 func TestDownloadDanmuku(t *testing.T) {
+	req := bilibili_api.HistoryDanmukuRequest{
+		Oid:  "144541892",
+		Date: "2020-01-21",
+	}
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	path, _ := os.UserHomeDir()
+	path = filepath.Join(path, "Desktop", "danmuku.xml")
+	item, err := req.Download(path, client).Get()
+	if err != nil {
+		t.Fatal(err)
+	} else if item.E != nil {
+		t.Fatal(item.E)
+	}
+	t.Log(item.V)
 
 }

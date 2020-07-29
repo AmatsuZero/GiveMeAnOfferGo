@@ -152,18 +152,23 @@ type VideoInfo struct {
 		Subtitle    VideoSubtitle
 		Staff       []VideoStaff `json:"staff, omitempty"`
 	}
+	progressCb func(progress float64)
 }
 
 func (info VideoInfo) IsReprint() bool {
 	return info.Data.Copyright == 2
 }
 
-func (info VideoInfo) Download(to string, client *http.Client, progressCB func(progress float64), opts ...rxgo.Option) rxgo.OptionalSingle {
+func (info *VideoInfo) SetProgressFunc(cb func(progress float64)) {
+	info.progressCb = cb
+}
+
+func (info VideoInfo) Download(to string, client *http.Client, opts ...rxgo.Option) rxgo.OptionalSingle {
 	req := VideoStreamRequest{}
 	req.Bvid = info.Data.Bvid
 	req.Avid = fmt.Sprintf("%d", info.Data.Aid)
 	req.Cid = fmt.Sprintf("%d", info.Data.Cid)
-	req.ProgressCb = progressCB
+	req.SetProgressFunc(info.progressCb)
 	return req.Download(to, client, opts...)
 }
 
