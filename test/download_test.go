@@ -1,6 +1,7 @@
-package bilibili_api
+package test
 
 import (
+	"github.com/AmatsuZero/GiveMeAnOfferGo/bilibili-api"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"testing"
@@ -8,7 +9,7 @@ import (
 )
 
 func TestGetVideoInfo(t *testing.T) {
-	req := VideoInfoRequest{}
+	req := bilibili_api.VideoInfoRequest{}
 	req.Aid = "85440373"
 	client := &http.Client{
 		Timeout: 10 * time.Second,
@@ -21,7 +22,7 @@ func TestGetVideoInfo(t *testing.T) {
 }
 
 func TestGetVideoDesc(t *testing.T) {
-	req := VideoDescRequest{}
+	req := bilibili_api.VideoDescRequest{}
 	req.Aid = "85440373"
 	client := &http.Client{
 		Timeout: 10 * time.Second,
@@ -34,7 +35,7 @@ func TestGetVideoDesc(t *testing.T) {
 }
 
 func TestFetchVideoPageList(t *testing.T) {
-	req := VideoPageListRequest{}
+	req := bilibili_api.VideoPageListRequest{}
 	req.Aid = "85440373"
 	client := &http.Client{
 		Timeout: 10 * time.Second,
@@ -49,7 +50,7 @@ func TestFetchVideoPageList(t *testing.T) {
 }
 
 func TestFetchVideoStreamSingle(t *testing.T) {
-	req := VideoStreamRequest{
+	req := bilibili_api.VideoStreamRequest{
 		Bvid: "BV1y7411Q7Eq",
 		Cid:  "171776208",
 	}
@@ -65,7 +66,7 @@ func TestFetchVideoStreamSingle(t *testing.T) {
 
 func TestDownloadSegment(t *testing.T) {
 	path := "/Users/jiangzhenhua/Desktop/download.flv"
-	req := VideoStreamRequest{
+	req := bilibili_api.VideoStreamRequest{
 		Bvid: "BV117411r7R1",
 		Cid:  "146044693",
 	}
@@ -85,7 +86,7 @@ func TestDownloadSegment(t *testing.T) {
 }
 
 func TestDownloadByVideoInfo(t *testing.T) {
-	req := VideoInfoRequest{}
+	req := bilibili_api.VideoInfoRequest{}
 	req.Aid = "85440373"
 	client := &http.Client{
 		Timeout: 10 * time.Second,
@@ -96,7 +97,7 @@ func TestDownloadByVideoInfo(t *testing.T) {
 	} else if item.E != nil {
 		t.Fatal(item.E)
 	}
-	info := item.V.(VideoInfo)
+	info := item.V.(bilibili_api.VideoInfo)
 	path := "/Users/jiangzhenhua/Desktop/download.flv"
 	item, err = info.Download(path, client, func(progress float64) {
 		t.Logf("下载进度 %f", progress*100)
@@ -110,10 +111,14 @@ func TestDownloadByVideoInfo(t *testing.T) {
 }
 
 func TestLogin(t *testing.T) {
-	req := LoginRequest{}
+	req := bilibili_api.LoginRequest{}
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
 	session := req.Login(client)
 	t.Log(session)
+}
+
+func TestDownloadDanmuku(t *testing.T) {
+
 }

@@ -6,14 +6,28 @@ import (
 	"github.com/reactivex/rxgo/v2"
 	"net/http"
 	"net/url"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
 var (
 	kPassportBaseURL, _ = url.Parse("http://passport.bilibili.com")
+	kDefaultSessionPath = ""
+	kDefaultSession     *Session
 )
+
+func init() {
+	config, err := os.UserConfigDir()
+	if err != nil {
+		return
+	}
+	kDefaultSessionPath = filepath.Join(config, "user_session")
+	kDefaultSession = NewSession(kDefaultSessionPath)
+}
 
 type LoginRequest struct {
 	baseRequest
@@ -29,13 +43,19 @@ func (request LoginRequest) Request() (*http.Request, error) {
 	return http.NewRequest("GET", u.String(), nil)
 }
 
-func (request LoginRequest) Login(client *http.Client, opts ...rxgo.Option) Session {
+func (request LoginRequest) Login(client *http.Client, opts ...rxgo.Option) (s *Session) {
+	s = NewSession("")
 	for item := range request.Fetch(client).Observe(opts...) {
-		if item.E == nil && item.V.(Session).IsSuccess() {
-			return item.V.(Session)
+		if item.E == nil && item.V.(*Session).IsSuccess() {
+			s = item.V.(*Session)
+			break
 		}
 	}
-	return Session{}
+	if s.IsSuccess() {
+		_ = s.Serialize(kDefaultSessionPath)
+		kDefaultSession = s // 更新 Session
+	}
+	return
 }
 
 func (request LoginRequest) Fetch(client *http.Client, opts ...rxgo.Option) rxgo.Observable {
@@ -62,7 +82,7 @@ func (request LoginRequest) Fetch(client *http.Client, opts ...rxgo.Option) rxgo
 		}
 		start := time.Now() // 180秒计时
 		return item.V.(sessionParam).Fetch(client, opts...).TakeUntil(func(i interface{}) bool {
-			return i.(Session).IsSuccess() || time.Since(start) >= 180
+			return i.(*Session).IsSuccess() || time.Since(start).Seconds() >= 180
 		})
 	})
 }
@@ -113,7 +133,7 @@ func (param sessionParam) Fetch(client *http.Client, opts ...rxgo.Option) rxgo.O
 	if client == nil {
 		client = http.DefaultClient
 	}
-	return rxgo.Interval(rxgo.WithDuration(3 * time.Second)).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
+	return rxgo.Interval(rxgo.WithDuration(3*time.Second)).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
 		req = req.WithContext(ctx)
 		resp, err := client.Do(req)
 		if err != nil {
@@ -122,8 +142,8 @@ func (param sessionParam) Fetch(client *http.Client, opts ...rxgo.Option) rxgo.O
 		defer func() {
 			_ = resp.Body.Close()
 		}()
-		var session Session
-		err = json.NewDecoder(resp.Body).Decode(&session)
+		session := NewSession("")
+		err = json.NewDecoder(resp.Body).Decode(session)
 		if err != nil {
 			return nil, err
 		}
@@ -131,34 +151,98 @@ func (param sessionParam) Fetch(client *http.Client, opts ...rxgo.Option) rxgo.O
 			session.SetCookies(resp.Request.URL, resp.Cookies()) // 持久化 Cookie
 		}
 		return session, nil
-	})
+	}, opts...)
 }
 
 type Session struct {
 	BaseResponse
-	Status bool
-	Data   interface{}
+	Status     bool
+	Data       interface{}
+	cookieJar  map[*url.URL][]*http.Cookie
+	cookieLock sync.Mutex
 }
 
-func (s Session) IsSuccess() bool {
+func NewSession(path string) (s *Session) {
+	s = &Session{}
+	if len(path) == 0 {
+		return
+	}
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) || info.IsDir() {
+		return
+	}
+	file, err := os.Open(path)
+	defer func() {
+		_ = file.Close()
+	}()
+	if err != nil {
+		return
+	}
+	err = json.NewDecoder(file).Decode(s)
+	return
+}
+
+func (s *Session) IsSuccess() bool {
 	return s.Status
 }
 
-func (s Session) RedirectURL() string {
+func (s *Session) RedirectURL() string {
 	if !s.IsSuccess() {
 		return ""
 	}
-	r, ok := s.Data.(string)
+	r, ok := s.Data.(map[string]interface{})
 	if !ok {
 		return ""
 	}
-	return r
+	ret := r["url"]
+	return ret.(string)
 }
 
-func (s Session) SetCookies(u *url.URL, cookies []*http.Cookie) {
-
+func (s *Session) SetCookies(u *url.URL, cookies []*http.Cookie) {
+	s.cookieLock.Lock()
+	if s.cookieJar == nil {
+		s.cookieJar = map[*url.URL][]*http.Cookie{}
+	}
+	defer s.cookieLock.Unlock()
+	jar, ok := s.cookieJar[u]
+	if ok {
+		jar = append(jar, cookies...)
+		set := map[*http.Cookie]bool{}
+		for _, c := range jar {
+			set[c] = true
+		}
+		jar = jar[:0]
+		for c := range set {
+			jar = append(jar, c)
+		}
+		jar = append(jar, cookies...)
+	} else {
+		jar = cookies
+	}
+	s.cookieJar[u] = jar
 }
 
-func (s Session) Cookies(u *url.URL) []*http.Cookie {
-	return nil
+func (s *Session) Cookies(u *url.URL) []*http.Cookie {
+	s.cookieLock.Lock()
+	defer s.cookieLock.Unlock()
+	if s.cookieJar == nil {
+		s.cookieJar = map[*url.URL][]*http.Cookie{}
+	}
+	return s.cookieJar[u]
+}
+
+func (s *Session) Serialize(path string) error {
+	byteArr, err := json.Marshal(s)
+	if err != nil {
+		return err
+	}
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+	_, err = file.Write(byteArr)
+	return err
 }

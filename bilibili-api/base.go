@@ -61,7 +61,9 @@ type BaseRequest interface {
 	Fetch(client *http.Client, opts ...rxgo.Option) rxgo.Observable
 }
 
-type baseRequest struct{}
+type baseRequest struct {
+	Session *Session
+}
 
 func (bq baseRequest) Request() (*http.Request, error) {
 	return nil, kInvalidParamError
@@ -77,6 +79,16 @@ func (bq baseRequest) fetch(client *http.Client, req *http.Request, opts ...rxgo
 	}
 	return rxgo.Defer([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
 		req = req.WithContext(ctx)
+		s := bq.Session
+		if s == nil {
+			s = kDefaultSession
+		}
+		if s != nil {
+			cookies := s.Cookies(req.URL)
+			for _, c := range cookies {
+				req.AddCookie(c)
+			}
+		}
 		resp, err := client.Do(req)
 		if err != nil {
 			next <- rxgo.Error(err)
