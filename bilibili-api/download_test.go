@@ -13,10 +13,8 @@ func TestGetVideoInfo(t *testing.T) {
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
-	item, err := req.Fetch(client).First().Get()
-	if err != nil {
-		t.Fatal(err)
-	} else if item.E != nil {
+	item := <-req.Fetch(client).Observe()
+	if item.E != nil {
 		t.Fatal(item.E)
 	}
 	assert.NotNil(t, item.V)
@@ -28,10 +26,8 @@ func TestGetVideoDesc(t *testing.T) {
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
-	item, err := req.Fetch(client).First().Get()
-	if err != nil {
-		t.Fatal(err)
-	} else if item.E != nil {
+	item := <-req.Fetch(client).Observe()
+	if item.E != nil {
 		t.Fatal(item.E)
 	}
 	assert.NotNil(t, item.V)
@@ -60,10 +56,8 @@ func TestFetchVideoStreamSingle(t *testing.T) {
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
-	item, err := req.Fetch(client).First().Get()
-	if err != nil {
-		t.Fatal(err)
-	} else if item.E != nil {
+	item := <-req.Fetch(client).Observe()
+	if item.E != nil {
 		t.Fatal(item.E)
 	}
 	assert.NotNil(t, item.V)
@@ -113,4 +107,16 @@ func TestDownloadByVideoInfo(t *testing.T) {
 		t.Fatal(item.E)
 	}
 	t.Log(item.V)
+}
+
+func TestLogin(t *testing.T) {
+	req := LoginRequest{}
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	item := <-req.Fetch(client).Observe()
+	if item.E != nil {
+		t.Fatal(item.E)
+	}
+	assert.NotNil(t, item.V)
 }
