@@ -3,6 +3,7 @@ package bilibili_api
 import (
 	"context"
 	"encoding/json"
+	"github.com/juju/persistent-cookiejar"
 	"github.com/reactivex/rxgo/v2"
 	"net/http"
 	"net/url"
@@ -10,7 +11,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -158,12 +158,22 @@ type Session struct {
 	BaseResponse
 	Status     bool
 	Data       interface{}
-	cookieJar  map[*url.URL][]*http.Cookie
-	cookieLock sync.Mutex
+	jar        *cookiejar.Jar
+	CookiePath string
 }
 
 func NewSession(path string) (s *Session) {
 	s = &Session{}
+	defer func() {
+		if len(s.CookiePath) == 0 {
+			s.CookiePath = cookiejar.DefaultCookieFile()
+		}
+		op := &cookiejar.Options{
+			Filename: s.CookiePath,
+		}
+		jar, _ := cookiejar.New(op)
+		s.jar = jar
+	}()
 	if len(path) == 0 {
 		return
 	}
@@ -199,36 +209,11 @@ func (s *Session) RedirectURL() string {
 }
 
 func (s *Session) SetCookies(u *url.URL, cookies []*http.Cookie) {
-	s.cookieLock.Lock()
-	if s.cookieJar == nil {
-		s.cookieJar = map[*url.URL][]*http.Cookie{}
-	}
-	defer s.cookieLock.Unlock()
-	jar, ok := s.cookieJar[u]
-	if ok {
-		jar = append(jar, cookies...)
-		set := map[*http.Cookie]bool{}
-		for _, c := range jar {
-			set[c] = true
-		}
-		jar = jar[:0]
-		for c := range set {
-			jar = append(jar, c)
-		}
-		jar = append(jar, cookies...)
-	} else {
-		jar = cookies
-	}
-	s.cookieJar[u] = jar
+	s.jar.SetCookies(u, cookies)
 }
 
 func (s *Session) Cookies(u *url.URL) []*http.Cookie {
-	s.cookieLock.Lock()
-	defer s.cookieLock.Unlock()
-	if s.cookieJar == nil {
-		s.cookieJar = map[*url.URL][]*http.Cookie{}
-	}
-	return s.cookieJar[u]
+	return s.jar.Cookies(u)
 }
 
 func (s *Session) Serialize(path string) error {
@@ -243,6 +228,7 @@ func (s *Session) Serialize(path string) error {
 	defer func() {
 		_ = file.Close()
 	}()
+	err = s.jar.Save()
 	_, err = file.Write(byteArr)
 	return err
 }
