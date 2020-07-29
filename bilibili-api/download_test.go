@@ -114,9 +114,6 @@ func TestLogin(t *testing.T) {
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
-	item := <-req.Fetch(client).Observe()
-	if item.E != nil {
-		t.Fatal(item.E)
-	}
-	assert.NotNil(t, item.V)
+	session := req.Login(client)
+	t.Log(session)
 }

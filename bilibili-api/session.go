@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/reactivex/rxgo/v2"
-	"math"
 	"net/http"
 	"net/url"
 	"os/exec"
@@ -30,6 +29,15 @@ func (request LoginRequest) Request() (*http.Request, error) {
 	return http.NewRequest("GET", u.String(), nil)
 }
 
+func (request LoginRequest) Login(client *http.Client, opts ...rxgo.Option) Session {
+	for item := range request.Fetch(client).Observe(opts...) {
+		if item.E == nil && item.V.(Session).IsSuccess() {
+			return item.V.(Session)
+		}
+	}
+	return Session{}
+}
+
 func (request LoginRequest) Fetch(client *http.Client, opts ...rxgo.Option) rxgo.Observable {
 	req, err := request.Request()
 	if err != nil {
@@ -43,7 +51,7 @@ func (request LoginRequest) Fetch(client *http.Client, opts ...rxgo.Option) rxgo
 			return nil, err
 		}
 		// 打开链接
-		err = exec.CommandContext(ctx, "python", "-m", "webbrowser", "-t", param.Data.Url).Run()
+		err = exec.CommandContext(ctx, "python", "-m", "webbrowser", "-t", param.QRLink()).Run()
 		if err != nil {
 			return nil, err
 		}
@@ -52,7 +60,10 @@ func (request LoginRequest) Fetch(client *http.Client, opts ...rxgo.Option) rxgo
 		if item.E != nil {
 			return rxgo.Thrown(item.E)
 		}
-		return item.V.(sessionParam).Fetch(client, opts...)
+		start := time.Now() // 180秒计时
+		return item.V.(sessionParam).Fetch(client, opts...).TakeUntil(func(i interface{}) bool {
+			return i.(Session).IsSuccess() || time.Since(start) >= 180
+		})
 	})
 }
 
@@ -65,8 +76,16 @@ type sessionParam struct {
 	}
 }
 
+func (param sessionParam) QRLink() string {
+	base, _ := url.Parse("https://cli.im/api/qrcode/code")
+	q := base.Query()
+	q.Set("text", param.Data.Url)
+	base.RawQuery = q.Encode()
+	return base.String()
+}
+
 func (param sessionParam) Request() (*http.Request, error) {
-	if param.IsParamsValid() {
+	if !param.IsParamsValid() {
 		return nil, kInvalidParamError
 	}
 	u := *kPassportBaseURL
@@ -94,44 +113,46 @@ func (param sessionParam) Fetch(client *http.Client, opts ...rxgo.Option) rxgo.O
 	if client == nil {
 		client = http.DefaultClient
 	}
-	start := time.Now()
-	return rxgo.Defer([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
-		var session Session
-		var err error
-		defer func() {
-			next <- rxgo.Item{
-				V: session,
-				E: err,
-			}
-		}()
+	return rxgo.Interval(rxgo.WithDuration(3 * time.Second)).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
+		req = req.WithContext(ctx)
 		resp, err := client.Do(req)
 		if err != nil {
-			return
+			return nil, err
 		}
 		defer func() {
 			_ = resp.Body.Close()
 		}()
+		var session Session
 		err = json.NewDecoder(resp.Body).Decode(&session)
 		if err != nil {
-			return
+			return nil, err
 		}
-		if !session.IsSuccess() {
-			err = session.GetError()
-			return
+		if session.IsSuccess() {
+			session.SetCookies(resp.Request.URL, resp.Cookies()) // 持久化 Cookie
 		}
-		session.SetCookies(resp.Request.URL, resp.Cookies()) // 持久化 Cookie
-	}}).Retry(math.MaxInt32, func(err error) bool {
-		return time.Since(start).Seconds() <= 180
+		return session, nil
 	})
 }
 
 type Session struct {
 	BaseResponse
 	Status bool
+	Data   interface{}
 }
 
 func (s Session) IsSuccess() bool {
 	return s.Status
+}
+
+func (s Session) RedirectURL() string {
+	if !s.IsSuccess() {
+		return ""
+	}
+	r, ok := s.Data.(string)
+	if !ok {
+		return ""
+	}
+	return r
 }
 
 func (s Session) SetCookies(u *url.URL, cookies []*http.Cookie) {
