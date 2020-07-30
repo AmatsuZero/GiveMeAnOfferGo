@@ -22,6 +22,7 @@ type HistoryDanmukuRequest struct {
 	Oid        string
 	Date       string
 	progressCb func(progress float64)
+	fileSize   int64
 }
 
 func (request HistoryDanmukuRequest) Request() (*http.Request, error) {
@@ -72,7 +73,14 @@ func (request HistoryDanmukuRequest) download(to string, client *http.Client, op
 		defer func() {
 			_ = file.Close()
 		}()
-		_, e = io.Copy(file, readerFunc(func(p []byte) (int, error) {
+		receivedSize := 0
+		_, e = io.Copy(file, readerFunc(func(p []byte) (n int, err error) {
+			defer func() {
+				receivedSize += n
+				if request.progressCb != nil {
+					request.progressCb(float64(receivedSize) / float64(request.fileSize))
+				}
+			}()
 			select {
 			case <-ctx.Done():
 				return 0, ctx.Err()
@@ -133,6 +141,7 @@ func (request *HistoryDanmukuRequest) Fetch(client *http.Client, opts ...rxgo.Op
 			err = info.GetError()
 			return
 		}
+		request.fileSize = r.ContentLength
 		next <- rxgo.Of(r)
 	}}, opts...)
 }
@@ -200,6 +209,8 @@ func (request *HistoryDanmukuIndexRequest) SetProgressFunc(cb func(progress floa
 func (request *HistoryDanmukuIndexRequest) Download(to string, client *http.Client, opts ...rxgo.Option) rxgo.OptionalSingle {
 	tmpDir := ""
 	var zipFile *os.File
+	totalProgress := float64(0)
+	count := 0
 	ob := request.Fetch(client, opts...).FlatMap(func(item rxgo.Item) rxgo.Observable {
 		if item.E != nil {
 			return rxgo.Thrown(item.E)
@@ -228,12 +239,19 @@ func (request *HistoryDanmukuIndexRequest) Download(to string, client *http.Clie
 		if len(dates) == 0 {
 			return rxgo.Empty()
 		}
+		count = len(dates)
 		return rxgo.Just(dates)()
 	}).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
 		req := HistoryDanmukuRequest{}
 		req.Session = request.Session
 		req.Oid = request.Oid
 		req.Date = i.(string)
+		req.SetProgressFunc(func(progress float64) {
+			totalProgress += progress / float64(count)
+			if req.progressCb != nil {
+				req.progressCb(totalProgress)
+			}
+		})
 		return req, nil
 	}).FlatMap(func(item rxgo.Item) rxgo.Observable {
 		req := item.V.(HistoryDanmukuRequest)

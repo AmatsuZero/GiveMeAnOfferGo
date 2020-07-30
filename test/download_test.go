@@ -134,6 +134,9 @@ func TestDownloadDanmuku(t *testing.T) {
 	}
 	path, _ := os.UserHomeDir()
 	path = filepath.Join(path, "Desktop", "danmuku.xml")
+	req.SetProgressFunc(func(progress float64) {
+		t.Logf("下载进度 %f", progress*100)
+	})
 	item, err := req.Download(path, client).Get()
 	if err != nil {
 		t.Fatal(err)
@@ -153,6 +156,9 @@ func TestDownloadDanmukuFromIndex(t *testing.T) {
 	}
 	path, _ := os.UserHomeDir()
 	path = filepath.Join(path, "Desktop")
+	req.SetProgressFunc(func(progress float64) {
+		t.Logf("下载进度 %f", progress*100)
+	})
 	item, err := req.Download(path, client).Get()
 	if err != nil {
 		t.Fatal(err)

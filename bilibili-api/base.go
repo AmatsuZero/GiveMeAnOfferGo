@@ -14,6 +14,7 @@ import (
 var (
 	kBaseURL, _        = url.Parse("http://api.bilibili.com")
 	kInvalidParamError = fmt.Errorf("invalid param")
+	kOutOfTimesError   = fmt.Errorf("can not retry")
 )
 
 // https://ixday.github.io/post/golang-cancel-copy/

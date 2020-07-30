@@ -200,7 +200,7 @@ type VideoSegments struct {
 
 func (segments VideoSegments) Request() (req *http.Request, err error) {
 	if segments.retryCount > len(segments.BackupUrl) {
-		return nil, fmt.Errorf("can not retry")
+		return nil, kOutOfTimesError
 	}
 	if segments.retryCount == 0 {
 		req, err = http.NewRequest("GET", segments.Url, nil)
@@ -286,7 +286,7 @@ func (segments *VideoSegments) writeToFile(ctx context.Context, i interface{}) (
 	defer func() {
 		_ = file.Close()
 	}()
-	_, err = io.Copy(file, readerFunc(func(p []byte) (int, error) {
+	_, err = io.Copy(file, readerFunc(func(p []byte) (n int, err error) {
 		// golang non-blocking channel: https://gobyexample.com/non-blocking-channel-operations
 		select {
 		// if context has been canceled
@@ -295,8 +295,9 @@ func (segments *VideoSegments) writeToFile(ctx context.Context, i interface{}) (
 			return 0, ctx.Err()
 		default:
 			// otherwise just run default io.Reader implementation
-			defer segments.progressCB(segments.Size, len(p))
-			return r.Body.Read(p)
+			n, err = r.Body.Read(p)
+			segments.progressCB(segments.Size, n)
+			return n, err
 		}
 	}))
 	return dst, err
