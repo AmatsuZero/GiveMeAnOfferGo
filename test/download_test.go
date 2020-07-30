@@ -167,3 +167,22 @@ func TestDownloadDanmukuFromIndex(t *testing.T) {
 	}
 	t.Log(item.V)
 }
+
+func TestDownloadMusic(t *testing.T) {
+	req := bilibili_api.MusicStreamRequest{
+		SongId:  "15664",
+		Quality: bilibili_api.MusicQuality320K,
+	}
+	path, _ := os.UserHomeDir()
+	path = filepath.Join(path, "Desktop", "test.mp3")
+	req.SetProgressFunc(func(progress float64) {
+		t.Logf("下载进度 %f", progress*100)
+	})
+	item, err := req.Download(path, nil).Get()
+	if err != nil {
+		t.Fatal(err)
+	} else if item.E != nil {
+		t.Fatal(item.E)
+	}
+	t.Log(item.V)
+}

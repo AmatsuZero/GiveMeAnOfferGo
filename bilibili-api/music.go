@@ -2,11 +2,16 @@ package bilibili_api
 
 import (
 	"context"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"github.com/reactivex/rxgo/v2"
+	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"os/exec"
+	"path/filepath"
 )
 
 type MusicQuality int
@@ -16,15 +21,30 @@ const (
 	MusicQuality192K
 	MusicQuality320K
 	MusicQualityFLAC
-	MusicQualityTrial = -1
+	MusicQualityTrial MusicQuality = -1
 )
+
+func (quality MusicQuality) String() string {
+	switch quality {
+	case MusicQuality128K:
+		return "流畅 128K"
+	case MusicQuality192K:
+		return "标准 192K"
+	case MusicQualityFLAC:
+		return "高品质 320K"
+	case MusicQualityTrial:
+		return "无损 FLAC （大会员）"
+	}
+	return "未知"
+}
 
 type MusicStreamRequest struct {
 	baseRequest
-	SongId   string
-	Quality  MusicQuality
-	Mid      string
-	Platform string
+	SongId     string
+	Quality    MusicQuality
+	Mid        string
+	Platform   string
+	progressCB func(progress float64)
 }
 
 func (request MusicStreamRequest) Request() (*http.Request, error) {
@@ -51,6 +71,19 @@ func (request MusicStreamRequest) Request() (*http.Request, error) {
 	return http.NewRequest("GET", base.String(), nil)
 }
 
+func (request *MusicStreamRequest) SetProgressFunc(cb func(progress float64)) {
+	request.progressCB = cb
+}
+
+func (request *MusicStreamRequest) Download(to string, client *http.Client, opts ...rxgo.Option) rxgo.OptionalSingle {
+	return request.Fetch(client, opts...).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
+		info := i.(MusicStreamInfo)
+		info.Session = request.Session
+		info.progressCB = request.progressCB
+		return info.Download(to, client, opts...).Get()
+	}).First()
+}
+
 func (request MusicStreamRequest) Fetch(client *http.Client, opts ...rxgo.Option) rxgo.Observable {
 	req, err := request.Request()
 	if err != nil {
@@ -64,6 +97,7 @@ func (request MusicStreamRequest) Fetch(client *http.Client, opts ...rxgo.Option
 			return nil, err
 		}
 		info.Session = request.Session
+		info.md5Sign = md5.Sum(data)
 		return info, nil
 	})
 }
@@ -87,8 +121,12 @@ type MusicQualityInfo struct {
 	Size        int
 	Bps         string
 	Tag         string
-	Require     string
+	Require     int
 	RequireDesc string `json:"requiredesc"`
+}
+
+func (info MusicQualityInfo) NeedVIP() bool {
+	return info.Require == 1
 }
 
 type MusicStreamInfo struct {
@@ -107,6 +145,7 @@ type MusicStreamInfo struct {
 	}
 	progressCB func(progress float64)
 	retryCount int
+	md5Sign    [16]byte
 }
 
 func (info *MusicStreamInfo) SetProgressFunc(cb func(progress float64)) {
@@ -114,7 +153,77 @@ func (info *MusicStreamInfo) SetProgressFunc(cb func(progress float64)) {
 }
 
 func (info *MusicStreamInfo) Download(to string, client *http.Client, opts ...rxgo.Option) rxgo.OptionalSingle {
-	return info.download(to, client, opts...).First()
+	tmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("%x", info.md5Sign))
+	_, err := os.Stat(tmpDir)
+	if os.IsNotExist(err) {
+		err = os.Mkdir(tmpDir, os.ModePerm)
+	}
+	if err != nil {
+		return rxgo.Thrown(err).First()
+	}
+	tmpCoverPath := filepath.Join(tmpDir, info.Data.Title+filepath.Ext(info.Data.Cover))
+	tmpMusicPath := filepath.Join(tmpDir, "music.mp3")
+	if info.Data.Type == MusicQualityFLAC {
+		tmpMusicPath = filepath.Join(tmpDir, "music.aac")
+	}
+	return rxgo.Merge([]rxgo.Observable{
+		info.downloadCover(tmpCoverPath, client, opts...),
+		info.download(tmpMusicPath, client, opts...),
+	}).Reduce(func(ctx context.Context, i interface{}, i2 interface{}) (interface{}, error) {
+		if i == nil {
+			return i2, nil
+		}
+		return i.(string) + i2.(string), nil
+	}).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
+		cmd := exec.CommandContext(ctx, "ffmpeg", "-i", tmpMusicPath, "-i", tmpCoverPath,
+			"-map_metadata", "0", "-map", "0", "-map", "1", to)
+		err = cmd.Run()
+		fmt.Println(cmd.String())
+		_ = os.RemoveAll(tmpDir)
+		return to, err
+	})
+}
+
+func (info *MusicStreamInfo) downloadCover(to string, client *http.Client, opts ...rxgo.Option) rxgo.Observable {
+	if client == nil {
+		client = http.DefaultClient
+	}
+	req, err := http.NewRequest("GET", info.Data.Cover, nil)
+	if err != nil {
+		return rxgo.Thrown(err)
+	}
+	return rxgo.Defer([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
+		req = req.WithContext(ctx)
+		r, err := client.Do(req)
+		if err != nil {
+			next <- rxgo.Error(err)
+			return
+		}
+		defer func() {
+			_ = r.Body.Close()
+		}()
+		file, err := os.Create(to)
+		if err != nil {
+			next <- rxgo.Error(err)
+			return
+		}
+		defer func() {
+			_ = file.Close()
+		}()
+		_, err = io.Copy(file, readerFunc(func(p []byte) (n int, err error) {
+			select {
+			case <-ctx.Done():
+				return 0, ctx.Err()
+			default:
+				return r.Body.Read(p)
+			}
+		}))
+		if err != nil {
+			next <- rxgo.Error(err)
+			return
+		}
+		next <- rxgo.Of(to)
+	}}, opts...)
 }
 
 func (info *MusicStreamInfo) download(to string, client *http.Client, opts ...rxgo.Option) rxgo.Observable {
@@ -125,7 +234,35 @@ func (info *MusicStreamInfo) download(to string, client *http.Client, opts ...rx
 		info.retryCount++
 		return true
 	}).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
-		return nil, nil
+		r := i.(*http.Response)
+		defer func() {
+			_ = r.Body.Close()
+		}()
+		file, err := os.Create(to)
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			_ = file.Close()
+		}()
+		receivedSize := 0
+		if info.Data.Size == 0 { // 试听类型，大小为 0
+			info.Data.Size = int(r.ContentLength)
+		}
+		_, err = io.Copy(file, readerFunc(func(p []byte) (n int, err error) {
+			select {
+			case <-ctx.Done():
+				return 0, ctx.Err()
+			default:
+				n, err = r.Body.Read(p)
+				receivedSize += n
+				if info.progressCB != nil {
+					info.progressCB(float64(receivedSize) / float64(info.Data.Size))
+				}
+				return n, err
+			}
+		}))
+		return to, err
 	})
 }
 
@@ -145,8 +282,11 @@ func (info *MusicStreamInfo) fetch(client *http.Client, req *http.Request, opts 
 		info.Session = kDefaultSession
 	}
 	if client.Jar == nil {
-		for _, c := range info.Session.Cookies(req.URL) {
-			req.AddCookie(c)
+		for _, c := range info.Session.jar.AllCookies() {
+			if c.Name == "SESSDATA" {
+				req.AddCookie(c)
+				break
+			}
 		}
 	}
 	return rxgo.Defer([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
