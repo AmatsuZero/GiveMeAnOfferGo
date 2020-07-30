@@ -80,22 +80,25 @@ func (bq *baseRequest) fetch(client *http.Client, req *http.Request, opts ...rxg
 	if bq.Session == nil {
 		bq.Session = kDefaultSession
 	}
+	if client.Jar == nil {
+		for _, c := range bq.Session.Cookies(req.URL) {
+			req.AddCookie(c)
+		}
+	}
 	return rxgo.Defer([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
 		req = req.WithContext(ctx)
-		s := bq.Session
-		if s != nil {
-			cookies := s.Cookies(req.URL)
-			for _, c := range cookies {
-				req.AddCookie(c)
-			}
-		}
 		resp, err := client.Do(req)
 		if err != nil {
 			next <- rxgo.Error(err)
 			return
 		}
-		kDefaultSession.SetCookies(resp.Request.URL, resp.Cookies())
-		_ = kDefaultSession.Serialize(kDefaultSessionPath)
+		defer func() {
+			if client.Jar != nil {
+				return
+			}
+			kDefaultSession.SetCookies(resp.Request.URL, resp.Cookies())
+			_ = kDefaultSession.Serialize(kDefaultSessionPath)
+		}()
 		next <- rxgo.Of(resp)
 	}}, opts...).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
 		var info BaseResponse

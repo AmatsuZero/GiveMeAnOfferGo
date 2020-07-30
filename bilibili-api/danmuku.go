@@ -24,18 +24,7 @@ func (request HistoryDanmukuRequest) Request() (*http.Request, error) {
 	base := *kBaseURL
 	base.Path = "x/v2/dm/history"
 	base.RawQuery = request.queryItems(base.Query()).Encode()
-	s := request.Session
-	if s == nil {
-		s = kDefaultSession
-	}
-	req, err := http.NewRequest("GET", base.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-	for _, c := range s.Cookies(&base) {
-		req.AddCookie(c)
-	}
-	return req, nil
+	return http.NewRequest("GET", base.String(), nil)
 }
 
 func (request *HistoryDanmukuRequest) SetProgressFunc(cb func(progress float64)) {
@@ -87,13 +76,21 @@ func (request HistoryDanmukuRequest) Download(to string, client *http.Client, op
 	}).First()
 }
 
-func (request HistoryDanmukuRequest) Fetch(client *http.Client, opts ...rxgo.Option) rxgo.Observable {
+func (request *HistoryDanmukuRequest) Fetch(client *http.Client, opts ...rxgo.Option) rxgo.Observable {
 	req, err := request.Request()
 	if err != nil {
 		return rxgo.Thrown(err)
 	}
 	if client == nil {
 		client = http.DefaultClient
+	}
+	if request.Session == nil {
+		request.Session = kDefaultSession
+	}
+	if client.Jar == nil {
+		for _, c := range request.Session.Cookies(req.URL) {
+			req.AddCookie(c)
+		}
 	}
 	return rxgo.Defer([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
 		req = req.WithContext(ctx)
@@ -102,6 +99,13 @@ func (request HistoryDanmukuRequest) Fetch(client *http.Client, opts ...rxgo.Opt
 			next <- rxgo.Error(err)
 			return
 		}
+		defer func() {
+			if client.Jar != nil {
+				return
+			}
+			kDefaultSession.SetCookies(r.Request.URL, r.Cookies())
+			_ = kDefaultSession.Serialize(kDefaultSessionPath)
+		}()
 		if r.Header.Get("Content-Type") != "text/xml" {
 			data, err := ioutil.ReadAll(r.Body)
 			defer func() {
@@ -118,8 +122,6 @@ func (request HistoryDanmukuRequest) Fetch(client *http.Client, opts ...rxgo.Opt
 			err = info.GetError()
 			return
 		}
-		kDefaultSession.SetCookies(r.Request.URL, r.Cookies())
-		_ = kDefaultSession.Serialize(kDefaultSessionPath)
 		next <- rxgo.Of(r)
 	}}, opts...)
 }

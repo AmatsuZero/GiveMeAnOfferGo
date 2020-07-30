@@ -185,6 +185,7 @@ func (request VideoStreamRequest) queryItems(query url.Values) url.Values {
 }
 
 type VideoSegments struct {
+	baseRequest
 	Order      int // 分段序号
 	Length     int
 	Size       int // 单位为Byte
@@ -228,15 +229,22 @@ func (segments *VideoSegments) Fetch(client *http.Client, opts ...rxgo.Option) r
 	if client == nil {
 		client = http.DefaultClient
 	}
-	return rxgo.Defer([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
-		req, err := segments.Request()
-		if err != nil {
-			next <- rxgo.Error(err)
-			return
+	req, err := segments.Request()
+	if err != nil {
+		return rxgo.Thrown(err)
+	}
+	if segments.Session == nil {
+		segments.Session = kDefaultSession
+	}
+	if client.Jar == nil {
+		for _, c := range segments.Session.Cookies(req.URL) {
+			req.AddCookie(c)
 		}
+	}
+	return rxgo.Defer([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
 		req = req.WithContext(ctx)
 		resp, err := client.Do(req)
-		if err == nil {
+		if err == nil && client.Jar == nil {
 			kDefaultSession.SetCookies(resp.Request.URL, resp.Cookies())
 			_ = kDefaultSession.Serialize(kDefaultSessionPath)
 		}
