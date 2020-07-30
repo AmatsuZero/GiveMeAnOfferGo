@@ -141,5 +141,23 @@ func TestDownloadDanmuku(t *testing.T) {
 		t.Fatal(item.E)
 	}
 	t.Log(item.V)
+}
 
+func TestDownloadDanmukuFromIndex(t *testing.T) {
+	req := bilibili_api.HistoryDanmukuIndexRequest{
+		Oid:   "144541892",
+		Month: "2020-01",
+	}
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	path, _ := os.UserHomeDir()
+	path = filepath.Join(path, "Desktop")
+	item, err := req.Download(path, client).Get()
+	if err != nil {
+		t.Fatal(err)
+	} else if item.E != nil {
+		t.Fatal(item.E)
+	}
+	t.Log(item.V)
 }
