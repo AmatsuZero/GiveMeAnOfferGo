@@ -144,7 +144,7 @@ func (request VideoStreamRequest) Download(to string, client *http.Client, opts 
 		}()
 		dataWriter := bufio.NewWriter(manifest)
 		for _, file := range i.([]string) {
-			_, _ = dataWriter.WriteString("file " + file + "\n")
+			_, _ = dataWriter.WriteString("file " + "'" + file + "'" + "\n")
 		}
 		err = dataWriter.Flush()
 		return p, err
