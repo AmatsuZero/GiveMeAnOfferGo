@@ -188,9 +188,21 @@ func TestDownloadMusic(t *testing.T) {
 }
 
 func TestDownloadCheeseVideo(t *testing.T) {
-	//req := bilibili_api.CheeseVideoStreamRequest{
-	//	Avid:        "76973173",
-	//	EpId:        "790",
-	//	Cid:         "132105993",
-	//}
+	req := bilibili_api.CheeseVideoStreamRequest{
+		Avid: "76973173",
+		EpId: "790",
+		Cid:  "132105993",
+	}
+	path, _ := os.UserHomeDir()
+	path = filepath.Join(path, "Desktop")
+	req.SetProgressFunc(func(progress float64) {
+		t.Logf("下载进度 %f", progress*100)
+	})
+	item, err := req.Download(path, nil).Get()
+	if err != nil {
+		t.Fatal(err)
+	} else if item.E != nil {
+		t.Fatal(item.E)
+	}
+	t.Log(item.V)
 }

@@ -46,7 +46,7 @@ func (request CheeseVideoStreamRequest) queryItems(query url.Values) url.Values 
 }
 
 func (request CheeseVideoStreamRequest) Download(to string, client *http.Client, opts ...rxgo.Option) rxgo.OptionalSingle {
-	defaultClient := http.DefaultClient // 这里改用没有超时的默认 Client，避免任务被 Cancel
+	defaultClient := http.DefaultClient
 	ob := request.download(request.Fetch(client), defaultClient, opts...)
 	return request.export(ob, to)
 }
@@ -57,7 +57,7 @@ func (request CheeseVideoStreamRequest) Fetch(client *http.Client, opts ...rxgo.
 		return rxgo.Thrown(err)
 	}
 	return request.fetch(client, req, opts...).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
-		info := &CheeseVideoStreamInfo{} // interface 要使用，必须 cast 为指针类型，参考：https://forum.golangbridge.org/t/how-to-cast-interface-to-a-given-interface/13997
+		info := &CheeseVideoStreamInfo{}
 		data := i.([]byte)
 		err := json.Unmarshal(data, info)
 		if err != nil {

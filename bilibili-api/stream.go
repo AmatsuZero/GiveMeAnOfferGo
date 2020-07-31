@@ -91,7 +91,7 @@ func (request *videoStreamBaseRequest) download(ob rxgo.Observable, client *http
 	})
 }
 
-func (request videoStreamBaseRequest) export(ob rxgo.Observable, to string) rxgo.OptionalSingle {
+func (request *videoStreamBaseRequest) export(ob rxgo.Observable, to string) rxgo.OptionalSingle {
 	return ob.Reduce(func(ctx context.Context, acc interface{}, elem interface{}) (interface{}, error) {
 		var ret []string
 		if acc == nil {
