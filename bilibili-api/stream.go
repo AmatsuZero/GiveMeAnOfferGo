@@ -55,15 +55,84 @@ func (resolution VideoStreamResolution) Encode() string {
 	return fmt.Sprintf("%d", resolution)
 }
 
-type VideoStreamRequest struct {
+type videoStreamBaseRequest struct {
 	baseRequest
+	progressCb func(progress float64)
+	tmpDir     string
+}
+
+func (request *videoStreamBaseRequest) SetProgressFunc(cb func(progress float64)) {
+	request.progressCb = cb
+}
+
+func (request videoStreamBaseRequest) Download(to string, client *http.Client, opts ...rxgo.Option) rxgo.OptionalSingle {
+	defaultClient := http.DefaultClient // 这里改用没有超时的默认 Client，避免任务被 Cancel
+	ob := request.download(request.Fetch(client), defaultClient, opts...)
+	return request.export(ob, to)
+}
+
+func (request *videoStreamBaseRequest) download(ob rxgo.Observable, client *http.Client, opts ...rxgo.Option) rxgo.Observable {
+	return ob.FlatMap(func(item rxgo.Item) rxgo.Observable {
+		if item.E != nil {
+			return rxgo.Thrown(item.E)
+		}
+		info := item.V.(videoStreamInfoProtocol)
+		tmpDir := info.GetTmpDirName()
+		_, err := os.Stat(tmpDir)
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(tmpDir, os.ModePerm)
+		}
+		if err != nil {
+			return rxgo.Thrown(item.E)
+		}
+		request.tmpDir = tmpDir
+		info.SetProgressFunc(request.progressCb)
+		return info.download(tmpDir, client, opts...)
+	})
+}
+
+func (request videoStreamBaseRequest) export(ob rxgo.Observable, to string) rxgo.OptionalSingle {
+	return ob.Reduce(func(ctx context.Context, acc interface{}, elem interface{}) (interface{}, error) {
+		var ret []string
+		if acc == nil {
+			ret = make([]string, 0)
+		} else {
+			ret = acc.([]string)
+		}
+		ret = append(ret, elem.(string))
+		return ret, nil
+	}).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
+		p := filepath.Join(request.tmpDir, "ff.txt")
+		manifest, err := os.Create(p)
+		if err != nil {
+			_ = os.RemoveAll(request.tmpDir)
+			return nil, err
+		}
+		defer func() {
+			_ = manifest.Close()
+		}()
+		dataWriter := bufio.NewWriter(manifest)
+		for _, file := range i.([]string) {
+			_, _ = dataWriter.WriteString("file " + "'" + file + "'" + "\n")
+		}
+		err = dataWriter.Flush()
+		return p, err
+	}).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
+		defer func() {
+			_ = os.RemoveAll(request.tmpDir)
+		}()
+		err := exec.CommandContext(ctx, "ffmpeg", "-f", "concat", "-safe", "0", "-i", i.(string), "-c", "copy", to).Run()
+		return to, err
+	})
+}
+
+type VideoStreamRequest struct {
+	videoStreamBaseRequest
 	Avid        string
 	Bvid        string
 	Cid         string
 	Resolution  VideoStreamResolution
 	ShouldUse4K bool
-	CompleteCb  func(err error)
-	progressCb  func(progress float64)
 }
 
 func (request VideoStreamRequest) IsParamsValid() bool {
@@ -80,94 +149,6 @@ func (request VideoStreamRequest) Request() (*http.Request, error) {
 	return http.NewRequest("GET", base.String(), nil)
 }
 
-func (request VideoStreamRequest) Fetch(client *http.Client, opts ...rxgo.Option) rxgo.Observable {
-	req, err := request.Request()
-	if err != nil {
-		return rxgo.Thrown(err)
-	}
-	return request.fetch(client, req, opts...).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
-		var info VideoStreamInfo
-		data := i.([]byte)
-		err := json.Unmarshal(data, &info)
-		if err != nil {
-			return nil, err
-		}
-		info.md5Sign = md5.Sum(data)
-		return info, nil
-	})
-}
-
-func (request *VideoStreamRequest) SetProgressFunc(cb func(progress float64)) {
-	request.progressCb = cb
-}
-
-func (request VideoStreamRequest) Download(to string, client *http.Client, opts ...rxgo.Option) rxgo.OptionalSingle {
-	defaultClient := http.DefaultClient // 这里改用没有超时的默认 Client，避免任务被 Cancel
-	tmpDir := ""
-	ob := request.Fetch(client).FlatMap(func(item rxgo.Item) rxgo.Observable {
-		if item.E != nil {
-			return rxgo.Thrown(item.E)
-		}
-		if len(tmpDir) == 0 {
-			tmpDir = filepath.Join(os.TempDir(), fmt.Sprintf("%x", item.V.(VideoStreamInfo).md5Sign))
-			_, err := os.Stat(tmpDir)
-			if os.IsNotExist(err) {
-				err = os.MkdirAll(tmpDir, os.ModePerm)
-			}
-			if err != nil {
-				return rxgo.Thrown(item.E)
-			}
-		}
-		info := item.V.(VideoStreamInfo)
-		info.progressCB = request.progressCb
-		return info.download(tmpDir, defaultClient, opts...)
-	})
-
-	return ob.Reduce(func(ctx context.Context, acc interface{}, elem interface{}) (interface{}, error) {
-		var ret []string
-		if acc == nil {
-			ret = make([]string, 0)
-		} else {
-			ret = acc.([]string)
-		}
-		ret = append(ret, elem.(string))
-		return ret, nil
-	}).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
-		p := filepath.Join(tmpDir, "ff.txt")
-		manifest, err := os.Create(p)
-		if err != nil {
-			_ = os.RemoveAll(tmpDir)
-			return nil, err
-		}
-		defer func() {
-			_ = manifest.Close()
-		}()
-		dataWriter := bufio.NewWriter(manifest)
-		for _, file := range i.([]string) {
-			_, _ = dataWriter.WriteString("file " + "'" + file + "'" + "\n")
-		}
-		err = dataWriter.Flush()
-		return p, err
-	}).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
-		defer func() {
-			_ = os.RemoveAll(tmpDir)
-		}()
-		err := exec.CommandContext(ctx, "ffmpeg", "-f", "concat", "-safe", "0", "-i", i.(string), "-c", "copy", to).Run()
-		return to, err
-	})
-}
-
-func (request VideoStreamRequest) combine(tmpDir, to string, opts ...rxgo.Option) rxgo.Observable {
-	return rxgo.Defer([]rxgo.Producer{func(ctx context.Context, next chan<- rxgo.Item) {
-		data, err := exec.CommandContext(ctx, "bash", tmpDir, to).Output()
-		if err != nil {
-			next <- rxgo.Error(err)
-		} else {
-			next <- rxgo.Of(string(data))
-		}
-	}}, opts...)
-}
-
 func (request VideoStreamRequest) queryItems(query url.Values) url.Values {
 	if len(request.Avid) > 0 {
 		query.Add("avid", request.Avid)
@@ -182,6 +163,29 @@ func (request VideoStreamRequest) queryItems(query url.Values) url.Values {
 		query.Set("fourk", "1")
 	}
 	return query
+}
+
+func (request VideoStreamRequest) Download(to string, client *http.Client, opts ...rxgo.Option) rxgo.OptionalSingle {
+	defaultClient := http.DefaultClient // 这里改用没有超时的默认 Client，避免任务被 Cancel
+	ob := request.download(request.Fetch(client), defaultClient, opts...)
+	return request.export(ob, to)
+}
+
+func (request VideoStreamRequest) Fetch(client *http.Client, opts ...rxgo.Option) rxgo.Observable {
+	req, err := request.Request()
+	if err != nil {
+		return rxgo.Thrown(err)
+	}
+	return request.fetch(client, req, opts...).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
+		info := &VideoStreamInfo{} // interface 要使用，必须 cast 为指针类型，参考：https://forum.golangbridge.org/t/how-to-cast-interface-to-a-given-interface/13997
+		data := i.([]byte)
+		err := json.Unmarshal(data, info)
+		if err != nil {
+			return nil, err
+		}
+		info.md5Sign = md5.Sum(data)
+		return info, nil
+	})
 }
 
 type VideoSegments struct {
@@ -303,35 +307,60 @@ func (segments *VideoSegments) writeToFile(ctx context.Context, i interface{}) (
 	return dst, err
 }
 
-type VideoStreamInfo struct {
-	BaseResponse
-	Data struct {
-		From              string
-		Result            string
-		Message           string
-		Quality           VideoStreamResolution
-		Format            string
-		TimeLength        int                     `json:"timelength"`
-		AcceptFormat      string                  `json:"accept_format"`
-		AcceptDescription []string                `json:"accept_description"`
-		AcceptQuality     []VideoStreamResolution `json:"accept_quality"`
-		VideoCodecid      int                     `json:"video_codecid"`
-		SeekParam         string                  `json:"seek_param"`
-		SeekType          string                  `json:"seek_type"`
-		Durl              []VideoSegments
-	}
+type VideoStreamInfoData struct {
+	From              string
+	Result            string
+	Message           string
+	Quality           VideoStreamResolution
+	Format            string
+	TimeLength        int                     `json:"timelength"`
+	AcceptFormat      string                  `json:"accept_format"`
+	AcceptDescription []string                `json:"accept_description"`
+	AcceptQuality     []VideoStreamResolution `json:"accept_quality"`
+	VideoCodecid      int                     `json:"video_codecid"`
+	SeekParam         string                  `json:"seek_param"`
+	SeekType          string                  `json:"seek_type"`
+	Durl              []VideoSegments
+}
+
+type videoStreamInfoProtocol interface {
+	Downloadable
+	GetTmpDirName() string
+	GetSegments() []VideoSegments
+	TotalSize() int64
+	download(tmpDir string, client *http.Client, opts ...rxgo.Option) rxgo.Observable
+}
+
+type baseVideoStreamInfo struct {
 	md5Sign    [16]byte
 	progressCB func(progress float64)
 }
 
-func (info VideoStreamInfo) SupportFormats() []string {
-	return strings.Split(info.Data.AcceptFormat, ",")
+func (info baseVideoStreamInfo) GetTmpDirName() string {
+	return filepath.Join(os.TempDir(), fmt.Sprintf("%x", info.md5Sign))
 }
 
-func (info VideoStreamInfo) download(tmpDir string, client *http.Client, opts ...rxgo.Option) rxgo.Observable {
-	totalSize := float64(info.TotalSize())
+func (info baseVideoStreamInfo) GetSegments() []VideoSegments {
+	return []VideoSegments{}
+}
+
+func (info *baseVideoStreamInfo) SetProgressFunc(cb func(progress float64)) {
+	info.progressCB = cb
+}
+
+func (info baseVideoStreamInfo) Download(to string, client *http.Client, opts ...rxgo.Option) rxgo.OptionalSingle {
+	return info.download(to, client, opts...).First()
+}
+
+func (info baseVideoStreamInfo) download(tmpDir string, client *http.Client, opts ...rxgo.Option) rxgo.Observable {
+	return info.operation(info.GetSegments(), info.TotalSize(), tmpDir, client, opts...)
+}
+
+func (info baseVideoStreamInfo) operation(segments []VideoSegments, size int64,
+	tmpDir string, client *http.Client, opts ...rxgo.Option) rxgo.Observable {
+	totalSize := float64(size)
 	receivedData := float64(0)
-	return rxgo.Just(info.Data.Durl)(rxgo.Serialize(func(i interface{}) int {
+	return rxgo.Just(segments)(rxgo.Serialize(func(i interface{}) int {
 		return i.(VideoSegments).Order
 	})).FlatMap(func(item rxgo.Item) rxgo.Observable {
 		if item.E != nil {
@@ -349,9 +378,38 @@ func (info VideoStreamInfo) download(tmpDir string, client *http.Client, opts ..
 	})
 }
 
-func (info VideoStreamInfo) TotalSize() (size int64) {
-	for _, seg := range info.Data.Durl {
+func (info baseVideoStreamInfo) TotalSize() (size int64) {
+	for _, seg := range info.GetSegments() {
 		size += int64(seg.Size)
 	}
 	return
+}
+
+type VideoStreamInfo struct {
+	BaseResponse
+	baseVideoStreamInfo
+	Data VideoStreamInfoData
+}
+
+func (info VideoStreamInfo) TotalSize() (size int64) {
+	for _, seg := range info.GetSegments() {
+		size += int64(seg.Size)
+	}
+	return
+}
+
+func (info VideoStreamInfo) GetSegments() []VideoSegments {
+	return info.Data.Durl
+}
+
+func (info VideoStreamInfo) SupportFormats() []string {
+	return strings.Split(info.Data.AcceptFormat, ",")
+}
+
+func (info VideoStreamInfo) download(tmpDir string, client *http.Client, opts ...rxgo.Option) rxgo.Observable {
+	return info.operation(info.GetSegments(), info.TotalSize(), tmpDir, client, opts...)
+}
+
+func (info VideoStreamInfo) Download(to string, client *http.Client, opts ...rxgo.Option) rxgo.OptionalSingle {
+	return info.download(to, client, opts...).First()
 }

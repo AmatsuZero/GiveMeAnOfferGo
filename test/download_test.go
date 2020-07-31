@@ -186,3 +186,11 @@ func TestDownloadMusic(t *testing.T) {
 	}
 	t.Log(item.V)
 }
+
+func TestDownloadCheeseVideo(t *testing.T) {
+	//req := bilibili_api.CheeseVideoStreamRequest{
+	//	Avid:        "76973173",
+	//	EpId:        "790",
+	//	Cid:         "132105993",
+	//}
+}
