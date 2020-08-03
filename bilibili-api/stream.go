@@ -121,7 +121,18 @@ func (request *videoStreamBaseRequest) export(ob rxgo.Observable, to string) rxg
 		defer func() {
 			_ = os.RemoveAll(request.tmpDir)
 		}()
-		err := exec.CommandContext(ctx, "ffmpeg", "-f", "concat", "-safe", "0", "-i", i.(string), "-c", "copy", to).Run()
+		info, err := os.Stat(to)
+		if info != nil && info.IsDir() { // 如果是文件夹，则创建文件
+			to = filepath.Join(to, "output.flv")
+			file, err := os.Create(to)
+			if err != nil {
+				return nil, err
+			}
+			defer func() {
+				_ = file.Close()
+			}()
+		}
+		err = exec.CommandContext(ctx, "ffmpeg", "-f", "concat", "-safe", "0", "-i", i.(string), "-c", "copy", to).Run()
 		return to, err
 	})
 }

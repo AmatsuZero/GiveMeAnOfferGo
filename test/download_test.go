@@ -194,7 +194,7 @@ func TestDownloadCheeseVideo(t *testing.T) {
 		Cid:  "132105993",
 	}
 	path, _ := os.UserHomeDir()
-	path = filepath.Join(path, "Desktop")
+	path = filepath.Join(path, "Desktop", "download.flv")
 	req.SetProgressFunc(func(progress float64) {
 		t.Logf("下载进度 %f", progress*100)
 	})
