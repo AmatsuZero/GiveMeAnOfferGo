@@ -397,7 +397,7 @@ const (
 type DanmukuType int
 
 const (
-	DanmukuTypeNormal DanmukuType = 3
+	DanmukuTypeNormal DanmukuType = 3 // 1、2、3 全部视为普通弹幕
 	DanmukuTypeTop
 	DanmukuTypeBottom
 	DanmukuTypeReverse
