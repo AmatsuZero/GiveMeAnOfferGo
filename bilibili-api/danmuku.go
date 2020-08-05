@@ -397,7 +397,7 @@ const (
 type DanmukuType int
 
 const (
-	DanmukuTypeNormal DanmukuType = 3 // 1、2、3 全部视为普通弹幕
+	DanmukuTypeNormal DanmukuType = iota + 3 // 1、2、3 全部视为普通弹幕
 	DanmukuTypeTop
 	DanmukuTypeBottom
 	DanmukuTypeReverse
@@ -414,7 +414,7 @@ type Danmuku struct {
 	UID       string
 	DmID      string
 	PoolType  DanmukuPoolType
-	Timing    float64
+	Start     float64
 	Content   string
 }
 
@@ -437,7 +437,7 @@ func newDanmuku(property DanmukuProperty) *Danmuku {
 		return nil
 	}
 	danmuku := &Danmuku{}
-	danmuku.Timing, _ = strconv.ParseFloat(parts[0], 8)
+	danmuku.Start, _ = strconv.ParseFloat(parts[0], 8)
 	danmuku.DanmukuType = NewDanmukuTypeFromString(parts[1])
 	size, _ := strconv.Atoi(parts[2])
 	danmuku.FontSize = DanmukuFontSize(size)
