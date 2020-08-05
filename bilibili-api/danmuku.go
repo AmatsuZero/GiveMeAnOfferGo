@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"github.com/reactivex/rxgo/v2"
 	"io"
@@ -15,7 +16,28 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
 )
+
+type DanmukuProperty struct {
+	XMLName xml.Name `xml:"d"`
+	Desc    string   `xml:"p,attr"`
+	Value   string   `xml:",chardata"`
+}
+
+type DanmukuList struct {
+	XMLName     xml.Name          `xml:"i"`
+	ChatServer  string            `xml:"chatserver"`
+	ChatId      string            `xml:"chatid"`
+	Mission     int               `xml:"mission"`
+	MaxLimit    int               `xml:"maxlimit"`
+	State       int               `xml:"state"`
+	RealName    string            `xml:"real_name"`
+	Source      string            `xml:"source"`
+	DanmukuList []DanmukuProperty `xml:"d"`
+}
 
 type HistoryDanmukuRequest struct {
 	baseRequest
@@ -46,6 +68,9 @@ func (request HistoryDanmukuRequest) Download(to string, client *http.Client, op
 func (request HistoryDanmukuRequest) download(to string, client *http.Client, opts ...rxgo.Option) rxgo.Observable {
 	return request.Fetch(client, opts...).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
 		r := i.(*http.Response)
+		defer func() {
+			_ = r.Body.Close()
+		}()
 		var e error
 		// Check that the server actually sent compressed data
 		var reader io.ReadCloser
@@ -144,6 +169,57 @@ func (request *HistoryDanmukuRequest) Fetch(client *http.Client, opts ...rxgo.Op
 		request.fileSize = r.ContentLength
 		next <- rxgo.Of(r)
 	}}, opts...)
+}
+
+func (request HistoryDanmukuRequest) FetchDanmukuList(client *http.Client, opts ...rxgo.Option) rxgo.Observable {
+	return request.Fetch(client, opts...).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
+		r, _ := i.(*http.Response)
+		defer func() {
+			_ = r.Body.Close()
+		}()
+		var e error
+		var reader io.ReadCloser
+		switch r.Header.Get("Content-Encoding") {
+		case "gzip":
+			reader, e = gzip.NewReader(r.Body)
+			if e != nil {
+				return nil, e
+			}
+			defer func() {
+				_ = reader.Close()
+			}()
+		case "deflate":
+			reader = flate.NewReader(r.Body)
+			defer func() {
+				_ = reader.Close()
+			}()
+		default:
+			reader = r.Body
+		}
+		var desc DanmukuList
+		err := xml.NewDecoder(reader).Decode(&desc)
+		if err != nil {
+			return nil, err
+		}
+		return desc, err
+	})
+}
+
+func (request HistoryDanmukuRequest) FetchDanmuku(client *http.Client, opts ...rxgo.Option) rxgo.Observable {
+	return request.FetchDanmukuList(client, opts...).FlatMap(func(item rxgo.Item) rxgo.Observable {
+		if item.E != nil {
+			return rxgo.Thrown(item.E)
+		}
+		desc := item.V.(DanmukuList)
+		return rxgo.Just(desc.DanmukuList)().Map(func(ctx context.Context, i interface{}) (interface{}, error) {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			default:
+				return newDanmuku(i.(DanmukuProperty)), nil
+			}
+		})
+	})
 }
 
 func (request HistoryDanmukuRequest) IsParamsValid() bool {
@@ -248,8 +324,8 @@ func (request *HistoryDanmukuIndexRequest) Download(to string, client *http.Clie
 		req.Date = i.(string)
 		req.SetProgressFunc(func(progress float64) {
 			totalProgress += progress / float64(count)
-			if req.progressCb != nil {
-				req.progressCb(totalProgress)
+			if request.progressCB != nil {
+				request.progressCB(totalProgress)
 			}
 		})
 		return req, nil
@@ -300,4 +376,79 @@ type HistoryDanmukuIndex struct {
 	BaseResponse
 	Data    []string
 	md5Sign [16]byte
+}
+
+type DanmukuFontSize int
+
+const (
+	DanmukuFontSmall  DanmukuFontSize = 18
+	DanmukuFontNormal DanmukuFontSize = 25
+	DanmukuFontLarge  DanmukuFontSize = 36
+)
+
+type DanmukuPoolType int
+
+const (
+	DanmukuNormalPool DanmukuPoolType = iota
+	DanmukuSubtitlePool
+	DanmukuSpecialPool
+)
+
+type DanmukuType int
+
+const (
+	DanmukuTypeNormal DanmukuType = 3
+	DanmukuTypeTop
+	DanmukuTypeBottom
+	DanmukuTypeReverse
+	DanmukuTypeSenior
+	DanmukuTypeCode
+	DanmukuTypeBAS
+)
+
+type Danmuku struct {
+	DanmukuType
+	FontSize  DanmukuFontSize
+	TimeStamp time.Time
+	Color     string
+	UID       string
+	DmID      string
+	PoolType  DanmukuPoolType
+	Timing    float64
+	Content   string
+}
+
+func NewDanmukuTypeFromString(str string) DanmukuType {
+	t, err := strconv.Atoi(str)
+	if err != nil || t <= 0 || t > 9 {
+		return DanmukuTypeNormal
+	}
+	switch t {
+	case 0, 1, 2, 3:
+		return DanmukuTypeNormal
+	default:
+		return DanmukuType(t)
+	}
+}
+
+func newDanmuku(property DanmukuProperty) *Danmuku {
+	parts := strings.Split(property.Desc, ",")
+	if len(parts) != 8 {
+		return nil
+	}
+	danmuku := &Danmuku{}
+	danmuku.Timing, _ = strconv.ParseFloat(parts[0], 8)
+	danmuku.DanmukuType = NewDanmukuTypeFromString(parts[1])
+	size, _ := strconv.Atoi(parts[2])
+	danmuku.FontSize = DanmukuFontSize(size)
+	color, _ := strconv.Atoi(parts[3])
+	danmuku.Color = strconv.FormatInt(int64(color), 16)
+	i, _ := strconv.ParseInt(parts[4], 10, 64)
+	danmuku.TimeStamp = time.Unix(i, 0)
+	t, _ := strconv.Atoi(parts[5])
+	danmuku.PoolType = DanmukuPoolType(t)
+	danmuku.UID = parts[6]
+	danmuku.DmID = parts[7]
+	danmuku.Content = property.Value
+	return danmuku
 }

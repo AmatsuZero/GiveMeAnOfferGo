@@ -146,6 +146,21 @@ func TestDownloadDanmuku(t *testing.T) {
 	t.Log(item.V)
 }
 
+func TestParseDanmukuXML(t *testing.T) {
+	req := bilibili_api.HistoryDanmukuRequest{
+		Oid:  "144541892",
+		Date: "2020-01-21",
+	}
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	danmuku, err := req.FetchDanmuku(client).ToSlice(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(danmuku)
+}
+
 func TestDownloadDanmukuFromIndex(t *testing.T) {
 	req := bilibili_api.HistoryDanmukuIndexRequest{
 		Oid:   "144541892",
