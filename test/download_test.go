@@ -221,3 +221,57 @@ func TestDownloadCheeseVideo(t *testing.T) {
 	}
 	t.Log(item.V)
 }
+
+func TestDownloadAss(t *testing.T) {
+	req := bilibili_api.HistoryDanmukuRequest{
+		Oid:  "144541892",
+		Date: "2020-01-21",
+	}
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	path, _ := os.UserHomeDir()
+	path = filepath.Join(path, "Desktop", "danmuku.ass")
+	config := bilibili_api.ASSConfig{
+		FontSize:     18,
+		ScreenWidth:  640,
+		ScreenHeight: 480,
+		LineCount:    100,
+	}
+	item, err := req.DownloadAss(path, config, client).Get()
+	if err != nil {
+		t.Fatal(err)
+	} else if item.E != nil {
+		t.Fatal(item.E)
+	}
+	t.Log(item.V)
+}
+
+func TestMergeVideoWithDanmuku(t *testing.T) {
+	req := bilibili_api.VideoStreamRequest{
+		Bvid: "BV1y7411Q7Eq",
+		Cid:  "171776208",
+	}
+	req.SetProgressFunc(func(progress float64) {
+		t.Logf("下载进度 %f", progress*100)
+	})
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	path, _ := os.UserHomeDir()
+	path = filepath.Join(path, "Desktop", "download.flv")
+	config := bilibili_api.ASSConfig{
+		FontSize:     18,
+		ScreenWidth:  640,
+		ScreenHeight: 480,
+		LineCount:    100,
+	}
+	item, err := req.DownloadWithLatestDanmuku(path, config, client).Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.E != nil {
+		t.Fatal(item.E)
+	}
+	assert.NotNil(t, item.V)
+}

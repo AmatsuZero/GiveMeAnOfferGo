@@ -245,7 +245,7 @@ func (c ASSConfig) String() string {
 }
 
 type assSubtitle struct {
-	Danmuku
+	*Danmuku
 	Offset    float64
 	LineIndex int
 	Config    ASSConfig
@@ -339,7 +339,7 @@ func (subtitle assSubtitle) BorderMarkup() string {
 	return ""
 }
 
-func convertToAss(c ASSConfig, danmukuArr []Danmuku) string {
+func convertToAss(c ASSConfig, danmukuArr []*Danmuku) (dropoutCnt int, file string) {
 	collisions := map[DanmukuType][]float64{
 		DanmukuTypeNormal: make([]float64, c.LineCount),
 		DanmukuTypeTop:    make([]float64, c.LineCount),
@@ -370,5 +370,5 @@ func convertToAss(c ASSConfig, danmukuArr []Danmuku) string {
 	for _, s := range subtitles {
 		events = append(events, fmt.Sprintf("%v", s))
 	}
-	return header + strings.Join(events, "\n")
+	return len(danmukuArr) - len(subtitles), header + strings.Join(events, "\n")
 }

@@ -222,6 +222,41 @@ func (request HistoryDanmukuRequest) FetchDanmuku(client *http.Client, opts ...r
 	})
 }
 
+func (request HistoryDanmukuRequest) DownloadAss(to string, config ASSConfig, client *http.Client, opts ...rxgo.Option) rxgo.OptionalSingle {
+	return request.FetchDanmuku(client, opts...).Reduce(func(ctx context.Context, i interface{}, i2 interface{}) (interface{}, error) {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			var danmukuArr []*Danmuku
+			if i == nil {
+				danmukuArr = make([]*Danmuku, 0)
+			} else {
+				danmukuArr = i.([]*Danmuku)
+			}
+			danmukuArr = append(danmukuArr, i2.(*Danmuku))
+			return danmukuArr, nil
+		}
+	}).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
+		_, ass := convertToAss(config, i.([]*Danmuku))
+		return ass, nil
+	}).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
+		if filepath.Ext(to) != ".ass" {
+			to += ".ass"
+		}
+		file, err := os.Create(to)
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			_ = file.Close()
+		}()
+		ass := i.(string)
+		_, err = file.WriteString(ass)
+		return to, err
+	})
+}
+
 func (request HistoryDanmukuRequest) IsParamsValid() bool {
 	return len(request.Date) > 0 && len(request.Oid) > 0
 }
