@@ -3,6 +3,7 @@ package bilibili_api
 import (
 	"fmt"
 	"math"
+	"runtime"
 	"strings"
 )
 
@@ -111,7 +112,7 @@ func (danmuku Danmuku) speed(c ASSConfig) int {
 	// 12 秒加上用户自定义的微调
 	base := 12 + c.TuneDuration
 	if base <= 0 {
-		base = 0
+		base = 1
 	}
 	return int(math.Ceil(float64(c.ScreenWidth) / base))
 }
@@ -214,24 +215,6 @@ type ASSConfig struct {
 	FontName                  string
 }
 
-// ass文件的头部
-const templateHeader = `
-[Script Info]
-ScriptType: v4.00+
-Collisions: Normal
-PlayResX: {width}
-PlayResY: {height}
-
-[V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{fontname},54,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0.00,0.00,1,2.00,0.00,2,30,30,120,0
-Style: Alternate,{fontname},36,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0.00,0.00,1,2.00,0.00,2,30,30,84,0
-Style: Danmaku,{fontname},{fontsize},&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0.00,0.00,1,1.00,0.00,2,30,30,30,0
-
-[Events]
-Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-`
-
 func (c ASSConfig) String() string {
 	header := c.TemplateHeader
 	if len(header) == 0 {
@@ -239,7 +222,15 @@ func (c ASSConfig) String() string {
 	}
 	header = strings.ReplaceAll(header, "{width}", fmt.Sprintf("%d", c.ScreenWidth))
 	header = strings.ReplaceAll(header, "{height}", fmt.Sprintf("%d", c.ScreenHeight))
-	header = strings.ReplaceAll(header, "{fontname}", c.FontName)
+	name := c.FontName
+	if len(c.FontName) == 0 {
+		if runtime.GOOS == "windows" {
+			name = "微软雅黑"
+		} else {
+			name = "WenQuanYi Micro Hei"
+		}
+	}
+	header = strings.ReplaceAll(header, "{fontname}", name)
 	header = strings.ReplaceAll(header, "{fontsize}", fmt.Sprintf("%d", c.FontSize))
 	return header
 }
@@ -271,8 +262,13 @@ func (subtitle assSubtitle) s2hms(secs float64) string {
 		return "0:00:00.00"
 	}
 	i, d := math.Modf(secs / 1)
-	m, s := math.Modf(i / 60)
-	h, m := math.Modf(m / 60)
+	divmod := func(numerator, denominator int64) (quotient, remainder int64) {
+		quotient = numerator / denominator // integer division, decimals are truncated
+		remainder = numerator % denominator
+		return
+	}
+	m, s := divmod(int64(i), 60)
+	h, m := divmod(m, 60)
 	return fmt.Sprintf("%d:%02d:%02d.%02d", int(h), int(m), int(s), int(d*100))
 }
 

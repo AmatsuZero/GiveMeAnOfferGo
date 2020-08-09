@@ -259,13 +259,8 @@ func TestMergeVideoWithDanmuku(t *testing.T) {
 		Timeout: 10 * time.Second,
 	}
 	path, _ := os.UserHomeDir()
-	path = filepath.Join(path, "Desktop", "download.flv")
-	config := bilibili_api.ASSConfig{
-		FontSize:     18,
-		ScreenWidth:  640,
-		ScreenHeight: 480,
-		LineCount:    100,
-	}
+	path = filepath.Join(path, "Desktop", "test.flv")
+	config := bilibili_api.NewDefaultAssConfig()
 	item, err := req.DownloadWithLatestDanmuku(path, config, client).Get()
 	if err != nil {
 		t.Fatal(err)

@@ -11,7 +11,55 @@ import (
 	"time"
 )
 
+// ass文件的头部
+const templateHeader = `
+[Script Info]
+ScriptType: v4.00+
+Collisions: Normal
+PlayResX: {width}
+PlayResY: {height}
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,{fontname},54,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0.00,0.00,1,2.00,0.00,2,30,30,120,0
+Style: Alternate,{fontname},36,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0.00,0.00,1,2.00,0.00,2,30,30,84,0
+Style: Danmaku,{fontname},{fontsize},&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0.00,0.00,1,1.00,0.00,2,30,30,30,0
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+`
+
+func NewDefaultAssConfig() ASSConfig {
+	return ASSConfig{
+		FontSize:       32,
+		TuneDuration:   0,
+		LineCount:      5,
+		TemplateHeader: templateHeader,
+		DropOffset:     2,
+	}
+}
+
 func (request VideoStreamRequest) DownloadWithLatestDanmuku(to string, config ASSConfig, client *http.Client, opts ...rxgo.Option) rxgo.OptionalSingle {
+	var configOb rxgo.Observable
+	if config.ScreenWidth == 0 || config.ScreenHeight == 0 { // 如果宽高没指定，先获取视频信息，然后按照视频的宽高设置
+		req := VideoInfoRequest{}
+		req.Aid = request.Avid
+		req.Bvid = request.Bvid
+		configOb = req.Fetch(client, opts...).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
+			dimension := i.(VideoInfo).Data.Dimension
+			if dimension.IsPortrait() {
+				config.ScreenWidth = dimension.Height
+				config.ScreenHeight = dimension.Width
+			} else {
+				config.ScreenWidth = dimension.Width
+				config.ScreenHeight = dimension.Height
+			}
+			return config, nil
+		})
+	} else {
+		configOb = rxgo.Just(config)()
+	}
+
 	dir := filepath.Dir(to)
 	danmukuTmpPath := filepath.Join(dir, "danmuku.ass")
 	t := time.Now()
@@ -28,10 +76,18 @@ func (request VideoStreamRequest) DownloadWithLatestDanmuku(to string, config AS
 		rhs, _ := time.Parse("2006-06-01", i2.(string))
 		return int(lhs.Sub(rhs).Seconds())
 	}).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
+		item, err := configOb.First().Get()
+		if err != nil {
+			return nil, err
+		}
+		if item.E != nil {
+			return nil, item.E
+		}
+		c := item.V.(ASSConfig)
 		req := HistoryDanmukuRequest{}
 		req.Oid = request.Cid
 		req.Date = i.(string)
-		item, err := req.DownloadAss(danmukuTmpPath, config, client).Get(rxgo.WithContext(ctx))
+		item, err = req.DownloadAss(danmukuTmpPath, c, client).Get(rxgo.WithContext(ctx))
 		if err != nil {
 			return nil, err
 		}
@@ -60,7 +116,11 @@ func (request VideoStreamRequest) DownloadWithLatestDanmuku(to string, config AS
 	return rxgo.Concat([]rxgo.Observable{danmukuOB, videoOb}).Reduce(func(ctx context.Context, i interface{}, i2 interface{}) (interface{}, error) {
 		return nil, nil
 	}).Map(func(ctx context.Context, i interface{}) (interface{}, error) {
-		err := exec.CommandContext(ctx, "ffmpeg", "-i", videoPath, "-vf", fmt.Sprintf("ass=%v", danmukuTmpPath), to).Run()
+		if filepath.Ext(to) != ".mp4" {
+			to += ".mp4"
+		}
+		cmd := exec.CommandContext(ctx, "ffmpeg", "-i", videoPath, "-vf", fmt.Sprintf("ass=%v", danmukuTmpPath), to)
+		err := cmd.Run()
 		_ = os.Remove(danmukuTmpPath)
 		_ = os.Remove(videoPath)
 		return to, err
