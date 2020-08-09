@@ -249,8 +249,8 @@ func TestDownloadAss(t *testing.T) {
 
 func TestMergeVideoWithDanmuku(t *testing.T) {
 	req := bilibili_api.VideoStreamRequest{
-		Bvid: "BV1y7411Q7Eq",
-		Cid:  "171776208",
+		Bvid: "BV1W54y1i7x7",
+		Cid:  "222436260",
 	}
 	req.SetProgressFunc(func(progress float64) {
 		t.Logf("下载进度 %f", progress*100)
@@ -261,6 +261,8 @@ func TestMergeVideoWithDanmuku(t *testing.T) {
 	path, _ := os.UserHomeDir()
 	path = filepath.Join(path, "Desktop", "test.flv")
 	config := bilibili_api.NewDefaultAssConfig()
+	config.ScreenWidth = 640
+	config.ScreenHeight = 480
 	item, err := req.DownloadWithLatestDanmuku(path, config, client).Get()
 	if err != nil {
 		t.Fatal(err)

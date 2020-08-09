@@ -233,7 +233,7 @@ type VideoState struct {
 	HistoryHighestRank int `json:"his_rank"`
 	LikeCount          int `json:"like"`
 	Dislike            int
-	Evaluation         string `json:"evaluation, omitempty"` // 默认为空
+	Evaluation         string `json:"evaluation,omitempty"` // 默认为空
 }
 
 func (state VideoState) IsBlocked() bool {
