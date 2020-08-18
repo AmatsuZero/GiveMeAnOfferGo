@@ -98,6 +98,8 @@ func (danmuku Danmuku) hPos(c ASSConfig) (x1, x2 int) {
 	switch danmuku.DanmukuType {
 	case DanmukuTypeNormal: // 滚动字幕的水平位置参考点是整条字幕文本的中点
 		return c.ScreenWidth + danmuku.width(c)/2, -danmuku.width(c) / 2
+	case DanmukuTypeReverse:
+		return -danmuku.width(c) / 2, c.ScreenWidth + danmuku.width(c)/2
 	default: // 默认在屏幕中间
 		return c.ScreenWidth / 2, c.ScreenWidth / 2
 	}
@@ -128,7 +130,7 @@ func (danmuku Danmuku) vPos(c ASSConfig, lineIndex int) (y1, y2 int) {
 		// 再减去自定义的底部边距
 		y -= c.BottomMargin
 		return y, y
-	case DanmukuTypeNormal:
+	case DanmukuTypeNormal, DanmukuTypeReverse:
 		size := c.FontSize
 		// 垂直位置，按基准字体大小算每一行的高度
 		y := (lineIndex + 1) * size

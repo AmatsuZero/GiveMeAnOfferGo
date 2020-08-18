@@ -73,14 +73,14 @@ func (bn *BinaryTreeNode) ForEachPostOrder(visit func(val Objects.ComparableObje
 
 func HeightOfTree(node *BinaryTreeNode) int {
 	if node == nil {
-		return -1
+		return 0
 	}
 	lhs := HeightOfTree(node.LeftChild)
 	rhs := HeightOfTree(node.RightChild)
 	if lhs > rhs {
 		return 1 + lhs
 	} else {
-		return 1 + lhs
+		return 1 + rhs
 	}
 }
 
