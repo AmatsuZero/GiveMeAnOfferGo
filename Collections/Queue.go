@@ -62,6 +62,7 @@ func (qa *QueueArray) Reversed() (queue *QueueArray) {
 		queue.Enqueue(element)
 		element = stack.Pop()
 	}
+
 	return
 }
 
