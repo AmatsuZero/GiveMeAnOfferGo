@@ -64,7 +64,7 @@ func numIslandsBFS(grid [][]byte) (count int) {
 	for rowIndex, rows := range grid {
 		width := len(rows) // 网格的宽
 		for columnIndex, box := range rows {
-			if box == '0' { // 是水，返回
+			if box == '0' { // 是水，返回v
 				continue
 			}
 			count += 1
