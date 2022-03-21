@@ -2,7 +2,7 @@ package averageoflevelsinbinarytree
 
 import "GiveMeAnOffer/defines"
 
-// https://leetcode-cn.com/problems/average-of-levels-in-binary-tree/
+// AverageOfLevels https://leetcode-cn.com/problems/average-of-levels-in-binary-tree/
 func AverageOfLevels(root *defines.TreeNode) (res []float64) {
 	if root == nil {
 		return []float64{0}
