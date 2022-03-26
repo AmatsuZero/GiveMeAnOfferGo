@@ -13,7 +13,7 @@ func SumOfDistancesInTree(n int, edges [][]int) []int {
 	dp := make([]int, n)
 	var dfs func(u, f int)
 	dfs = func(u, f int) {
-		su[u] = 1
+		sz[u] = 1
 		for _, v := range graph[u] {
 			if v == f {
 				continue
