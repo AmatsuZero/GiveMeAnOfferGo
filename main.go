@@ -66,18 +66,20 @@ func updateSheets(sheet *excelize.File, src map[string]*ownerInfo) {
 	for i := 2; i < rowsCnt; i++ {
 		row := rowInfo(rows[i]) // 这一行的信息
 		name := row.getValueFromIndex(1)
+		realRowNum := i + 1 // 行号跟数组下标不一样
 		if len(name) == 0 {
-			fmt.Printf("❌ 第 %v 行人名为空\n", i)
+			fmt.Printf("❌ 第 %v 行人名为空\n", realRowNum)
 			continue
 		}
 		names := strings.Split(name, "/") // 可能名字有多个
 		for _, n := range names {
 			info, ok := src[n]
 			if !ok {
-				fmt.Printf("❌ 第 %v 行没有找到这个人：%v\n", i, n)
+				fmt.Printf("❌ 第 %v 行没有找到这个人：%v\n", realRowNum, n)
+				// 标记背景色
+				fillStyle(sheet, realRowNum)
 				continue
 			}
-			realRowNum := i + 1 // 行号跟数组下标不一样
 			// 填写数量
 			axis := "E" + strconv.Itoa(realRowNum)
 			sheet.SetCellValue(targetSheetName, axis, len(info.rooms))
@@ -89,6 +91,30 @@ func updateSheets(sheet *excelize.File, src map[string]*ownerInfo) {
 			sheet.SetCellValue(targetSheetName, axis, info.RoomNos())
 		}
 	}
+}
+
+func fillStyle(sheet *excelize.File, realRowNum int) {
+	// 统一设置背景色为黄色 / 居中样式 / 黑色边框
+	style, _ := sheet.NewStyle(&excelize.Style{
+		Fill: excelize.Fill{
+			Type:    "pattern",
+			Color:   []string{"#FFFF00"},
+			Pattern: 1,
+		},
+		Alignment: &excelize.Alignment{
+			Horizontal: "center",
+			Vertical:   "center",
+		},
+		Border: []excelize.Border{
+			{Type: "left", Color: "#000000", Style: 1},
+			{Type: "top", Color: "#000000", Style: 1},
+			{Type: "bottom", Color: "#000000", Style: 1},
+			{Type: "right", Color: "#000000", Style: 1},
+		},
+	})
+	start := "A" + strconv.Itoa(realRowNum)
+	end := "I" + strconv.Itoa(realRowNum)
+	sheet.SetCellStyle(targetSheetName, start, end, style)
 }
 
 func extractAllInfo(sheet *excelize.File) (source map[string]*ownerInfo) {
@@ -108,7 +134,7 @@ func extractAllInfo(sheet *excelize.File) (source map[string]*ownerInfo) {
 		}
 		name := row.getValueFromIndex(2)
 		if len(name) == 0 {
-			fmt.Printf("❌ 第 %v 行人名为空\n", i)
+			fmt.Printf("❌ 第 %v 行人名为空\n", i+1)
 			continue
 		}
 		// 有的房子包含多个业主，这样各计一次
