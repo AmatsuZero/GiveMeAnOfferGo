@@ -76,7 +76,7 @@ func updateSheets(sheet *excelize.File, src map[string]*ownerInfo) {
 			info, ok := src[n]
 			if !ok {
 				fmt.Printf("❌ 第 %v 行没有找到这个人：%v\n", realRowNum, n)
-				// 标记背景色
+				// 设置样式
 				fillStyle(sheet, realRowNum)
 				continue
 			}
@@ -176,14 +176,15 @@ func (r rowInfo) getValueFromIndex(idx int) string {
 }
 
 func (o ownerInfo) SumOfArea() string { // 这里用高精度求值
-	const precision = 2
+	const precision = 200
 	if len(o.rooms) == 0 {
 		return "0"
 	} else if len(o.rooms) == 1 {
 		return o.rooms[0].area
 	}
 	result, _ := new(big.Float).SetPrec(precision).SetString(o.rooms[0].area)
-	for _, r := range o.rooms {
+	for i := 1; i < len(o.rooms); i++ {
+		r := o.rooms[i]
 		num, _ := new(big.Float).SetPrec(precision).SetString(r.area)
 		result = result.Add(result, num)
 	}
