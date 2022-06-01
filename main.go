@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"bufio"
 	"bytes"
 	"fmt"
 	"github.com/urfave/cli/v2"
@@ -15,7 +16,11 @@ import (
 	"strings"
 )
 
-var tmpFilePath string
+const constPrefix = "Contents of (__DATA"
+const queryClassList = "__objc_classlist"
+const queryClassRefs = "__objc_classrefs"
+const querySuperRefs = "__objc_superrefs"
+const querySelRefs = "__objc_selrefs"
 
 // 从 ipa 文件生成 mach-O 文件
 func generateMachOFileFromIpa(ipaPath string) (string, error) {
@@ -116,22 +121,55 @@ func generateMachOFileFromIpa(ipaPath string) (string, error) {
 	return txtPath, nil
 }
 
+func checkIsValid(linkMapPath string) error {
+	file, err := os.Open(linkMapPath)
+
+	if err != nil {
+		return err
+	}
+
+	defer file.Close()
+
+	r := bufio.NewReader(file)
+	line, isPrefix, err := r.ReadLine()
+	for err == nil && !isPrefix {
+		s := string(line)
+		idx := strings.Index(s, constPrefix)
+		if idx != -1 {
+			return nil
+		}
+		line, isPrefix, err = r.ReadLine()
+	}
+
+	return fmt.Errorf("otool文件格式有误")
+}
+
 func main() {
 	app := &cli.App{
 		Action: func(c *cli.Context) error {
 			if len(os.Args) == 0 || len(os.Args[0]) == 0 {
 				return fmt.Errorf("缺少文件路径")
 			}
-			filePath := os.Args[1]
-			if path.Ext(filePath) == ".ipa" {
-				path, err := generateMachOFileFromIpa(filePath)
+			linkMap := os.Args[1]
+
+			isTmp := false
+			if path.Ext(linkMap) == ".ipa" {
+				path, err := generateMachOFileFromIpa(linkMap)
 				if err != nil {
 					return err
 				}
-				filePath = path
+				isTmp = true
+				linkMap = path
 			}
 
-			fmt.Println(filePath)
+			err := checkIsValid(linkMap)
+			if err != nil {
+				return err
+			}
+
+			if isTmp { // 移除临时文件
+				os.Remove(linkMap)
+			}
 			return nil
 		},
 	}
