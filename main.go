@@ -14,6 +14,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 const constPrefix = "Contents of (__DATA"
@@ -131,21 +132,177 @@ func checkIsValid(linkMapPath string) error {
 	defer file.Close()
 
 	r := bufio.NewReader(file)
-	line, isPrefix, err := r.ReadLine()
-	for err == nil && !isPrefix {
+	for line, isPrefix, err := r.ReadLine(); err == nil && !isPrefix; line, isPrefix, err = r.ReadLine() {
 		s := string(line)
 		idx := strings.Index(s, constPrefix)
 		if idx != -1 {
 			return nil
 		}
-		line, isPrefix, err = r.ReadLine()
 	}
 
 	return fmt.Errorf("otool文件格式有误")
 }
 
+/// 获取所有方法集合 { className:{ address: methodName } }
+func allSelRefsFromContent(linkMapPath string) (map[string]map[string]string, error) {
+	file, err := os.Open(linkMapPath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	allSelResultsBegin := false
+	canAddName := false
+	canAddMethods := false
+	className := ""
+
+	methodDict := make(map[string]string)
+	allSelResults := make(map[string]map[string]string, 0)
+
+	r := bufio.NewReader(file)
+	for line, isPrefix, err := r.ReadLine(); err == nil && !isPrefix; line, isPrefix, err = r.ReadLine() {
+		s := string(line)
+
+		if strings.Contains(s, constPrefix) && strings.Contains(s, queryClassList) {
+			allSelResultsBegin = true
+			continue
+		} else if allSelResultsBegin && strings.Contains(s, constPrefix) {
+			allSelResultsBegin = false
+			break
+		}
+
+		if !allSelResultsBegin {
+			continue
+		}
+
+		if strings.Contains(s, "data") {
+			if len(methodDict) > 0 {
+				allSelResults[className] = methodDict
+				methodDict = make(map[string]string)
+			}
+			// data之后第一个的name，是类名
+			canAddName = true
+			canAddMethods = false
+			continue
+		}
+
+		if canAddName && strings.Contains(s, "name") {
+			components := strings.Split(s, " ")
+			className = components[len(components)-1]
+			continue
+		}
+
+		if strings.Contains(s, "methods") || strings.Contains(s, "Methods") {
+			// method之后的name是方法名，和方法地址
+			canAddName = false
+			canAddMethods = true
+			continue
+		}
+
+		if canAddMethods && strings.Contains(s, "name") {
+			components := strings.Split(s, " ")
+			if len(components) > 2 {
+				methodAddress := components[len(components)-2]
+				methodName := components[len(components)-1]
+				methodDict[methodName] = methodAddress
+			}
+		}
+	}
+	return allSelResults, err
+}
+
+// 获取已使用的方法集合
+func selRefsFromContent(linkMapPath string) (map[string]string, error) {
+	file, err := os.Open(linkMapPath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	selRefsResults := make(map[string]string)
+	selRefsBegin := false
+
+	r := bufio.NewReader(file)
+	for line, isPrefix, err := r.ReadLine(); err == nil && !isPrefix; line, isPrefix, err = r.ReadLine() {
+		s := string(line)
+
+		if strings.Contains(s, constPrefix) && strings.Contains(s, querySelRefs) {
+			selRefsBegin = true
+			continue
+		} else if selRefsBegin && strings.Contains(s, constPrefix) {
+			selRefsBegin = false
+			break
+		}
+
+		if !selRefsBegin {
+			continue
+		}
+
+		components := strings.Split(s, " ")
+		if len(components) > 2 {
+			methodAddress := components[len(components)-2]
+			methodName := components[len(components)-1]
+			selRefsResults[methodName] = methodAddress
+		}
+	}
+
+	fmt.Printf("\n\n__objc_selrefs总结如下，共有%d个\n%v：", len(selRefsResults), selRefsResults)
+	return selRefsResults, err
+}
+
+// 查找多余的方法
+func analyzeUsedMethods(linkMapPath string) {
+	var group sync.WaitGroup
+	var methodsListDic map[string]map[string]string
+	var selRefsDic map[string]string
+
+	group.Add(1)
+	go func() {
+		dict, err := allSelRefsFromContent(linkMapPath)
+		if err != nil {
+			fmt.Println(err)
+		}
+		methodsListDic = dict
+		group.Done()
+	}()
+
+	group.Add(1)
+	go func() {
+		dict, err := selRefsFromContent(linkMapPath)
+		if err != nil {
+			fmt.Println(err)
+		}
+		selRefsDic = dict
+		group.Done()
+	}()
+
+	group.Wait()
+
+	// 遍历selRefs移除methodsListDic，剩下的就是未使用的
+	for methodAddress, _ := range selRefsDic {
+		for _, methodDic := range methodsListDic {
+			delete(methodDic, methodAddress)
+		}
+	}
+
+	// 遍历移除空的元素
+	result := make(map[string]map[string]string)
+	for classNameStr, methodDic := range methodsListDic {
+		if len(methodDic) > 0 {
+			result[classNameStr] = methodDic
+		}
+	}
+}
+
 func main() {
 	app := &cli.App{
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  "func",
+				Value: "1",
+				Usage: "解析方法",
+			},
+		},
 		Action: func(c *cli.Context) error {
 			if len(os.Args) == 0 || len(os.Args[0]) == 0 {
 				return fmt.Errorf("缺少文件路径")
@@ -166,6 +323,8 @@ func main() {
 			if err != nil {
 				return err
 			}
+
+			analyzeUsedMethods(linkMap)
 
 			if isTmp { // 移除临时文件
 				os.Remove(linkMap)
