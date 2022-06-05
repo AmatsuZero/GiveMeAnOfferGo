@@ -2,7 +2,6 @@ package main
 
 import (
 	"archive/zip"
-	"bufio"
 	"bytes"
 	"fmt"
 	"github.com/urfave/cli/v2"
@@ -122,24 +121,22 @@ func generateMachOFileFromIpa(ipaPath string) (string, error) {
 }
 
 func checkIsValid(macho string) error {
-	file, err := os.Open(macho)
+	valid := false
+	err := readFileByLine(macho, func(s string, b *bool) {
+		idx := strings.Index(s, constPrefix)
+		if idx != -1 {
+			valid = true
+			*b = true
+		}
+	})
 
 	if err != nil {
 		return err
+	} else if !valid {
+		return fmt.Errorf("otool文件格式有误")
 	}
 
-	defer file.Close()
-
-	r := bufio.NewReader(file)
-	for line, isPrefix, err := r.ReadLine(); err == nil && !isPrefix; line, isPrefix, err = r.ReadLine() {
-		s := string(line)
-		idx := strings.Index(s, constPrefix)
-		if idx != -1 {
-			return nil
-		}
-	}
-
-	return fmt.Errorf("otool文件格式有误")
+	return nil
 }
 
 /// 获取所有方法集合 { className:{ address: methodName } }
@@ -458,25 +455,6 @@ func classListFromContent(macho string, c *cli.Context) (map[string]string, erro
 	}
 
 	return classListResults, err
-}
-
-func readFileByLine(filePath string, block func(string, *bool)) error {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	r := bufio.NewReader(file)
-	shouldStop := false
-	for line, isPrefix, err := r.ReadLine(); err == nil && !isPrefix; line, isPrefix, err = r.ReadLine() {
-		s := string(line)
-		block(s, &shouldStop)
-		if shouldStop {
-			break
-		}
-	}
-	return nil
 }
 
 func Unused(c *cli.Context) error {

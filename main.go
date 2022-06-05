@@ -27,6 +27,11 @@ func main() {
 				Description: "分析项目的Mach-O文件，检查Mach-O文件中无用的类和方法",
 				Action:      Unused,
 			},
+			{
+				Name:        "size",
+				Description: "分析项目的LinkMap文件，得出每个类或者库所占用的空间大小（代码段+数据段）",
+				Action:      ClassSize,
+			},
 		},
 	}
 
