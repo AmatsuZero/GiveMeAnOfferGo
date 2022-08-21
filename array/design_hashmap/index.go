@@ -24,10 +24,12 @@ func (m *MyHashMap) hash(key int) int {
 func (m *MyHashMap) Put(key int, value int) {
 	h := m.hash(key)
 	for e := m.data[h].Front(); e != nil; e = e.Next() {
-		e.Value = entry{key, value}
-		return
+		if et := e.Value.(entry); et.key == key {
+			e.Value = entry{key, value}
+			return
+		}
 	}
-	m.data[h].PushBack(entry{key,value})
+	m.data[h].PushBack(entry{key, value})
 }
 
 func (m *MyHashMap) Get(key int) int {

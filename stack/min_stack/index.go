@@ -1,6 +1,6 @@
 package minstack
 
-// https://leetcode-cn.com/problems/min-stack/
+// MinStack https://leetcode-cn.com/problems/min-stack/
 type MinStack struct {
 	elements, min []int
 	l             int
