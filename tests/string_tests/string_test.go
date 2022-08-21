@@ -2,6 +2,7 @@ package string_tests
 
 import (
 	"GiveMeAnOffer/leetcode"
+	check_if_a_word_occurs_as_a_prefix_of_any_word_in_a_sentence "GiveMeAnOffer/string/check-if-a-word-occurs-as-a-prefix-of-any-word-in-a-sentence"
 	"GiveMeAnOffer/string/solve_the_equation"
 	"testing"
 )
@@ -31,6 +32,21 @@ func TestReplaceWords(t *testing.T) {
 func TestMinLengthEncoding(t *testing.T) {
 	ans := leetcode.MiniMumLengthEncoding([]string{"time", "me", "bell"})
 	if ans != 10 {
+		t.Fail()
+	}
+}
+
+func TestIsPrefixOfWord(t *testing.T) {
+	ans := check_if_a_word_occurs_as_a_prefix_of_any_word_in_a_sentence.IsPrefixOfWord("i love eating burger", "burg")
+	if ans != 4 {
+		t.Fail()
+	}
+	ans = check_if_a_word_occurs_as_a_prefix_of_any_word_in_a_sentence.IsPrefixOfWord("this problem is an easy problem", "pro")
+	if ans != 2 {
+		t.Fail()
+	}
+	ans = check_if_a_word_occurs_as_a_prefix_of_any_word_in_a_sentence.IsPrefixOfWord("i am tired", "you")
+	if ans != -1 {
 		t.Fail()
 	}
 }
