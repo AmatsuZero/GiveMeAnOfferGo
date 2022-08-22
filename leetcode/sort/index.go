@@ -9,8 +9,7 @@ func Merge(intervals [][]int) (ans [][]int) {
 		return intervals[i][0] < intervals[j][0]
 	})
 
-	i := 0
-	for ; i < len(intervals); i += 1 {
+	for i := 0; i < len(intervals); i += 1 {
 		temp := []int{intervals[i][0], intervals[i][1]}
 		j := i + 1
 		for j < len(intervals) && intervals[j][0] <= temp[1] {
@@ -20,6 +19,7 @@ func Merge(intervals [][]int) (ans [][]int) {
 			j += 1
 		}
 		ans = append(ans, temp)
+		i = j
 	}
 	return
 }
