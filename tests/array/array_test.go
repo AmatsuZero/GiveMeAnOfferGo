@@ -1,7 +1,8 @@
 package array
 
 import (
-	make_two_arrays_equal_by_reversing_sub_arrays "GiveMeAnOffer/array/make-two-arrays-equal-by-reversing-sub-arrays"
+	"GiveMeAnOffer/array/find_peak_element"
+	"GiveMeAnOffer/array/make-two-arrays-equal-by-reversing-sub-arrays"
 	"GiveMeAnOffer/array/set_zeros"
 	"GiveMeAnOffer/leetcode/sort"
 	"reflect"
@@ -78,6 +79,13 @@ func TestCanEqual(t *testing.T) {
 	}
 
 	if make_two_arrays_equal_by_reversing_sub_arrays.CanBeEqual([]int{3, 7, 9}, []int{3, 7, 11}) {
+		t.Fail()
+	}
+}
+
+func TestFindPeakElement(t *testing.T) {
+	ans := find_peak_element.FindPeakElement([]int{3, 2, 1})
+	if ans != 0 {
 		t.Fail()
 	}
 }
