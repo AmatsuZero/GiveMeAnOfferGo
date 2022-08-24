@@ -2,6 +2,7 @@ package string_tests
 
 import (
 	"GiveMeAnOffer/leetcode"
+	"GiveMeAnOffer/leetcode/backtrace"
 	check_if_a_word_occurs_as_a_prefix_of_any_word_in_a_sentence "GiveMeAnOffer/string/check-if-a-word-occurs-as-a-prefix-of-any-word-in-a-sentence"
 	"GiveMeAnOffer/string/solve_the_equation"
 	"GiveMeAnOffer/tree/is_palindrome"
@@ -48,6 +49,10 @@ func TestIsPrefixOfWord(t *testing.T) {
 	}
 	ans = check_if_a_word_occurs_as_a_prefix_of_any_word_in_a_sentence.IsPrefixOfWord("i am tired", "you")
 	if ans != -1 {
+		t.Fail()
+	}
+
+	if backtrace.IsPalindrome("0P") {
 		t.Fail()
 	}
 }

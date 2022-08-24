@@ -40,3 +40,18 @@ func Combine(n, k int) (result [][]int) {
 	helper(1)
 	return
 }
+
+func addDigits(num int) int {
+	if num < 10 {
+		return num
+	}
+	sum := 0
+	for num/10 != 0 {
+		sum += num % 10
+		num /= 10
+	}
+	if num != 0 {
+		sum += num
+	}
+	return addDigits(sum)
+}
