@@ -1,6 +1,7 @@
 package array
 
 import (
+	"GiveMeAnOffer/array/count_battleships"
 	"GiveMeAnOffer/array/find_peak_element"
 	"GiveMeAnOffer/array/make-two-arrays-equal-by-reversing-sub-arrays"
 	"GiveMeAnOffer/array/set_zeros"
@@ -86,6 +87,31 @@ func TestCanEqual(t *testing.T) {
 func TestFindPeakElement(t *testing.T) {
 	ans := find_peak_element.FindPeakElement([]int{3, 2, 1})
 	if ans != 0 {
+		t.Fail()
+	}
+}
+
+func TestCountBattleShips(t *testing.T) {
+	ans := count_battleships.CountBattleships([][]byte{
+		{'X', '.', '.', 'X'},
+		{'.', '.', '.', 'X'},
+		{'.', '.', '.', 'X'},
+	})
+	if ans != 2 {
+		t.Fail()
+	}
+
+	ans = count_battleships.CountBattleships([][]byte{
+		{'.'},
+	})
+	if ans != 0 {
+		t.Fail()
+	}
+
+	ans = count_battleships.CountBattleships([][]byte{
+		{'X', 'X', 'X'},
+	})
+	if ans != 1 {
 		t.Fail()
 	}
 }
