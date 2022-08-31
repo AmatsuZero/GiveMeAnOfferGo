@@ -5,6 +5,7 @@ import (
 	"GiveMeAnOffer/array/find_peak_element"
 	"GiveMeAnOffer/array/make-two-arrays-equal-by-reversing-sub-arrays"
 	"GiveMeAnOffer/array/set_zeros"
+	validate_stack_sequences "GiveMeAnOffer/array/validate-stack-sequences"
 	"GiveMeAnOffer/leetcode/sort"
 	"reflect"
 	"testing"
@@ -112,6 +113,23 @@ func TestCountBattleShips(t *testing.T) {
 		{'X', 'X', 'X'},
 	})
 	if ans != 1 {
+		t.Fail()
+	}
+}
+
+func TestValidStackSequence(t *testing.T) {
+	ans := validate_stack_sequences.ValidateStackSequences([]int{1, 2, 3, 4, 5}, []int{4, 5, 3, 2, 1})
+	if !ans {
+		t.Fail()
+	}
+
+	ans = validate_stack_sequences.ValidateStackSequences([]int{1, 2, 3, 4, 5}, []int{4, 3, 5, 1, 2})
+	if ans {
+		t.Fail()
+	}
+
+	ans = validate_stack_sequences.ValidateStackSequences([]int{2, 1, 0}, []int{1, 2, 0})
+	if !ans {
 		t.Fail()
 	}
 }
