@@ -2,6 +2,7 @@ package array
 
 import (
 	"GiveMeAnOffer/array/count_battleships"
+	crawler_log_folder "GiveMeAnOffer/array/crawler-log-folder"
 	"GiveMeAnOffer/array/find_peak_element"
 	"GiveMeAnOffer/array/make-two-arrays-equal-by-reversing-sub-arrays"
 	"GiveMeAnOffer/array/set_zeros"
@@ -130,6 +131,13 @@ func TestValidStackSequence(t *testing.T) {
 
 	ans = validate_stack_sequences.ValidateStackSequences([]int{2, 1, 0}, []int{1, 2, 0})
 	if !ans {
+		t.Fail()
+	}
+}
+
+func TestMinOperation(t *testing.T) {
+	ans := crawler_log_folder.MinOperations([]string{"d1/", "d2/", "../", "d21/", "./"})
+	if ans != 2 {
 		t.Fail()
 	}
 }
