@@ -2,8 +2,8 @@ package string_tests
 
 import (
 	"GiveMeAnOffer/leetcode"
-	"GiveMeAnOffer/leetcode/backtrace"
 	check_if_a_word_occurs_as_a_prefix_of_any_word_in_a_sentence "GiveMeAnOffer/string/check-if-a-word-occurs-as-a-prefix-of-any-word-in-a-sentence"
+	decode_string "GiveMeAnOffer/string/decode-string"
 	"GiveMeAnOffer/string/solve_the_equation"
 	"GiveMeAnOffer/tree/is_palindrome"
 	"testing"
@@ -51,26 +51,28 @@ func TestIsPrefixOfWord(t *testing.T) {
 	if ans != -1 {
 		t.Fail()
 	}
+}
 
-	if backtrace.IsPalindrome("0P") {
+func TestIsPalindrome(t *testing.T) {
+	if !is_palindrome.IsPalindrome("A man, a plan, a canal: Panama") {
+		t.Fail()
+	}
+
+	if is_palindrome.IsPalindrome("race a car") {
+		t.Fail()
+	}
+
+	if !is_palindrome.IsPalindrome(".,") {
+		t.Fail()
+	}
+
+	if is_palindrome.IsPalindrome("0P") {
 		t.Fail()
 	}
 }
 
-func TestIsPalindrome(t *testing.T) {
-	//if !is_palindrome.IsPalindrome("A man, a plan, a canal: Panama") {
-	//	t.Fail()
-	//}
-	//
-	//if is_palindrome.IsPalindrome("race a car") {
-	//	t.Fail()
-	//}
-	//
-	//if !is_palindrome.IsPalindrome(".,") {
-	//	t.Fail()
-	//}
-
-	if is_palindrome.IsPalindrome("0P") {
+func TestDecodeString(t *testing.T) {
+	if decode_string.DecodeString("3[a]2[bc]") != "aaabcbc" {
 		t.Fail()
 	}
 }
