@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import {reactive} from 'vue'
-import {Greet} from '../../wailsjs/go/main/App'
+import {OpenSelectM3U8} from '../../wailsjs/go/main/App'
 
 const data = reactive({
   name: "",
@@ -8,8 +8,10 @@ const data = reactive({
 })
 
 function greet() {
-  Greet(data.name).then(result => {
+  OpenSelectM3U8().then(result => {
     data.resultText = result
+  }).catch( err => {
+      console.log(err)
   })
 }
 
@@ -20,7 +22,7 @@ function greet() {
     <div id="result" class="result">{{ data.resultText }}</div>
     <div id="input" class="input-box">
       <input id="name" v-model="data.name" autocomplete="off" class="input" type="text"/>
-      <button class="btn" @click="greet">Greet</button>
+      <button class="btn" @click="greet">Open</button>
     </div>
   </main>
 </template>

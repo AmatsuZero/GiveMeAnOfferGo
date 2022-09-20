@@ -28,5 +28,10 @@ func (a *App) Greet(name string) string {
 }
 
 func (a *App) OpenSelectM3U8() (string, error) {
-	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{})
+	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Filters: []runtime.FileFilter{{
+			DisplayName: "m3u8 files",
+			Pattern:     "*.m3u8",
+		}},
+	})
 }
