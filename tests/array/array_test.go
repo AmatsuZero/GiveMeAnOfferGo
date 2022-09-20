@@ -5,6 +5,7 @@ import (
 	crawler_log_folder "GiveMeAnOffer/array/crawler-log-folder"
 	"GiveMeAnOffer/array/find_peak_element"
 	"GiveMeAnOffer/array/make-two-arrays-equal-by-reversing-sub-arrays"
+	partition_to_k_equal_sum_subsets "GiveMeAnOffer/array/partition-to-k-equal-sum-subsets"
 	"GiveMeAnOffer/array/set_zeros"
 	validatestacksequences "GiveMeAnOffer/array/validate-stack-sequences"
 	"GiveMeAnOffer/leetcode/sort"
@@ -138,6 +139,16 @@ func TestValidStackSequence(t *testing.T) {
 func TestMinOperation(t *testing.T) {
 	ans := crawler_log_folder.MinOperations([]string{"d1/", "d2/", "../", "d21/", "./"})
 	if ans != 2 {
+		t.Fail()
+	}
+}
+
+func TestCanPartitionSubsets(t *testing.T) {
+	if !partition_to_k_equal_sum_subsets.CanPartitionKSubsets([]int{4, 3, 2, 3, 5, 2, 1}, 4) {
+		t.Fail()
+	}
+
+	if partition_to_k_equal_sum_subsets.CanPartitionKSubsets([]int{1, 2, 3, 4}, 3) {
 		t.Fail()
 	}
 }
