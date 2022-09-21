@@ -6,22 +6,50 @@ import (
 	"fmt"
 	"github.com/grafov/m3u8"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
 type DownloadTask struct {
 	Req *http.Request
 	Idx int
+	Dst string
 }
 
-func (t *DownloadTask) Start(c context.Context) {
+func (t *DownloadTask) Start(g *sync.WaitGroup) {
+	defer g.Done()
+	out, err := os.Create(t.Dst)
+	if err != nil {
+		runtime.LogError(SharedApp.ctx, err.Error())
+		return
+	}
+	defer out.Close()
+	resp, err := SharedApp.client.Do(t.Req)
+	if err != nil {
+		runtime.LogError(SharedApp.ctx, err.Error())
+		return
+	}
 
+	if resp.StatusCode != 200 {
+		runtime.LogError(SharedApp.ctx, fmt.Sprintf("Received HTTP %v for %v", resp.StatusCode, t.Req.URL.String()))
+		return
+	}
+
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		runtime.LogError(SharedApp.ctx, fmt.Sprintf("Received HTTP %v for %v", resp.StatusCode, t.Req.URL.String()))
+		return
+	}
+
+	resp.Body.Close()
 }
 
-func (t *DownloadTask) Stop(c context.Context) {
+func (t *DownloadTask) Stop() {
 
 }
 
@@ -31,26 +59,12 @@ type DownloadQueue struct {
 	ctx           context.Context
 	myKeyIV       string
 	Done          chan bool
+	downloadDir   string
 }
 
-func (q *DownloadQueue) StartDownloadVOD(config *ParserTask, list *m3u8.MediaPlaylist) {
-	name := config.TaskName
-	if len(name) == 0 {
-		name = fmt.Sprintf("%v", time.Now().Unix())
-	}
-
-	downloadDir := filepath.Join(SharedApp.config.PathDownloader, name)
-	if _, err := os.Stat(downloadDir); errors.Is(err, os.ErrNotExist) {
-		os.Mkdir(downloadDir, os.ModePerm)
-	}
-
-	if len(q.tasks) > 0 {
-		for _, task := range q.tasks {
-			task.Stop(q.ctx)
-		}
-	}
-
+func (q *DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.MediaPlaylist) {
 	q.tasks = nil
+
 	for i, seg := range list.Segments {
 		if seg != nil {
 			q.TotalDuration += seg.Duration
@@ -59,17 +73,48 @@ func (q *DownloadQueue) StartDownloadVOD(config *ParserTask, list *m3u8.MediaPla
 				runtime.LogError(SharedApp.ctx, fmt.Sprintf("生成 Segments 请求出粗：%v", err))
 				continue
 			}
+			if seg.Key != nil && len(seg.Key.Method) > 0 {
 
+			}
+			dst := path.Base(req.URL.Path)
+			dst = filepath.Join(q.downloadDir, dst)
 			q.tasks = append(q.tasks, &DownloadTask{
 				Req: req,
 				Idx: i,
+				Dst: dst,
 			})
 		}
 	}
 
+	wg := &sync.WaitGroup{}
+	wg.Add(int(list.Count()))
+
 	for _, task := range q.tasks {
-		println(task)
+		go task.Start(wg)
 	}
 
+	wg.Wait()
 	q.Done <- true
+}
+
+func (q *DownloadQueue) StartDownload(config *ParserTask, list *m3u8.MediaPlaylist) {
+	name := config.TaskName
+	if len(name) == 0 {
+		name = fmt.Sprintf("%v", time.Now().Unix())
+	}
+
+	q.downloadDir = filepath.Join(SharedApp.config.PathDownloader, name)
+	if _, err := os.Stat(q.downloadDir); errors.Is(err, os.ErrNotExist) {
+		err = os.Mkdir(q.downloadDir, os.ModePerm)
+	}
+
+	if len(q.tasks) > 0 {
+		for _, task := range q.tasks {
+			task.Stop()
+		}
+	}
+
+	if list.Closed {
+		q.startDownloadVOD(config, list)
+	}
 }

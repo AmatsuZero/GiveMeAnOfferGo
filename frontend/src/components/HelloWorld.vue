@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import {reactive} from 'vue'
-import {OpenSelectM3U8, OpenConfigDir, TaskAdd} from '../../wailsjs/go/main/App'
+import {OpenSelectM3U8, OpenConfigDir, TaskAdd, StartMergeTs} from '../../wailsjs/go/main/App'
 import {main} from "../../wailsjs/go/models";
 import ParserTask = main.ParserTask;
 
@@ -10,11 +10,12 @@ const data = reactive({
 })
 
 function greet() {
-  OpenSelectM3U8().then(result => {
-    data.resultText = result
-  }).catch( err => {
-      console.error(err);
-  });
+  const config = new main.MergeFilesConfig()
+  StartMergeTs(config).then(ret => {
+    data.resultText = ret
+  }).catch(err => {
+
+  })
 }
 
 function openConfigDir() {

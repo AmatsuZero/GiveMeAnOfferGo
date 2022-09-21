@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 var configFilePath string
@@ -97,8 +98,9 @@ type MergeFilesConfig struct {
 	TsName    string   `json:"taskName"`
 }
 
-func (a *App) StartMergeTs(config MergeFilesConfig) {
-
+func (a *App) StartMergeTs(config MergeFilesConfig) string {
+	time.Sleep(time.Second * 3)
+	return "hello"
 }
 
 func (a *App) OpenConfigDir() (string, error) {

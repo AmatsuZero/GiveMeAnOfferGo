@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -67,7 +68,27 @@ func (t *ParserTask) parseLocalFile(path string) error {
 	return nil
 }
 
+func (t *ParserTask) buildSegmentsURL(u string) (string, error) {
+	if strings.HasPrefix(u, "http") {
+		return url.QueryUnescape(u)
+	} else {
+		playlistUrl, err := url.Parse(t.Url)
+		msUrl, err := playlistUrl.Parse(u)
+		if err != nil {
+			return "", err
+		}
+		return url.QueryUnescape(msUrl.String())
+	}
+}
+
 func (t *ParserTask) BuildReq(u string) (*http.Request, error) {
+	if u != t.Url {
+		var err error
+		u, err = t.buildSegmentsURL(u)
+		if err != nil {
+			return nil, err
+		}
+	}
 	playlistUrl, err := url.Parse(u)
 	if err != nil {
 		return nil, err
@@ -126,7 +147,7 @@ func (t *ParserTask) getPlayerList() error {
 		queue := &DownloadQueue{}
 
 		if mpl.Closed {
-			go queue.StartDownloadVOD(t, mpl)
+			go queue.StartDownload(t, mpl)
 			d := time.Unix(int64(queue.TotalDuration), 0).Format("15:07:51")
 			info = fmt.Sprintf("点播资源解析成功，有%v个片段，时长：%v，，即将开始缓存...", cnt, d)
 		} else {
