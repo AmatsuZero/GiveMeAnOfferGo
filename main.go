@@ -10,9 +10,11 @@ import (
 //go:embed frontend/dist
 var assets embed.FS
 
+var SharedApp *App
+
 func main() {
 	// Create an instance of the app structure
-	app := NewApp()
+	SharedApp = NewApp()
 
 	// Create application with options
 	err := wails.Run(&options.App{
@@ -21,10 +23,10 @@ func main() {
 		Height:           768,
 		Assets:           assets,
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
-		OnStartup:        app.startup,
-		OnShutdown:       app.shutdown,
+		OnStartup:        SharedApp.startup,
+		OnShutdown:       SharedApp.shutdown,
 		Bind: []interface{}{
-			app,
+			SharedApp,
 		},
 	})
 

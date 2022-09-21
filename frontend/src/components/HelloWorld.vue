@@ -1,6 +1,8 @@
 <script lang="ts" setup>
 import {reactive} from 'vue'
-import {OpenSelectM3U8, OpenConfigDir} from '../../wailsjs/go/main/App'
+import {OpenSelectM3U8, OpenConfigDir, TaskAdd} from '../../wailsjs/go/main/App'
+import {main} from "../../wailsjs/go/models";
+import ParserTask = main.ParserTask;
 
 const data = reactive({
   name: "",
@@ -23,6 +25,16 @@ function openConfigDir() {
   });
 }
 
+function ParseAndDownload() {
+  const task = new ParserTask();
+  task.url = data.name;
+  TaskAdd(task).then(() => {
+
+  }).catch( err => {
+    console.error(err);
+  });
+}
+
 </script>
 
 <template>
@@ -30,8 +42,9 @@ function openConfigDir() {
     <div id="result" class="result">{{ data.resultText }}</div>
     <div id="input" class="input-box">
       <input id="name" v-model="data.name" autocomplete="off" class="input" type="text"/>
-      <button class="btn" @click="greet">Open</button>
+      <button class="btn" @click="greet">Greet</button>
       <button class="btn" @click="openConfigDir">Select</button>
+      <button class="btn" @click="ParseAndDownload">Download</button>
     </div>
   </main>
 </template>
@@ -44,7 +57,7 @@ function openConfigDir() {
 }
 
 .input-box .btn {
-  width: 60px;
+  width: 74px;
   height: 30px;
   line-height: 30px;
   border-radius: 3px;

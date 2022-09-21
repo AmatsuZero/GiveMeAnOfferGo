@@ -17,3 +17,7 @@ export function OpenSelectTsDir(arg1) {
 export function StartMergeTs(arg1) {
   return window['go']['main']['App']['StartMergeTs'](arg1);
 }
+
+export function TaskAdd(arg1) {
+  return window['go']['main']['App']['TaskAdd'](arg1);
+}

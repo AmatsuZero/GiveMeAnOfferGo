@@ -35,13 +35,8 @@ func NewConfig(path string) (*UserConfig, error) {
 		return defaultConfig(path), err
 	}
 	defer file.Close()
-	var dataEncoded []byte
-	_, err = file.Read(dataEncoded)
-	if err != nil {
-		return nil, err
-	}
 	var tmp UserConfig
-	err = json.Unmarshal(dataEncoded, &tmp)
+	err = json.NewDecoder(file).Decode(&tmp)
 	return &tmp, err
 }
 
@@ -50,7 +45,8 @@ func (c *UserConfig) Save() error {
 	if err != nil {
 		return err
 	}
-	f, err := os.OpenFile("access.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+
+	f, err := os.OpenFile(configFilePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 	if err != nil {
 		return err
 	}

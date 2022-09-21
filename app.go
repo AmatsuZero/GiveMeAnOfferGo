@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"net/http"
 	"os"
 	"path/filepath"
 )
@@ -15,7 +16,7 @@ func init() {
 	if len(configFilePath) == 0 {
 		configFilePath = os.Getenv("APPDATA")
 	}
-	configFilePath = filepath.Join(configFilePath, "M3U8-Downloader")
+	configFilePath = filepath.Join(configFilePath, "M3U8-Downloader-GO")
 
 	if _, err := os.Stat(configFilePath); errors.Is(err, os.ErrNotExist) {
 		os.Mkdir(configFilePath, os.ModePerm)
@@ -28,16 +29,27 @@ func init() {
 type App struct {
 	config *UserConfig
 	ctx    context.Context
+	client *http.Client
 }
 
 // NewApp creates a new App application struct
 func NewApp() *App {
-	return &App{}
+	return &App{
+		client: &http.Client{},
+	}
 }
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
-	a.config, _ = NewConfig(configFilePath)
+	config, err := NewConfig(configFilePath)
+	if err != nil {
+		runtime.LogError(a.ctx, err.Error())
+	} else if config.ConfigProxy != nil {
+		// 写入代理配置
+		os.Setenv("HTTP_PROXY", config.ConfigProxy.http)
+		os.Setenv("HTTPS_PROXY", config.ConfigProxy.https)
+	}
+	a.config = config
 }
 
 func (a *App) shutdown(ctx context.Context) {
@@ -108,4 +120,8 @@ func (a *App) OpenConfigDir() (string, error) {
 
 	a.config.PathDownloader = dir
 	return dir, err
+}
+
+func (a *App) TaskAdd(task ParserTask) error {
+	return task.Parse()
 }
