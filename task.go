@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	TaskAddEvent = "task-add-reply"
+	TaskAddEvent  = "task-add-reply"
+	SelectVariant = "select-variant"
 )
 
 type ParserTask struct {
@@ -26,9 +27,9 @@ type ParserTask struct {
 }
 
 type EventMessage struct {
-	Code      int
-	Message   string
-	PlayLists []string
+	Code    int
+	Message string
+	info    interface{}
 }
 
 func (t *ParserTask) Parse() error {
@@ -120,6 +121,19 @@ func (t *ParserTask) BuildReq(u string) (*http.Request, error) {
 	return req, nil
 }
 
+func (t *ParserTask) selectVariant(l *m3u8.MasterPlaylist) {
+	// 等待前端选择
+	msg := EventMessage{
+		Code:    1,
+		Message: "",
+	}
+	var playlist []string
+	for _, variant := range l.Variants {
+		playlist = append(playlist, variant.Resolution)
+	}
+	runtime.EventsEmit(SharedApp.ctx, SelectVariant, msg)
+}
+
 func (t *ParserTask) getPlayerList() error {
 	req, err := t.BuildReq(t.Url)
 	if err != nil {
@@ -138,7 +152,7 @@ func (t *ParserTask) getPlayerList() error {
 	resp.Body.Close()
 
 	if listType == m3u8.MASTER {
-
+		t.selectVariant(playlist.(*m3u8.MasterPlaylist))
 	} else {
 		mpl := playlist.(*m3u8.MediaPlaylist)
 		cnt := 0
@@ -155,12 +169,11 @@ func (t *ParserTask) getPlayerList() error {
 		}
 
 		runtime.EventsEmit(SharedApp.ctx, TaskAddEvent, EventMessage{
-			Code:    1,
+			Code:    0,
 			Message: info,
 		})
 
 		<-queue.Done
 	}
-
 	return nil
 }
