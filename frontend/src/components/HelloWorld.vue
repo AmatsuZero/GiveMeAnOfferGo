@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import {reactive} from 'vue'
-import {OpenSelectM3U8} from '../../wailsjs/go/main/App'
+import {OpenSelectM3U8, OpenConfigDir} from '../../wailsjs/go/main/App'
 
 const data = reactive({
   name: "",
@@ -11,8 +11,16 @@ function greet() {
   OpenSelectM3U8().then(result => {
     data.resultText = result
   }).catch( err => {
-      console.log(err)
-  })
+      console.error(err);
+  });
+}
+
+function openConfigDir() {
+  OpenConfigDir().then(dir => {
+    data.resultText = dir
+  }).catch(err => {
+    console.error(err);
+  });
 }
 
 </script>
@@ -23,6 +31,7 @@ function greet() {
     <div id="input" class="input-box">
       <input id="name" v-model="data.name" autocomplete="off" class="input" type="text"/>
       <button class="btn" @click="greet">Open</button>
+      <button class="btn" @click="openConfigDir">Select</button>
     </div>
   </main>
 </template>
