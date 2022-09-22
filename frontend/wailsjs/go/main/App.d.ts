@@ -8,6 +8,6 @@ export function OpenSelectM3U8():Promise<string>;
 
 export function OpenSelectTsDir(arg1:string):Promise<Array<string>>;
 
-export function StartMergeTs(arg1:main.MergeFilesConfig):Promise<string>;
+export function StartMergeTs(arg1:main.MergeFilesConfig):Promise<Error>;
 
 export function TaskAdd(arg1:main.ParserTask):Promise<Error>;

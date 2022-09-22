@@ -2,7 +2,7 @@ export namespace main {
 	
 	export class MergeFilesConfig {
 	    files: string[];
-	    age: string;
+	    mergeType: string;
 	    taskName: string;
 	
 	    static createFrom(source: any = {}) {
@@ -12,7 +12,7 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.files = source["files"];
-	        this.age = source["age"];
+	        this.mergeType = source["mergeType"];
 	        this.taskName = source["taskName"];
 	    }
 	}

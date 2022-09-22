@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import {reactive} from 'vue'
-import {OpenSelectM3U8, OpenConfigDir, TaskAdd, StartMergeTs} from '../../wailsjs/go/main/App'
+import {OpenSelectM3U8, OpenConfigDir, TaskAdd, StartMergeTs, OpenSelectTsDir} from '../../wailsjs/go/main/App'
 import {main} from "../../wailsjs/go/models";
 import ParserTask = main.ParserTask;
 import {EventsEmit, EventsOn} from "../../wailsjs/runtime"
@@ -10,13 +10,19 @@ const data = reactive({
   resultText: "Please enter your name below 👇",
 })
 
-function greet() {
-  const config = new main.MergeFilesConfig()
-  StartMergeTs(config).then(ret => {
-    data.resultText = ret
-  }).catch(err => {
-
-  })
+async function MergeFiles() {
+  try {
+    const files = await OpenSelectTsDir("");
+    if (files.length == 0) {
+      return;
+    }
+    const config = new main.MergeFilesConfig();
+    config.files = files;
+    config.mergeType = "copy";
+    await StartMergeTs(config);
+  } catch (e) {
+    console.error(e);
+  }
 }
 
 function openConfigDir() {
@@ -29,6 +35,7 @@ function openConfigDir() {
 
 function ParseAndDownload() {
   const task = new ParserTask();
+  task.delOnComplete = true;
   task.url = data.name;
   TaskAdd(task).then(() => {
 
@@ -50,7 +57,7 @@ EventsOn("select-variant", (msg) => {
     <div id="result" class="result">{{ data.resultText }}</div>
     <div id="input" class="input-box">
       <input id="name" v-model="data.name" autocomplete="off" class="input" type="text"/>
-      <button class="btn" @click="greet">Greet</button>
+      <button class="btn" @click="MergeFiles">MergeFiles</button>
       <button class="btn" @click="openConfigDir">Select</button>
       <button class="btn" @click="ParseAndDownload">Download</button>
     </div>

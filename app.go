@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
 )
 
 var configFilePath string
@@ -108,10 +107,8 @@ func (a *App) OpenSelectTsDir(dir string) ([]string, error) {
 	})
 }
 
-func (a *App) StartMergeTs(config MergeFilesConfig) string {
-	time.Sleep(time.Second * 3)
-
-	return "hello"
+func (a *App) StartMergeTs(config MergeFilesConfig) error {
+	return config.Merge()
 }
 
 func (a *App) OpenConfigDir() (string, error) {

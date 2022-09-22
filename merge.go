@@ -60,7 +60,7 @@ func (c *MergeFilesConfig) Merge() error {
 	}
 
 	for _, file := range c.Files {
-		_, err = f.WriteString(fmt.Sprintf("file '%v\n'", file))
+		_, err = f.WriteString(fmt.Sprintf("file '%v'\n", file))
 		if err != nil {
 			return err
 		}
@@ -69,12 +69,12 @@ func (c *MergeFilesConfig) Merge() error {
 	f.Close()
 
 	output := filepath.Join(SharedApp.config.PathDownloader, "output.mp4")
-	cmdStr := fmt.Sprintf("ffmpeg -loglevel quiet -f concat -safe 0 -i %v -vcodec copy -acodec copy %v\n", f.Name(), output)
+	cmdStr := fmt.Sprintf("ffmpeg -loglevel quiet -f concat -safe 0 -i %v -vcodec copy -acodec copy %v", f.Name(), output)
 	args := strings.Split(cmdStr, " ")
 	msg, err := Cmd(args[0], args[1:])
 	if err != nil {
 		runtime.LogError(SharedApp.ctx, fmt.Sprintf("videoConvert failed, %v, output: %v\n", err, msg))
 	}
-
-	return os.Remove(f.Name())
+	defer os.Remove(f.Name())
+	return err
 }

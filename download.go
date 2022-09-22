@@ -23,7 +23,10 @@ type DownloadTask struct {
 }
 
 func (t *DownloadTask) Start(g *sync.WaitGroup) {
-	defer g.Done()
+	defer func() {
+		g.Done()
+	}()
+
 	out, err := os.Create(t.Dst)
 	if err != nil {
 		runtime.LogError(SharedApp.ctx, err.Error())
@@ -42,12 +45,12 @@ func (t *DownloadTask) Start(g *sync.WaitGroup) {
 
 	resp, err := SharedApp.client.Do(req)
 	if err != nil {
-		runtime.LogError(SharedApp.ctx, err.Error())
+		runtime.LogError(SharedApp.ctx, fmt.Sprintf("下载失败：%v", err))
 		return
 	}
 
 	if resp.StatusCode != 200 {
-		runtime.LogError(SharedApp.ctx, fmt.Sprintf("Received HTTP %v for %v", resp.StatusCode, t.Req.URL.String()))
+		runtime.LogError(SharedApp.ctx, fmt.Sprintf("下载失败：Received HTTP %v for %v", resp.StatusCode, t.Req.URL.String()))
 		return
 	}
 
@@ -56,7 +59,7 @@ func (t *DownloadTask) Start(g *sync.WaitGroup) {
 		runtime.LogError(SharedApp.ctx, fmt.Sprintf("Received HTTP %v for %v", resp.StatusCode, t.Req.URL.String()))
 		return
 	}
-
+	runtime.LogPrint(SharedApp.ctx, fmt.Sprintf("下载完成， %v", req.URL.String()))
 	err = resp.Body.Close()
 	if err != nil {
 		runtime.LogError(SharedApp.ctx, err.Error())
@@ -121,6 +124,7 @@ func (q *DownloadQueue) StartDownload(config *ParserTask, list *m3u8.MediaPlayli
 		name = fmt.Sprintf("%v", time.Now().Unix())
 	}
 
+	q.Done = make(chan bool)
 	q.DownloadDir = filepath.Join(SharedApp.config.PathDownloader, name)
 	if _, err := os.Stat(q.DownloadDir); errors.Is(err, os.ErrNotExist) {
 		err = os.Mkdir(q.DownloadDir, os.ModePerm)
