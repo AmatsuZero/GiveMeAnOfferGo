@@ -3,6 +3,7 @@ import {reactive} from 'vue'
 import {OpenSelectM3U8, OpenConfigDir, TaskAdd, StartMergeTs} from '../../wailsjs/go/main/App'
 import {main} from "../../wailsjs/go/models";
 import ParserTask = main.ParserTask;
+import {EventsEmit, EventsOn} from "../../wailsjs/runtime"
 
 const data = reactive({
   name: "",
@@ -35,6 +36,12 @@ function ParseAndDownload() {
     console.error(err);
   });
 }
+
+EventsOn("select-variant", (msg) => {
+  const resolution = Object.keys(msg["Info"]);
+
+  EventsEmit("variant-selected", resolution[0]);
+})
 
 </script>
 

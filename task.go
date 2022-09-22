@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	TaskAddEvent  = "task-add-reply"
-	SelectVariant = "select-variant"
+	TaskAddEvent      = "task-add-reply"
+	SelectVariant     = "select-variant"
+	OnVariantSelected = "variant-selected"
 )
 
 type ParserTask struct {
@@ -29,7 +30,7 @@ type ParserTask struct {
 type EventMessage struct {
 	Code    int
 	Message string
-	info    interface{}
+	Info    interface{}
 }
 
 func (t *ParserTask) Parse() error {
@@ -45,7 +46,6 @@ func (t *ParserTask) Parse() error {
 	} else {
 		t.getPlayerList()
 	}
-
 	return nil
 }
 
@@ -60,11 +60,9 @@ func (t *ParserTask) parseLocalFile(path string) error {
 	}
 	switch listType {
 	case m3u8.MEDIA:
-		mediapl := p.(*m3u8.MediaPlaylist)
-		fmt.Printf("%+v\n", mediapl)
+		t.handleMediaPlayList(p.(*m3u8.MediaPlaylist))
 	case m3u8.MASTER:
-		masterpl := p.(*m3u8.MasterPlaylist)
-		fmt.Printf("%+v\n", masterpl)
+		t.selectVariant(p.(*m3u8.MasterPlaylist))
 	}
 	return nil
 }
@@ -127,11 +125,53 @@ func (t *ParserTask) selectVariant(l *m3u8.MasterPlaylist) {
 		Code:    1,
 		Message: "",
 	}
-	var playlist []string
-	for _, variant := range l.Variants {
-		playlist = append(playlist, variant.Resolution)
+	playlist := map[string]int{}
+	for i, variant := range l.Variants {
+		playlist[variant.Resolution] = i
 	}
+	msg.Info = playlist
 	runtime.EventsEmit(SharedApp.ctx, SelectVariant, msg)
+	runtime.EventsOnce(SharedApp.ctx, OnVariantSelected, func(optionalData ...interface{}) {
+		res := optionalData[0].(string)
+		idx := playlist[res]
+		t.handleVariant(l.Variants[idx])
+	})
+}
+
+func (t *ParserTask) handleVariant(v *m3u8.Variant) {
+	if v.Chunklist != nil {
+		t.handleMediaPlayList(v.Chunklist)
+		return
+	}
+	req, err := t.BuildReq(v.URI)
+	if err != nil {
+		runtime.LogError(SharedApp.ctx, err.Error())
+		return
+	}
+	t.Url = req.URL.String()
+	t.Parse()
+}
+
+func (t *ParserTask) handleMediaPlayList(mpl *m3u8.MediaPlaylist) {
+	cnt := 0
+	info := ""
+
+	queue := &DownloadQueue{}
+
+	if mpl.Closed {
+		go queue.StartDownload(t, mpl)
+		d := time.Unix(int64(queue.TotalDuration), 0).Format("15:07:51")
+		info = fmt.Sprintf("点播资源解析成功，有%v个片段，时长：%v，，即将开始缓存...", cnt, d)
+	} else {
+		info = "直播资源解析成功，即将开始缓存..."
+	}
+
+	runtime.EventsEmit(SharedApp.ctx, TaskAddEvent, EventMessage{
+		Code:    0,
+		Message: info,
+	})
+
+	<-queue.Done
 }
 
 func (t *ParserTask) getPlayerList() error {
@@ -154,26 +194,7 @@ func (t *ParserTask) getPlayerList() error {
 	if listType == m3u8.MASTER {
 		t.selectVariant(playlist.(*m3u8.MasterPlaylist))
 	} else {
-		mpl := playlist.(*m3u8.MediaPlaylist)
-		cnt := 0
-		info := ""
-
-		queue := &DownloadQueue{}
-
-		if mpl.Closed {
-			go queue.StartDownload(t, mpl)
-			d := time.Unix(int64(queue.TotalDuration), 0).Format("15:07:51")
-			info = fmt.Sprintf("点播资源解析成功，有%v个片段，时长：%v，，即将开始缓存...", cnt, d)
-		} else {
-			info = "直播资源解析成功，即将开始缓存..."
-		}
-
-		runtime.EventsEmit(SharedApp.ctx, TaskAddEvent, EventMessage{
-			Code:    0,
-			Message: info,
-		})
-
-		<-queue.Done
+		t.handleMediaPlayList(playlist.(*m3u8.MediaPlaylist))
 	}
 	return nil
 }
