@@ -1,6 +1,7 @@
 package array
 
 import (
+	check_array_formation_through_concatenation "GiveMeAnOffer/array/check-array-formation-through-concatenation"
 	"GiveMeAnOffer/array/count_battleships"
 	crawler_log_folder "GiveMeAnOffer/array/crawler-log-folder"
 	"GiveMeAnOffer/array/find_peak_element"
@@ -149,6 +150,26 @@ func TestCanPartitionSubsets(t *testing.T) {
 	}
 
 	if partition_to_k_equal_sum_subsets.CanPartitionKSubsets([]int{1, 2, 3, 4}, 3) {
+		t.Fail()
+	}
+}
+
+func TestCanFormArray(t *testing.T) {
+	if !check_array_formation_through_concatenation.CanFormArray([]int{15, 88}, [][]int{
+		{88}, {15},
+	}) {
+		t.Fail()
+	}
+
+	if check_array_formation_through_concatenation.CanFormArray([]int{49, 18, 16}, [][]int{
+		{16, 18, 49},
+	}) {
+		t.Fail()
+	}
+
+	if !check_array_formation_through_concatenation.CanFormArray([]int{91, 4, 64, 78}, [][]int{
+		{78}, {4, 64}, {91},
+	}) {
 		t.Fail()
 	}
 }
