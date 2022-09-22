@@ -186,14 +186,18 @@ func (t *ParserTask) handleMediaPlayList(mpl *m3u8.MediaPlaylist) error {
 	})
 
 	<-queue.Done
+	runtime.LogInfof(SharedApp.ctx, "切片下载完成，一共%v个", len(queue.tasks))
 
 	merger := NewMergeConfigFromDownloadQueue(queue)
 	err := merger.Merge()
 	if err != nil {
 		return err
 	}
+	runtime.LogInfo(SharedApp.ctx, "切片合并完成")
+
 	if t.DelOnComplete {
 		err = os.RemoveAll(queue.DownloadDir)
+		runtime.LogInfo(SharedApp.ctx, "切片删除完成")
 	}
 	return err
 }

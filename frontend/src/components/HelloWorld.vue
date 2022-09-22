@@ -1,9 +1,10 @@
 <script lang="ts" setup>
 import {reactive} from 'vue'
-import {OpenSelectM3U8, OpenConfigDir, TaskAdd, StartMergeTs, OpenSelectTsDir} from '../../wailsjs/go/main/App'
+import {OpenConfigDir, OpenSelectTsDir, StartMergeTs, TaskAdd} from '../../wailsjs/go/main/App'
 import {main} from "../../wailsjs/go/models";
-import ParserTask = main.ParserTask;
 import {EventsEmit, EventsOn} from "../../wailsjs/runtime"
+import ParserTask = main.ParserTask;
+import MergeType = main.MergeType;
 
 const data = reactive({
   name: "",
@@ -18,7 +19,6 @@ async function MergeFiles() {
     }
     const config = new main.MergeFilesConfig();
     config.files = files;
-    config.mergeType = "copy";
     await StartMergeTs(config);
   } catch (e) {
     console.error(e);

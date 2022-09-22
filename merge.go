@@ -11,10 +11,17 @@ import (
 	"strings"
 )
 
+type MergeType string
+
+const (
+	MergeTypeSpeed       MergeType = "speed"
+	MergeTypeTransCoding MergeType = "transcoding"
+)
+
 type MergeFilesConfig struct {
-	Files     []string `json:"files"`
-	MergeType string   `json:"mergeType"` // copy: 快速合并 / transcoding：修复合并(慢|转码)
-	TsName    string   `json:"taskName"`
+	Files     []string  `json:"files"`
+	MergeType MergeType `json:"mergeType"` // speed: 快速合并 / transcoding：修复合并(慢|转码)
+	TsName    string    `json:"taskName"`
 }
 
 func NewMergeConfigFromDownloadQueue(q *DownloadQueue) *MergeFilesConfig {
@@ -68,8 +75,21 @@ func (c *MergeFilesConfig) Merge() error {
 
 	f.Close()
 
-	output := filepath.Join(SharedApp.config.PathDownloader, "output.mp4")
-	cmdStr := fmt.Sprintf("ffmpeg -loglevel quiet -f concat -safe 0 -i %v -vcodec copy -acodec copy %v", f.Name(), output)
+	audioCodec := "copy"
+	if c.MergeType == MergeTypeTransCoding {
+		audioCodec = "aac"
+	}
+	videoCodec := "copy"
+	if c.MergeType == MergeTypeTransCoding {
+		videoCodec = "libx264"
+	}
+	output := c.TsName
+	if len(output) == 0 {
+		output = "output.mp4"
+	}
+
+	output = filepath.Join(SharedApp.config.PathDownloader, output)
+	cmdStr := fmt.Sprintf("ffmpeg -loglevel quiet -f concat -safe 0 -i %v -vcodec %v -acodec %v %v", f.Name(), videoCodec, audioCodec, output)
 	args := strings.Split(cmdStr, " ")
 	msg, err := Cmd(args[0], args[1:])
 	if err != nil {

@@ -59,7 +59,7 @@ func (t *DownloadTask) Start(g *sync.WaitGroup) {
 		runtime.LogError(SharedApp.ctx, fmt.Sprintf("Received HTTP %v for %v", resp.StatusCode, t.Req.URL.String()))
 		return
 	}
-	runtime.LogPrint(SharedApp.ctx, fmt.Sprintf("下载完成， %v", req.URL.String()))
+	runtime.LogPrint(SharedApp.ctx, fmt.Sprintf("下载完: %v", req.URL.String()))
 	err = resp.Body.Close()
 	if err != nil {
 		runtime.LogError(SharedApp.ctx, err.Error())

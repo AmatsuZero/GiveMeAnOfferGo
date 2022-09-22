@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 var configFilePath string
@@ -38,8 +40,21 @@ type App struct {
 
 // NewApp creates a new App application struct
 func NewApp() *App {
+	tr := &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   0,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
 	return &App{
-		client: &http.Client{},
+		client: &http.Client{
+			Transport: tr,
+		},
 	}
 }
 
