@@ -42,15 +42,21 @@ func (t *ParserTask) Parse() error {
 	isLocal := u.Scheme == "http" || u.Scheme == "https"
 
 	if !isLocal {
-		t.parseLocalFile(u.String())
+		err = t.parseLocalFile(u.String())
+		if err != nil {
+			return err
+		}
 	} else {
-		t.getPlayerList()
+		err = t.getPlayerList()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 func (t *ParserTask) parseLocalFile(path string) error {
-	f, err := os.Open("playlist.m3u8")
+	f, err := os.Open(path)
 	if err != nil {
 		return err
 	}
@@ -116,6 +122,7 @@ func (t *ParserTask) BuildReq(u string) (*http.Request, error) {
 	}
 	req.Header.Set("Referer", refer)
 
+	req = req.WithContext(SharedApp.ctx)
 	return req, nil
 }
 
@@ -148,8 +155,12 @@ func (t *ParserTask) handleVariant(v *m3u8.Variant) {
 		runtime.LogError(SharedApp.ctx, err.Error())
 		return
 	}
+
 	t.Url = req.URL.String()
-	t.Parse()
+	err = t.Parse()
+	if err != nil {
+		runtime.LogError(SharedApp.ctx, err.Error())
+	}
 }
 
 func (t *ParserTask) handleMediaPlayList(mpl *m3u8.MediaPlaylist) {
@@ -189,7 +200,11 @@ func (t *ParserTask) getPlayerList() error {
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+
+	err = resp.Body.Close()
+	if err != nil {
+		return err
+	}
 
 	if listType == m3u8.MASTER {
 		t.selectVariant(playlist.(*m3u8.MasterPlaylist))

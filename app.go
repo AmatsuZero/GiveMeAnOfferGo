@@ -20,7 +20,10 @@ func init() {
 	configFilePath = filepath.Join(configFilePath, "M3U8-Downloader-GO")
 
 	if _, err := os.Stat(configFilePath); errors.Is(err, os.ErrNotExist) {
-		os.Mkdir(configFilePath, os.ModePerm)
+		err = os.Mkdir(configFilePath, os.ModePerm)
+		if err != nil {
+			return
+		}
 	}
 
 	configFilePath = filepath.Join(configFilePath, "config.json")
@@ -28,9 +31,10 @@ func init() {
 
 // App struct
 type App struct {
-	config *UserConfig
-	ctx    context.Context
-	client *http.Client
+	config    *UserConfig
+	ctx       context.Context
+	client    *http.Client
+	stopTasks context.CancelFunc
 }
 
 // NewApp creates a new App application struct
@@ -41,20 +45,32 @@ func NewApp() *App {
 }
 
 func (a *App) startup(ctx context.Context) {
-	a.ctx = ctx
+	ctx, cancel := context.WithCancel(ctx)
+	a.ctx, a.stopTasks = ctx, cancel
+
 	config, err := NewConfig(configFilePath)
 	if err != nil {
 		runtime.LogError(a.ctx, err.Error())
 	} else if config.ConfigProxy != nil {
 		// 写入代理配置
-		os.Setenv("HTTP_PROXY", config.ConfigProxy.http)
-		os.Setenv("HTTPS_PROXY", config.ConfigProxy.https)
+		err = os.Setenv("HTTP_PROXY", config.ConfigProxy.http)
+		if err != nil {
+			runtime.LogError(ctx, err.Error())
+		}
+		err = os.Setenv("HTTPS_PROXY", config.ConfigProxy.https)
+		if err != nil {
+			runtime.LogError(ctx, err.Error())
+		}
 	}
 	a.config = config
 }
 
 func (a *App) shutdown(ctx context.Context) {
-	a.config.Save()
+	err := a.config.Save()
+	if err != nil {
+		runtime.LogError(ctx, err.Error())
+	}
+	a.stopTasks()
 }
 
 func (a *App) OpenSelectM3U8() (string, error) {

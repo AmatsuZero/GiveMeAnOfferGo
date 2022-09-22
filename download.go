@@ -16,9 +16,10 @@ import (
 )
 
 type DownloadTask struct {
-	Req *http.Request
-	Idx int
-	Dst string
+	Req    *http.Request
+	Idx    int
+	Dst    string
+	cancel context.CancelFunc
 }
 
 func (t *DownloadTask) Start(g *sync.WaitGroup) {
@@ -28,8 +29,18 @@ func (t *DownloadTask) Start(g *sync.WaitGroup) {
 		runtime.LogError(SharedApp.ctx, err.Error())
 		return
 	}
-	defer out.Close()
-	resp, err := SharedApp.client.Do(t.Req)
+	defer func(out *os.File) {
+		err = out.Close()
+		if err != nil {
+			runtime.LogError(SharedApp.ctx, err.Error())
+		}
+	}(out)
+
+	ctx, cancel := context.WithCancel(SharedApp.ctx)
+	req := t.Req.WithContext(ctx)
+	t.cancel = cancel
+
+	resp, err := SharedApp.client.Do(req)
 	if err != nil {
 		runtime.LogError(SharedApp.ctx, err.Error())
 		return
@@ -46,11 +57,16 @@ func (t *DownloadTask) Start(g *sync.WaitGroup) {
 		return
 	}
 
-	resp.Body.Close()
+	err = resp.Body.Close()
+	if err != nil {
+		runtime.LogError(SharedApp.ctx, err.Error())
+	}
 }
 
 func (t *DownloadTask) Stop() {
-
+	if t.cancel != nil {
+		t.cancel()
+	}
 }
 
 type DownloadQueue struct {
@@ -76,6 +92,7 @@ func (q *DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.MediaPla
 			if seg.Key != nil && len(seg.Key.Method) > 0 {
 
 			}
+
 			dst := path.Base(req.URL.Path)
 			dst = filepath.Join(q.downloadDir, dst)
 			q.tasks = append(q.tasks, &DownloadTask{
