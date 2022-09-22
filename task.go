@@ -66,7 +66,7 @@ func (t *ParserTask) parseLocalFile(path string) error {
 	}
 	switch listType {
 	case m3u8.MEDIA:
-		t.handleMediaPlayList(p.(*m3u8.MediaPlaylist))
+		return t.handleMediaPlayList(p.(*m3u8.MediaPlaylist))
 	case m3u8.MASTER:
 		t.selectVariant(p.(*m3u8.MasterPlaylist))
 	}
@@ -147,7 +147,10 @@ func (t *ParserTask) selectVariant(l *m3u8.MasterPlaylist) {
 
 func (t *ParserTask) handleVariant(v *m3u8.Variant) {
 	if v.Chunklist != nil {
-		t.handleMediaPlayList(v.Chunklist)
+		err := t.handleMediaPlayList(v.Chunklist)
+		if err != nil {
+			runtime.LogError(SharedApp.ctx, err.Error())
+		}
 		return
 	}
 	req, err := t.BuildReq(v.URI)
@@ -163,7 +166,7 @@ func (t *ParserTask) handleVariant(v *m3u8.Variant) {
 	}
 }
 
-func (t *ParserTask) handleMediaPlayList(mpl *m3u8.MediaPlaylist) {
+func (t *ParserTask) handleMediaPlayList(mpl *m3u8.MediaPlaylist) error {
 	cnt := 0
 	info := ""
 
@@ -183,6 +186,16 @@ func (t *ParserTask) handleMediaPlayList(mpl *m3u8.MediaPlaylist) {
 	})
 
 	<-queue.Done
+
+	merger := NewMergeConfigFromDownloadQueue(queue)
+	err := merger.Merge()
+	if err != nil {
+		return err
+	}
+	if t.DelOnComplete {
+		err = os.RemoveAll(queue.DownloadDir)
+	}
+	return err
 }
 
 func (t *ParserTask) getPlayerList() error {
@@ -209,7 +222,7 @@ func (t *ParserTask) getPlayerList() error {
 	if listType == m3u8.MASTER {
 		t.selectVariant(playlist.(*m3u8.MasterPlaylist))
 	} else {
-		t.handleMediaPlayList(playlist.(*m3u8.MediaPlaylist))
+		return t.handleMediaPlayList(playlist.(*m3u8.MediaPlaylist))
 	}
 	return nil
 }

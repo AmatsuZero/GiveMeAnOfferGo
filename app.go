@@ -108,14 +108,9 @@ func (a *App) OpenSelectTsDir(dir string) ([]string, error) {
 	})
 }
 
-type MergeFilesConfig struct {
-	Files     []string `json:"files"`
-	MergeType string   `json:"age"` // copy: 快速合并 / transcoding：修复合并(慢|转码)
-	TsName    string   `json:"taskName"`
-}
-
 func (a *App) StartMergeTs(config MergeFilesConfig) string {
 	time.Sleep(time.Second * 3)
+
 	return "hello"
 }
 
