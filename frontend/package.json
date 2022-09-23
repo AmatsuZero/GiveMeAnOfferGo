@@ -8,7 +8,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "element-theme-chalk": "^2.15.10",
+    "@element-plus/icons-vue": "^2.0.9",
+    "element-plus": "^2.2.17",
     "vue": "^3.2.25"
   },
   "devDependencies": {
@@ -16,6 +17,8 @@
     "@types/node": "^18.7.18",
     "@vitejs/plugin-vue": "^2.3.3",
     "typescript": "^4.5.4",
+    "unplugin-auto-import": "^0.11.2",
+    "unplugin-vue-components": "^0.22.7",
     "vite": "^2.9.9",
     "vue-tsc": "^0.34.7"
   }

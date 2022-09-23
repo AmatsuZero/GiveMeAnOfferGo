@@ -83,7 +83,12 @@ func (c *Cipher) Generate() error {
 			runtime.LogError(SharedApp.ctx, fmt.Sprintf("下载密钥失败：%v", err))
 			return err
 		}
-		defer resp.Body.Close()
+		defer func(Body io.ReadCloser) {
+			err = Body.Close()
+			if err != nil {
+				runtime.LogError(SharedApp.ctx, err.Error())
+			}
+		}(resp.Body)
 
 		if resp.StatusCode != 200 {
 			return fmt.Errorf("下载失败：Received HTTP %v for %v", resp.StatusCode, c.KeyReq.URL.String())

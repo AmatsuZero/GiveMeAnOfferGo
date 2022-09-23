@@ -13,7 +13,8 @@
     "lib": [
       "esnext",
       "dom"
-    ]
+    ],
+    "types": ["element-plus/global"]
   },
   "include": [
     "src/**/*.ts",

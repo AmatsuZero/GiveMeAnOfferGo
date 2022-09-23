@@ -1,0 +1,17 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="App:Dev" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="GiveMeAnOfferGo" />
+    <working_directory value="$PROJECT_DIR$" />
+    <go_parameters value="-tags dev -gcflags &quot;all=-N -l&quot;" />
+    <useCustomBuildTags value="true" />
+    <envs>
+      <env name="devserver" value="localhost:63677" />
+      <env name="frontenddevserverurl" value="http://localhost:3000" />
+    </envs>
+    <kind value="DIRECTORY" />
+    <package value="changeme" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/main.go" />
+    <method v="2" />
+  </configuration>
+</component>

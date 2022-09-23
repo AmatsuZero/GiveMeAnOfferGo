@@ -4,7 +4,6 @@ import {OpenConfigDir, OpenSelectTsDir, StartMergeTs, TaskAdd} from '../../wails
 import {main} from "../../wailsjs/go/models";
 import {EventsEmit, EventsOn} from "../../wailsjs/runtime"
 import ParserTask = main.ParserTask;
-import MergeType = main.MergeType;
 
 const data = reactive({
   name: "",
