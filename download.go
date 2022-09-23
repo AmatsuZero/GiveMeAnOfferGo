@@ -16,16 +16,27 @@ import (
 )
 
 type DownloadTask struct {
-	Req    *http.Request
-	Idx    uint64
-	Dst    string
-	cancel context.CancelFunc
+	Req     *http.Request
+	Idx     uint64
+	Dst     string
+	cancel  context.CancelFunc
+	decrypt *Cipher
 }
 
 func (t *DownloadTask) Start(g *sync.WaitGroup) {
 	defer func() {
 		g.Done()
 	}()
+
+	// 解密
+	if t.decrypt != nil {
+		t.decrypt.Ctx = t.Req.Context()
+		err := t.decrypt.Generate()
+		if err != nil {
+			runtime.LogError(SharedApp.ctx, fmt.Sprintf("创建解密信息失败：%v", err))
+			return
+		}
+	}
 
 	out, err := os.Create(t.Dst)
 	if err != nil {
@@ -48,22 +59,29 @@ func (t *DownloadTask) Start(g *sync.WaitGroup) {
 		runtime.LogError(SharedApp.ctx, fmt.Sprintf("下载失败：%v", err))
 		return
 	}
+	defer func(Body io.ReadCloser) {
+		err = Body.Close()
+		if err != nil {
+			runtime.LogError(SharedApp.ctx, err.Error())
+		}
+	}(resp.Body)
 
 	if resp.StatusCode != 200 {
-		runtime.LogError(SharedApp.ctx, fmt.Sprintf("下载失败：Received HTTP %v for %v", resp.StatusCode, t.Req.URL.String()))
+		runtime.LogErrorf(SharedApp.ctx, "下载失败：Received HTTP %v for %v", resp.StatusCode, t.Req.URL.String())
 		return
 	}
 
-	_, err = io.Copy(out, resp.Body)
+	buffer, err := t.decrypt.Decrypt(resp.Body)
 	if err != nil {
-		runtime.LogError(SharedApp.ctx, fmt.Sprintf("Received HTTP %v for %v", resp.StatusCode, t.Req.URL.String()))
+		runtime.LogError(SharedApp.ctx, "解密失败")
 		return
 	}
-	runtime.LogPrint(SharedApp.ctx, fmt.Sprintf("下载完: %v", req.URL.String()))
-	err = resp.Body.Close()
+	_, err = io.Copy(out, buffer)
 	if err != nil {
-		runtime.LogError(SharedApp.ctx, err.Error())
+		runtime.LogErrorf(SharedApp.ctx, "Received HTTP %v for %v", resp.StatusCode, t.Req.URL.String())
+		return
 	}
+	runtime.LogPrint(SharedApp.ctx, fmt.Sprintf("下载完成: %v", req.URL.String()))
 }
 
 func (t *DownloadTask) Stop() {
@@ -76,13 +94,23 @@ type DownloadQueue struct {
 	tasks         []*DownloadTask
 	TotalDuration float64
 	ctx           context.Context
-	myKeyIV       string
 	Done          chan bool
 	DownloadDir   string
+
+	keys map[string][]byte
 }
 
 func (q *DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.MediaPlaylist) {
 	q.tasks = nil
+
+	var cipher *Cipher
+	keys := map[string][]byte{}
+	queryKey := func(u string) ([]byte, bool) {
+		return keys[u], false
+	}
+	setKey := func(u string, key []byte) {
+		keys[u] = key
+	}
 
 	for _, seg := range list.Segments {
 		if seg != nil {
@@ -93,17 +121,32 @@ func (q *DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.MediaPla
 				continue
 			}
 
-			if seg.Key != nil && len(seg.Key.Method) > 0 {
-
-			}
-
 			dst := path.Base(req.URL.Path)
 			dst = filepath.Join(q.DownloadDir, dst)
-			q.tasks = append(q.tasks, &DownloadTask{
+			task := &DownloadTask{
 				Req: req,
 				Idx: seg.SeqId,
 				Dst: dst,
-			})
+			}
+
+			decrypt, err := NewCipherFromKey(seg.Key, config.KeyIV, queryKey, setKey)
+			if decrypt != nil {
+				task.decrypt = decrypt
+				if cipher == nil {
+					cipher = decrypt
+				}
+			} else if cipher != nil {
+				task.decrypt = cipher
+			}
+			q.tasks = append(q.tasks, task)
+		}
+	}
+
+	// 创建解密
+	if cipher != nil {
+		err := cipher.Generate()
+		if err != nil {
+			runtime.LogError(SharedApp.ctx, fmt.Sprintf("生成解密结构体出错：%v", err))
 		}
 	}
 

@@ -1,5 +1,21 @@
 export namespace main {
 	
+	export class MergeFilesConfig {
+	    files: string[];
+	    mergeType: string;
+	    taskName: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MergeFilesConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.files = source["files"];
+	        this.mergeType = source["mergeType"];
+	        this.taskName = source["taskName"];
+	    }
+	}
 	export class ParserTask {
 	    url: string;
 	    taskName: string;
@@ -20,22 +36,6 @@ export namespace main {
 	        this.delOnComplete = source["delOnComplete"];
 	        this.keyIV = source["keyIV"];
 	        this.headers = source["headers"];
-	    }
-	}
-	export class MergeFilesConfig {
-	    files: string[];
-	    mergeType: string;
-	    taskName: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new MergeFilesConfig(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.files = source["files"];
-	        this.mergeType = source["mergeType"];
-	        this.taskName = source["taskName"];
 	    }
 	}
 
