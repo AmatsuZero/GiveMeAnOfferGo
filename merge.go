@@ -75,14 +75,18 @@ func (c *MergeFilesConfig) Merge() error {
 
 	f.Close()
 
-	audioCodec := "copy"
-	if c.MergeType == MergeTypeTransCoding {
+	audioCodec, videoCodec := "", ""
+	switch c.MergeType {
+	case MergeTypeSpeed:
+		audioCodec = "copy"
+		videoCodec = "copy"
+	case MergeTypeTransCoding:
 		audioCodec = "aac"
-	}
-	videoCodec := "copy"
-	if c.MergeType == MergeTypeTransCoding {
 		videoCodec = "libx264"
+	default:
+		break
 	}
+
 	output := c.TsName
 	if len(output) == 0 {
 		output = "output.mp4"

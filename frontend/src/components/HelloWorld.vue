@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import {reactive} from 'vue'
-import {OpenConfigDir, OpenSelectTsDir, StartMergeTs, TaskAdd} from '../../wailsjs/go/main/App'
+import {OpenConfigDir, OpenSelectTsDir, SniffLinks, StartMergeTs, TaskAdd} from '../../wailsjs/go/main/App'
 import {main} from "../../wailsjs/go/models";
 import {EventsEmit, EventsOn} from "../../wailsjs/runtime"
 import ParserTask = main.ParserTask;
@@ -43,6 +43,21 @@ function ParseAndDownload() {
   });
 }
 
+function Sniff() {
+  SniffLinks(data.name).then(links => {
+    debugger;
+    for (const link in links) {
+      if (link.indexOf("hls") !== -1) {
+          data.name = link;
+          ParseAndDownload();
+          break;
+      }
+    }
+  }).catch(err => {
+
+  })
+}
+
 EventsOn("select-variant", (msg) => {
   const resolution = Object.keys(msg["Info"]);
 
@@ -56,9 +71,10 @@ EventsOn("select-variant", (msg) => {
     <div id="result" class="result">{{ data.resultText }}</div>
     <div id="input" class="input-box">
       <input id="name" v-model="data.name" autocomplete="off" class="input" type="text"/>
-      <button class="btn" @click="MergeFiles">MergeFiles</button>
+      <button class="btn" @click="MergeFiles">Merge</button>
       <button class="btn" @click="openConfigDir">Select</button>
       <button class="btn" @click="ParseAndDownload">Download</button>
+      <button class="btn" @click="Sniff">Sniff</button>
     </div>
   </main>
 </template>

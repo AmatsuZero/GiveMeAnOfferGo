@@ -36,6 +36,8 @@ type App struct {
 	ctx       context.Context
 	client    *http.Client
 	stopTasks context.CancelFunc
+
+	sniffer *Sniffer
 }
 
 // NewApp creates a new App application struct
@@ -149,4 +151,12 @@ func (a *App) OpenConfigDir() (string, error) {
 
 func (a *App) TaskAdd(task ParserTask) error {
 	return task.Parse()
+}
+
+func (a *App) SniffLinks(u string) ([]string, error) {
+	if a.sniffer != nil && a.sniffer.Cancel != nil {
+		a.sniffer.Cancel()
+	}
+	a.sniffer = NewSniffer(u)
+	return a.sniffer.GetLinks()
 }
