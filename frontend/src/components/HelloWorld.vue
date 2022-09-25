@@ -32,30 +32,19 @@ function openConfigDir() {
   });
 }
 
-function ParseAndDownload() {
+async function ParseAndDownload() {
   const task = new ParserTask();
   task.delOnComplete = true;
   task.url = data.name;
-  TaskAdd(task).then(() => {
-
-  }).catch( err => {
-    console.error(err);
-  });
+  await TaskAdd(task);
 }
 
-function Sniff() {
-  SniffLinks(data.name).then(links => {
-    for (let i = 0; i < links.length; i++) {
-      const link = links[i];
-      if (link.indexOf("hls") !== -1) {
-        data.name = link;
-        ParseAndDownload();
-        break;
-      }
-    }
-  }).catch(err => {
-
-  })
+async function Sniff() {
+  const links = await SniffLinks(data.name);
+  for (let i = 0; i < links.length; i++) {
+    data.name = links[i];
+    await ParseAndDownload();
+  }
 }
 
 EventsOn("select-variant", (msg) => {

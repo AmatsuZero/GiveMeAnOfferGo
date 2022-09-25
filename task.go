@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"strings"
 	"time"
 )
@@ -40,19 +41,20 @@ func (t *ParserTask) Parse() error {
 	}
 
 	isLocal := u.Scheme == "http" || u.Scheme == "https"
-
-	if !isLocal {
-		err = t.parseLocalFile(u.String())
-		if err != nil {
-			return err
+	ext := path.Ext(t.Url)
+	switch ext {
+	case ".m3u8":
+		if !isLocal {
+			return t.parseLocalFile(u.String())
+		} else {
+			return t.getPlayerList()
 		}
-	} else {
-		err = t.getPlayerList()
-		if err != nil {
-			return err
-		}
+	default:
+		q := &CommonDownloader{}
+		q.StartDownload(t, []string{t.Url})
 	}
-	return nil
+
+	return err
 }
 
 func (t *ParserTask) parseLocalFile(path string) error {
@@ -170,7 +172,7 @@ func (t *ParserTask) handleMediaPlayList(mpl *m3u8.MediaPlaylist) error {
 	cnt := 0
 	info := ""
 
-	queue := &DownloadQueue{}
+	queue := &M3U8DownloadQueue{}
 
 	if mpl.Closed {
 		go queue.StartDownload(t, mpl)

@@ -102,7 +102,7 @@ func (t *DownloadTask) Stop() {
 	}
 }
 
-type DownloadQueue struct {
+type M3U8DownloadQueue struct {
 	tasks         []*DownloadTask
 	TotalDuration float64
 	ctx           context.Context
@@ -112,7 +112,7 @@ type DownloadQueue struct {
 	keys map[string][]byte
 }
 
-func (q *DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.MediaPlaylist) {
+func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.MediaPlaylist) {
 	q.tasks = nil
 
 	var cipher *Cipher
@@ -173,12 +173,16 @@ func (q *DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.MediaPla
 	q.Done <- true
 }
 
-func (q *DownloadQueue) startDownloadLive(config *ParserTask, list *m3u8.MediaPlaylist) {
+func (q *M3U8DownloadQueue) startDownloadLive(config *ParserTask, list *m3u8.MediaPlaylist) {
 	// tasksSet := map[string]bool{}
 
+	//var downloadSeg func(seg *m3u8.MediaSegment)
+	//for _, segment := range list.Segments {
+	//
+	//}
 }
 
-func (q *DownloadQueue) StartDownload(config *ParserTask, list *m3u8.MediaPlaylist) {
+func (q *M3U8DownloadQueue) preDownload(config *ParserTask) (err error) {
 	name := config.TaskName
 	if len(name) == 0 {
 		name = fmt.Sprintf("%v", time.Now().Unix())
@@ -186,7 +190,7 @@ func (q *DownloadQueue) StartDownload(config *ParserTask, list *m3u8.MediaPlayli
 
 	q.Done = make(chan bool)
 	q.DownloadDir = filepath.Join(SharedApp.config.PathDownloader, name)
-	if _, err := os.Stat(q.DownloadDir); errors.Is(err, os.ErrNotExist) {
+	if _, err = os.Stat(q.DownloadDir); errors.Is(err, os.ErrNotExist) {
 		err = os.Mkdir(q.DownloadDir, os.ModePerm)
 	}
 
@@ -196,9 +200,60 @@ func (q *DownloadQueue) StartDownload(config *ParserTask, list *m3u8.MediaPlayli
 		}
 	}
 
+	return
+}
+
+func (q *M3U8DownloadQueue) StartDownload(config *ParserTask, list *m3u8.MediaPlaylist) {
+	err := q.preDownload(config)
+	if err != nil {
+		runtime.LogError(SharedApp.ctx, err.Error())
+		return
+	}
+
 	if list.Closed {
 		q.startDownloadVOD(config, list)
 	} else {
 		q.startDownloadLive(config, list)
 	}
+}
+
+type CommonDownloader struct {
+	M3U8DownloadQueue
+}
+
+func (c *CommonDownloader) StartDownload(config *ParserTask, urls []string) {
+	err := c.preDownload(config)
+	if err != nil {
+		runtime.LogError(SharedApp.ctx, err.Error())
+		return
+	}
+
+	for idx, u := range urls {
+		req, err := http.NewRequest("GET", u, nil)
+		if err != nil {
+			runtime.LogInfof(SharedApp.ctx, "生成请求失败：%v", u)
+			continue
+		}
+
+		dst := path.Base(req.URL.Path)
+		dst = filepath.Join(c.DownloadDir, dst)
+
+		task := &DownloadTask{
+			Req: req,
+			Idx: uint64(idx),
+			Dst: dst,
+		}
+
+		c.tasks = append(c.tasks, task)
+	}
+
+	wg := &sync.WaitGroup{}
+	wg.Add(len(c.tasks))
+
+	for _, task := range c.tasks {
+		go task.Start(wg)
+	}
+
+	wg.Wait()
+	c.Done <- true
 }

@@ -24,7 +24,7 @@ type MergeFilesConfig struct {
 	TsName    string    `json:"taskName"`
 }
 
-func NewMergeConfigFromDownloadQueue(q *DownloadQueue) *MergeFilesConfig {
+func NewMergeConfigFromDownloadQueue(q *M3U8DownloadQueue) *MergeFilesConfig {
 	config := &MergeFilesConfig{
 		MergeType: MergeTypeSpeed,
 	}
@@ -73,7 +73,10 @@ func (c *MergeFilesConfig) Merge() error {
 		}
 	}
 
-	f.Close()
+	err = f.Close()
+	if err != nil {
+		return err
+	}
 
 	audioCodec, videoCodec := "", ""
 	switch c.MergeType {
@@ -99,6 +102,11 @@ func (c *MergeFilesConfig) Merge() error {
 	if err != nil {
 		runtime.LogError(SharedApp.ctx, fmt.Sprintf("videoConvert failed, %v, output: %v\n", err, msg))
 	}
-	defer os.Remove(f.Name())
+	defer func(name string) {
+		err = os.Remove(name)
+		if err != nil {
+			runtime.LogInfof(SharedApp.ctx, "删除合并文件临时列表失败：%v", err.Error())
+		}
+	}(f.Name())
 	return err
 }
