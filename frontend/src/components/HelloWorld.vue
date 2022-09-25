@@ -45,12 +45,12 @@ function ParseAndDownload() {
 
 function Sniff() {
   SniffLinks(data.name).then(links => {
-    debugger;
-    for (const link in links) {
+    for (let i = 0; i < links.length; i++) {
+      const link = links[i];
       if (link.indexOf("hls") !== -1) {
-          data.name = link;
-          ParseAndDownload();
-          break;
+        data.name = link;
+        ParseAndDownload();
+        break;
       }
     }
   }).catch(err => {

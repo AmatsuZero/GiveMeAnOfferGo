@@ -11,7 +11,7 @@ import (
 
 type Sniffer struct {
 	Link          string
-	resourceLinks []string
+	resourceLinks map[string]bool
 	Cancel        context.CancelFunc
 }
 
@@ -58,16 +58,24 @@ func (s *Sniffer) GetLinks() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return s.resourceLinks, nil
+
+	// 去重
+	var links []string
+	for l, _ := range s.resourceLinks {
+		links = append(links, l)
+	}
+	return links, nil
 }
 
 func (s *Sniffer) interceptM3u8(ctx context.Context) func(interface{}) {
+	s.resourceLinks = make(map[string]bool)
+
 	return func(event interface{}) {
 		switch ev := event.(type) {
 		case *network.EventResponseReceived:
 			ext := path.Ext(ev.Response.URL)
 			if ext == ".m3u8" {
-				s.resourceLinks = append(s.resourceLinks, ev.Response.URL)
+				s.resourceLinks[ev.Response.URL] = true
 			}
 		}
 	}

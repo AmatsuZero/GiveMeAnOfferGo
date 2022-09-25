@@ -26,7 +26,7 @@ type MergeFilesConfig struct {
 
 func NewMergeConfigFromDownloadQueue(q *DownloadQueue) *MergeFilesConfig {
 	config := &MergeFilesConfig{
-		MergeType: "copy",
+		MergeType: MergeTypeSpeed,
 	}
 
 	sort.Slice(q.tasks, func(i, j int) bool {

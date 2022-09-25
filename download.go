@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/avast/retry-go"
 	"github.com/grafov/m3u8"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"io"
@@ -23,25 +24,21 @@ type DownloadTask struct {
 	decrypt *Cipher
 }
 
-func (t *DownloadTask) Start(g *sync.WaitGroup) {
-	defer func() {
-		g.Done()
-	}()
-
+func (t *DownloadTask) download() error {
 	// 解密
 	if t.decrypt != nil {
 		t.decrypt.Ctx = t.Req.Context()
 		err := t.decrypt.Generate()
 		if err != nil {
 			runtime.LogError(SharedApp.ctx, fmt.Sprintf("创建解密信息失败：%v", err))
-			return
+			return err
 		}
 	}
 
 	out, err := os.Create(t.Dst)
 	if err != nil {
 		runtime.LogError(SharedApp.ctx, err.Error())
-		return
+		return err
 	}
 	defer func(out *os.File) {
 		err = out.Close()
@@ -50,14 +47,10 @@ func (t *DownloadTask) Start(g *sync.WaitGroup) {
 		}
 	}(out)
 
-	ctx, cancel := context.WithCancel(SharedApp.ctx)
-	req := t.Req.WithContext(ctx)
-	t.cancel = cancel
-
-	resp, err := SharedApp.client.Do(req)
+	resp, err := SharedApp.client.Do(t.Req)
 	if err != nil {
 		runtime.LogError(SharedApp.ctx, fmt.Sprintf("下载失败：%v", err))
-		return
+		return err
 	}
 	defer func(Body io.ReadCloser) {
 		err = Body.Close()
@@ -67,21 +60,40 @@ func (t *DownloadTask) Start(g *sync.WaitGroup) {
 	}(resp.Body)
 
 	if resp.StatusCode != 200 {
-		runtime.LogErrorf(SharedApp.ctx, "下载失败：Received HTTP %v for %v", resp.StatusCode, t.Req.URL.String())
-		return
+		info := fmt.Sprintf("下载失败：Received HTTP %v for %v", resp.StatusCode, t.Req.URL.String())
+		runtime.LogError(SharedApp.ctx, info)
+		return fmt.Errorf(info)
 	}
 
-	buffer, err := t.decrypt.Decrypt(resp.Body)
-	if err != nil {
-		runtime.LogError(SharedApp.ctx, "解密失败")
-		return
+	if t.decrypt != nil {
+		buffer, err := t.decrypt.Decrypt(resp.Body)
+		if err != nil {
+			runtime.LogError(SharedApp.ctx, "解密失败")
+			return err
+		}
+		_, err = io.Copy(out, buffer)
+	} else {
+		_, err = io.Copy(out, resp.Body)
 	}
-	_, err = io.Copy(out, buffer)
+
 	if err != nil {
 		runtime.LogErrorf(SharedApp.ctx, "Received HTTP %v for %v", resp.StatusCode, t.Req.URL.String())
-		return
+		return err
 	}
-	runtime.LogPrint(SharedApp.ctx, fmt.Sprintf("下载完成: %v", req.URL.String()))
+	runtime.LogPrint(SharedApp.ctx, fmt.Sprintf("下载完成: %v", t.Req.URL.String()))
+
+	return nil
+}
+
+func (t *DownloadTask) Start(g *sync.WaitGroup) {
+	ctx, cancel := context.WithCancel(SharedApp.ctx)
+	t.Req = t.Req.WithContext(ctx)
+	t.cancel = cancel
+	_ = retry.Do(t.download, retry.Context(ctx), retry.DelayType(func(n uint, config *retry.Config) time.Duration {
+		return retry.BackOffDelay(n, config)
+	}))
+
+	g.Done()
 }
 
 func (t *DownloadTask) Stop() {
@@ -161,6 +173,11 @@ func (q *DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.MediaPla
 	q.Done <- true
 }
 
+func (q *DownloadQueue) startDownloadLive(config *ParserTask, list *m3u8.MediaPlaylist) {
+	// tasksSet := map[string]bool{}
+
+}
+
 func (q *DownloadQueue) StartDownload(config *ParserTask, list *m3u8.MediaPlaylist) {
 	name := config.TaskName
 	if len(name) == 0 {
@@ -181,5 +198,7 @@ func (q *DownloadQueue) StartDownload(config *ParserTask, list *m3u8.MediaPlayli
 
 	if list.Closed {
 		q.startDownloadVOD(config, list)
+	} else {
+		q.startDownloadLive(config, list)
 	}
 }

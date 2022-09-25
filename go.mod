@@ -9,6 +9,7 @@ require (
 )
 
 require (
+	github.com/avast/retry-go v2.7.0+incompatible // indirect
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/chromedp/cdproto v0.0.0-20220920095854-8ac44782747c // indirect
 	github.com/chromedp/chromedp v0.8.5 // indirect
