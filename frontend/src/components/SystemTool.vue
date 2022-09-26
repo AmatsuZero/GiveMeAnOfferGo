@@ -2,23 +2,24 @@
 import { BrowserOpenURL } from "../../wailsjs/runtime"
 import { Link, Connection, Setting, Close } from "@element-plus/icons-vue";
 
-function clickAClick(link: PointerEvent) {
-  console.log(link)
-  BrowserOpenURL("link.target.href")
-}
-
-function clickStartHookUrl() {
-
-}
-
-function clickClose() {
-
-}
-
 export default {
   name: "SystemTool",
   data: {
-    version: ""
+    version: "",
+  },
+  methods: {
+    clickClose: function () {
+
+    },
+
+    clickStartHookUrl: function () {
+
+    },
+
+    clickAClick: function (link: PointerEvent) {
+      console.log(link)
+      BrowserOpenURL("link.target.href")
+    }
   }
 }
 

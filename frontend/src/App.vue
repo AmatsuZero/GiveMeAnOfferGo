@@ -10,7 +10,6 @@ import FeedbackTab from "./components/FeedbackTab.vue";
 import AboutTab from "./components/AboutTab.vue";
 
 
-
 </script>
 <template>
   <el-container>

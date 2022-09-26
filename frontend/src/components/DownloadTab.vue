@@ -3,11 +3,19 @@ export default {
   name: "download-tab",
   data: {
     ts_urls: Array<string>(),
+    allVideos: Array<string>(),
+    downloadSpeed:'0 MB/s',
+
+  },
+  methods: {
+    clickNewTask: function () {
+
+    },
+
+    clickClearTask: function () {
+
+    }
   }
-
-}
-
-function clickNewTask() {
 
 }
 </script>
@@ -25,12 +33,12 @@ function clickNewTask() {
           <el-col :span="4" :offset="1">
             <el-button class="mybutton" type="danger" icon="el-icon-news"
                        @click="clickClearTask">
-<!--              清空下载任务( {{allVideos.length}} )-->
+              清空下载任务( {{allVideos.length}} )
             </el-button>
           </el-col>
           <el-col v-show="false" :span="4" :offset="11">
             <div class="speed el-icon-download">
-<!--              {{downloadSpeed}}-->
+              {{downloadSpeed}}
             </div>
           </el-col>
         </el-row>
