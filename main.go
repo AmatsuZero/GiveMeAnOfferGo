@@ -25,8 +25,7 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
 		OnStartup:        SharedApp.startup,
 		OnShutdown:       SharedApp.shutdown,
-		CSSDragProperty:  "widows",
-		CSSDragValue:     "1",
+		Frameless:        true,
 		Bind: []interface{}{
 			SharedApp,
 		},

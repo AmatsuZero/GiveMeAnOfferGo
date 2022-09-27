@@ -1,0 +1,23 @@
+export class VideoItem {
+    url: string = "";
+    key: string = "";
+    headers: string = "";
+}
+
+export class DownloadTask {
+    id = "";
+    url = "";
+    taskName = "";
+    time = 0;
+    status = "";
+    videoPath = "";
+}
+
+export enum MergeFileType {
+    Speed = "speed",
+    TransCoding = "transcoding"
+}
+
+export class PlaylistItem {
+
+}

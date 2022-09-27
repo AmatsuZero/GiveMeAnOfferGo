@@ -1,11 +1,26 @@
 <script lang="ts">
+import { DownloadTask, MergeFileType } from "../models";
+
 export default {
   name: "download-tab",
-  data: {
-    ts_urls: Array<string>(),
-    allVideos: Array<string>(),
-    downloadSpeed:'0 MB/s',
-
+  data() {
+    return {
+      ts_urls: Array<string>(),
+      allVideos: Array<DownloadTask>(),
+      downloadSpeed: '0 MB/s',
+      tsMergeType: MergeFileType.Speed,
+      dlg_newTask_visible: false,
+      tsMergeMp4Path: '',
+      tsMergeStatus: '',
+      m3u8_urls: '',
+      addTaskMessage: '',
+      headers: '',
+      m3u8_url: '',
+      m3u8_url_prefix: '',
+      taskName: '',
+      taskIsDelTs: true,
+      ts_dir: '',
+    }
   },
   methods: {
     clickNewTask: function () {
@@ -14,14 +29,60 @@ export default {
 
     clickClearTask: function () {
 
-    }
+    },
+
+    clickItemOptData: function () {
+
+    },
+
+    clickSelectM3U8: function () {
+
+    },
+
+    clickClearMergeTS: function () {
+
+    },
+
+    getPlaylistLabel: function () {
+
+    },
+
+    dropM3U8File: function () {
+
+    },
+
+    m3u8UrlChange: function () {
+
+    },
+
+    clickOpenMergeTSDir: function () {
+
+    },
+
+    clickPlayMergeMp4: function () {
+
+    },
+
+    clickNewTaskOK: function () {
+
+    },
+
+    clickNewTaskMuti: function () {
+
+    },
+
+    clickSelectTSDir: function () {
+
+    },
+
+    clickStartMergeTS: function () {}
   }
 
 }
 </script>
 
 <template>
-  <el-tab-pane>
+  <el-tab-pane label="资源下载">
     <span slot="label"><i class="el-icon-download"></i> 资源下载</span>
     <el-tabs type="border-card" v-model="tabPane">
       <el-tab-pane label="M3U8视频下载">
@@ -48,16 +109,16 @@ export default {
             <div class="link"><input type="text" :value="o.url" readonly></div>
 
             <div class="name"><span>名称：</span><span class="value">
-<!--              {{o.taskName}}-->
+              {{o.taskName}}
             </span>
             </div>
             <div class="time"><span>时间：</span><span class="value">
-<!--              {{o.time}}-->
+              {{o.time}}
             </span>
             </div>
             <div class="status">
               <span>状态：</span><span class="value">
-<!--              {{o.status}}-->
+              {{o.status}}
             </span>
             </div>
             <div class="opt">
@@ -68,7 +129,7 @@ export default {
               <div class="bottom">
                 <input class="del" opt="delvideo" :data="o.id" type="button"
                        value="删除" @click="clickItemOptData">
-                <input class="play" opt="playvideo" :data="o.videopath"
+                <input class="play" opt="playvideo" :data="o.videoPath"
                        type="button" value="播放" @click="clickItemOptData">
                 <input class="StartStop" opt="StartOrStop" :data="o.id"
                        type="button" value="停止" @click="clickItemOptData">
@@ -80,7 +141,7 @@ export default {
                     title="您还没有添加下载任务，在浏览器里嗅探到M3U8(HLS协议)视频流后，可以在这里缓存下载，快来试试吧。" type="success"
                     effect="light" :closable="false" :center="true" show-icon></el-alert>
         </ul>
-        <el-dialog title="新建下载任务" :visible.sync="dlg_newtask_visible" width="60%"
+        <el-dialog title="新建下载任务" :visible.sync="dlg_newTask_visible" width="60%"
                    :modal="true" :close-on-click-modal="false" :close-on-press-escape="false"
                    :center="false">
           <el-form label-width="80px">
@@ -201,7 +262,7 @@ export default {
           <el-col :span="7" :offset="3">
             <div>
               <el-radio style="line-height: 40px;" v-model="tsMergeType"
-                        label="speed">快速合并
+                        label="">快速合并
               </el-radio>
               <el-radio style="line-height: 40px;" v-model="tsMergeType"
                         label="transcoding">
@@ -226,9 +287,9 @@ export default {
         <el-row :gutter="8" style="margin-top: 10px;margin-bottom: 5px;"
                 v-if="tsMergeStatus">
           <el-col :span="2" :offset="1">
-                                            <span v-if="tsMergeStatus !='success'"
+                                            <span v-if="tsMergeStatus !=='success'"
                                                   style="line-height: 100px;float: right;">合并进度</span>
-            <span v-if="tsMergeStatus =='success'"
+            <span v-if="tsMergeStatus ==='success'"
                   style="line-height: 40px;float: right;">查看文件</span>
           </el-col>
           <el-col :span="6" v-if="tsMergeStatus !='success'">
@@ -246,7 +307,7 @@ export default {
           </el-col>
         </el-row>
 
-        <el-row :gutter="8" v-if="tsMergeStatus !='success' && tsMergeStatus">
+        <el-row :gutter="8" v-if="tsMergeStatus !=='success' && tsMergeStatus">
           <el-col :span="2" :offset="1">
             <span style="line-height: 40px;float: right;">日志</span>
           </el-col>
