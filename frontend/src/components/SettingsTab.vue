@@ -1,6 +1,11 @@
 <script lang="ts">
 export default {
-  name: "SettingsTab"
+  name: "SettingsTab",
+  methods: {
+    clickOpenLogDir: function () {
+
+    }
+  }
 }
 </script>
 
@@ -43,7 +48,7 @@ export default {
     <el-row :gutter="8">
       <el-col :span="4" :offset="7">
         <el-card class="paycode alipay" shadow="always">
-          <img class="image" src="icon/alipay_code.png">
+          <img class="image" src="../assets/icon/alipay_code.jpg">
           <div style="padding: 14px;word-break: keep-all;">
             <span>支付宝赞助</span>
           </div>
@@ -51,7 +56,7 @@ export default {
       </el-col>
       <el-col :span="4" :offset="2">
         <el-card class="paycode wechat" shadow="always">
-          <img class="image" src="icon/wechat_code.png">
+          <img class="image" src="../assets/icon/wechat_code.jpg">
           <div style="padding: 14px;word-break: keep-all;">
             <span>微信赞助</span>
           </div>

@@ -26,7 +26,6 @@ declare module '@vue/runtime-core' {
     ElHeader: typeof import('element-plus/es')['ElHeader']
     ElIcon: typeof import('element-plus/es')['ElIcon']
     ElInput: typeof import('element-plus/es')['ElInput']
-    ElLabel: typeof import('element-plus/es')['ElLabel']
     ElMain: typeof import('element-plus/es')['ElMain']
     ElOption: typeof import('element-plus/es')['ElOption']
     ElProgress: typeof import('element-plus/es')['ElProgress']
@@ -42,6 +41,5 @@ declare module '@vue/runtime-core' {
     Panel: typeof import('./src/components/Panel.vue')['default']
     SettingsTab: typeof import('./src/components/SettingsTab.vue')['default']
     SnifferTab: typeof import('./src/components/SnifferTab.vue')['default']
-    SystemTool: typeof import('./src/components/SystemTool.vue')['default']
   }
 }

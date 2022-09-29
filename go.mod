@@ -1,18 +1,18 @@
 module GiveMeAnOffer
 
-go 1.17
+go 1.18
 
 require (
+	github.com/avast/retry-go v2.7.0+incompatible
+	github.com/chromedp/cdproto v0.0.0-20220920095854-8ac44782747c
+	github.com/chromedp/chromedp v0.8.5
 	github.com/grafov/m3u8 v0.11.1
 	github.com/wailsapp/wails/v2 v2.0.0
 	golang.org/x/net v0.0.0-20211015210444-4f30a5c0130f
 )
 
 require (
-	github.com/avast/retry-go v2.7.0+incompatible // indirect
 	github.com/bep/debounce v1.2.1 // indirect
-	github.com/chromedp/cdproto v0.0.0-20220920095854-8ac44782747c // indirect
-	github.com/chromedp/chromedp v0.8.5 // indirect
 	github.com/chromedp/sysutil v1.0.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
