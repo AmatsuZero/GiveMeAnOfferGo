@@ -4,6 +4,7 @@ import (
 	"GiveMeAnOffer/leetcode"
 	check_if_a_word_occurs_as_a_prefix_of_any_word_in_a_sentence "GiveMeAnOffer/string/check-if-a-word-occurs-as-a-prefix-of-any-word-in-a-sentence"
 	decode_string "GiveMeAnOffer/string/decode-string"
+	reformat_phone_number "GiveMeAnOffer/string/reformat-phone-number"
 	"GiveMeAnOffer/string/solve_the_equation"
 	string_rotation_lcci "GiveMeAnOffer/string/string-rotation-lcci"
 	"GiveMeAnOffer/tree/is_palindrome"
@@ -84,6 +85,20 @@ func TestIsFlippedString(t *testing.T) {
 	}
 
 	if !string_rotation_lcci.IsFlippedString("", "") {
+		t.Fail()
+	}
+}
+
+func TestReformatPhoneNumber(t *testing.T) {
+	if reformat_phone_number.ReformatNumber("1-23-45 6") != "123-456" {
+		t.Fail()
+	}
+
+	if reformat_phone_number.ReformatNumber("123 4-567") != "123-45-67" {
+		t.Fail()
+	}
+
+	if reformat_phone_number.ReformatNumber("123 4-5678") != "123-456-78" {
 		t.Fail()
 	}
 }
