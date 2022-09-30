@@ -1,8 +1,15 @@
 <script lang="ts">
 export default {
+  props: {
+    config_save_dir: "",
+  },
   name: "SettingsTab",
   methods: {
     clickOpenLogDir: function () {
+
+    },
+
+    clickOpenConfigDir: function () {
 
     }
   }

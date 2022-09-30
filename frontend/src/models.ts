@@ -19,5 +19,5 @@ export enum MergeFileType {
 }
 
 export class PlaylistItem {
-
+    uri = "";
 }

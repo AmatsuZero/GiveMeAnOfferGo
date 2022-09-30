@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"runtime"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -25,7 +26,7 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
 		OnStartup:        SharedApp.startup,
 		OnShutdown:       SharedApp.shutdown,
-		Frameless:        true,
+		Frameless:        runtime.GOOS != "darwin",
 		Bind: []interface{}{
 			SharedApp,
 		},

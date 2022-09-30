@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="App:Dev" type="GoApplicationRunConfiguration" factoryName="Go Application">
+  <configuration default="false" name="App:Dev:OSX" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="GiveMeAnOfferGo" />
     <working_directory value="$PROJECT_DIR$" />
     <go_parameters value="-tags dev -gcflags &quot;all=-N -l&quot;" />
@@ -7,11 +7,14 @@
     <envs>
       <env name="devserver" value="localhost:63677" />
       <env name="frontenddevserverurl" value="http://localhost:3000" />
+      <env name="CGO_CFLAGS" value="-mmacosx-version-min=10.13" />
+      <env name="CGO_LDFLAGS" value="-framework UniformTypeIdentifiers -mmacosx-version-min=10.13" />
     </envs>
-    <kind value="DIRECTORY" />
-    <package value="changeme" />
+    <kind value="PACKAGE" />
+    <package value="GiveMeAnOffer" />
     <directory value="$PROJECT_DIR$" />
-    <filePath value="$PROJECT_DIR$/main.go" />
+    <filePath value="$PROJECT_DIR$" />
+    <output_directory value="$PROJECT_DIR$/../doodle/build" />
     <method v="2" />
   </configuration>
 </component>
