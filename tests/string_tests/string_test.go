@@ -7,6 +7,7 @@ import (
 	reformat_phone_number "GiveMeAnOffer/string/reformat-phone-number"
 	"GiveMeAnOffer/string/solve_the_equation"
 	string_rotation_lcci "GiveMeAnOffer/string/string-rotation-lcci"
+	swap_adjacent_in_lr_string "GiveMeAnOffer/string/swap-adjacent-in-lr-string"
 	"GiveMeAnOffer/tree/is_palindrome"
 	"testing"
 )
@@ -99,6 +100,12 @@ func TestReformatPhoneNumber(t *testing.T) {
 	}
 
 	if reformat_phone_number.ReformatNumber("123 4-5678") != "123-456-78" {
+		t.Fail()
+	}
+}
+
+func TestCanTransform(t *testing.T) {
+	if !swap_adjacent_in_lr_string.CanTransform("RXXLRXRXL", "XRLXXRRLX") {
 		t.Fail()
 	}
 }
