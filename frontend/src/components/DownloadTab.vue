@@ -1,7 +1,8 @@
 <script lang="ts">
 import { ElMessage } from 'element-plus';
 import { DownloadTask, MergeFileType, PlaylistItem } from "../models";
-import { OpenSelectTsDir } from "../../wailsjs/go/main/App";
+import {OpenSelectTsDir, TaskAdd} from "../../wailsjs/go/main/App";
+import {main} from "../../wailsjs/go/models";
 
 export default {
   props: {
@@ -40,10 +41,6 @@ export default {
 
     },
 
-    clickNewTaskOK: function () {
-
-    },
-
     clickNewTaskMuti: function () {
 
     },
@@ -61,29 +58,28 @@ export default {
 }
 </script>
 <script lang="ts" setup>
-import { Link, CirclePlusFilled, RemoveFilled } from "@element-plus/icons";
+import { Link, CirclePlusFilled, RemoveFilled, FolderOpened, Download } from "@element-plus/icons";
 import {DownloadTask, MergeFileType, PlaylistItem} from "../models";
-import {OpenSelectTsDir} from "../../wailsjs/go/main/App";
-import {ElMessage} from "element-plus";
+import {OpenSelectTsDir, TaskAdd} from "../../wailsjs/go/main/App";
+import {ElMessage, ElIcon} from "element-plus";
+import { ref, reactive } from 'vue';
+import {main} from "../../wailsjs/go/models";
 
 let ts_urls = Array<string>();
 const allVideos = Array<DownloadTask>();
 let downloadSpeed = '0 MB/s';
 let tsMergeType = MergeFileType.Speed;
-let dlg_newTask_visible = false;
+let dlg_newTask_visible = ref(false);
 let tsMergeMp4Path = '';
 let tsMergeStatus = '';
 let m3u8_urls = '';
 let addTaskMessage = '';
-let headers = '';
-let m3u8_url = '';
-let m3u8_url_prefix = '';
-let taskName = '';
-let taskIsDelTs = true;
 let ts_dir = '';
 let playlists = Array<PlaylistItem>();
 let myKeyIV = "";
 let playlistUri = "";
+let toolTipVisible = ref(false);
+let tsMergeProgress = 0;
 
 function clickOpenMergeTSDir () {
   OpenSelectTsDir("").then(files => {
@@ -99,10 +95,19 @@ function m3u8UrlChange() {
 
 
 function clickNewTask() {
-  dlg_newTask_visible = true;
-  taskName = '';
-  m3u8_url = '';
+  dlg_newTask_visible.value = true;
+  parserTask.taskName = '';
+  parserTask.url = '';
+  m3u8UrlChange();
 }
+
+const parserTask = reactive(new main.ParserTask());
+
+function clickNewTaskOK() {
+  TaskAdd(parserTask).catch(err => {
+    console.error(err)
+  });
+};
 
 </script>
 
@@ -123,9 +128,8 @@ function clickNewTask() {
             </el-button>
           </el-col>
           <el-col v-show="false" :span="4" :offset="11">
-            <div class="speed el-icon-download">
-              {{downloadSpeed}}
-            </div>
+            <ElIcon class="speed"><Download/></ElIcon>
+            {{downloadSpeed}}
           </el-col>
         </el-row>
         <ul class="list TaskList" style="overflow:auto">
@@ -153,79 +157,90 @@ function clickNewTask() {
               </div>
               <div class="bottom">
                 <input class="del" opt="delvideo" :data="o.id" type="button"
-                       value="删除" @click="clickItemOptData">
+                       value="删除" @click="clickItemOptData"/>
                 <input class="play" opt="playvideo" :data="o.videoPath"
-                       type="button" value="播放" @click="clickItemOptData">
+                       type="button" value="播放" @click="clickItemOptData"/>
                 <input class="StartStop" opt="StartOrStop" :data="o.id"
-                       type="button" value="停止" @click="clickItemOptData">
+                       type="button" value="停止" @click="clickItemOptData"/>
               </div>
             </div>
           </li>
           <el-alert v-if="!allVideos.length"
                     style="margin-top: 10px; height: 100px; line-height: 1;"
                     title="您还没有添加下载任务，在浏览器里嗅探到M3U8(HLS协议)视频流后，可以在这里缓存下载，快来试试吧。" type="success"
-                    effect="light" :closable="false" :center="true" show-icon></el-alert>
+                    effect="light" :closable="false" :center="true" show-icon/>
         </ul>
-        <el-dialog title="新建下载任务" :width="60" :model-value="dlg_newTask_visible"
-                   :modal="true">
-          <el-form label-width="80px">
-            <el-form-item label="视频源" label-position="right">
+        <el-dialog title="新建下载任务"
+                   width="60%"
+                   v-model="dlg_newTask_visible"
+                   :close-on-press-escape="false"
+                   :close-on-click-modal="false"
+        >
+          <el-form label-width="80px" label-position="right" :model="parserTask">
+            <el-form-item label="视频源">
               <div @drop="dropM3U8File" @dragover.prevent @dragenter.prevent>
-                <el-input placeholder="输入在线网络视频源URL，或将M3U8文件拖拽至此" v-model="m3u8_url"
+                <el-input placeholder="输入在线网络视频源URL，或将M3U8文件拖拽至此" v-model="parserTask.url"
                           draggable="false" @input="m3u8UrlChange" :suffix-icon="Link">
-                  <i slot="prefix" class="el-input__icon el-icon-link"></i>
+                  <ElIcon><Link/></ElIcon>
                   <i slot="suffix" class="el-input__icon el-icon-folder-opened"
                      @click="clickSelectM3U8"></i>
                 </el-input>
               </div>
             </el-form-item>
-            <el-form-item v-if="playlists.length" label="* 画质" label-position="right">
+            <el-form-item v-if="playlists.length > 0" label="* 画质">
               <el-select v-model="playlistUri" placeholder="选择视频源"
                          style="width: 100%;">
                 <el-option v-for="playlist in playlists" :key="playlist.uri"
-                           :label="getPlaylistLabel(playlist)" :value="playlist.uri">
-                </el-option>
+                           :label="getPlaylistLabel(playlist)" :value="playlist.uri"/>
               </el-select>
             </el-form-item>
-            <el-form-item label="任务名" label-position="right">
-              <el-input type="text" placeholder="[可空] 默认当前时间戳" v-model="taskName">
-              </el-input>
+            <el-form-item label="任务名">
+              <el-input type="text" placeholder="[可空] 默认当前时间戳" v-model="parserTask.taskName"/>
             </el-form-item>
-            <el-form-item label="URL前缀" label-position="right"
-                          v-if="m3u8_url.startsWith('file:///')">
+            <el-form-item label="URL前缀"
+                          v-if="parserTask.url.startsWith('file://')">
               <el-tooltip effect="light" placement="top-start">
                 <div slot="content">
                   如果M3U8文件是从网上直接下载下来的，TS流是在网络上的且M3U8文件里没有URL(http)前缀，就需要填写<br /><br />
                   如果TS视频流在M3U8文件目录下，则不需要填写这块<br /></div>
                 <el-input type="text"
                           placeholder="[可空] M3U8 URL前缀，例如：http://www.baidu.com/cdn/123456/"
-                          v-model="m3u8_url_prefix"></el-input>
+                          :model-value="parserTask.prefix" />
               </el-tooltip>
             </el-form-item>
-            <el-form-item label="附加头" label-position="right">
-              <el-input type="textarea" :rows="4" placeholder="[可空] 请输入一行一个Header，例如：
-                Origin: http://www.host.com
-                Referer: http://www.host.com" v-model="headers"></el-input>
+            <el-form-item label="附加头">
+              <el-input type="textarea"
+                        :rows="4"
+                        v-model="parserTask.headers"
+                        placeholder="[可空] 请输入一行一个Header，例如:
+                                                      Origin: http://www.host.com
+                                                                  Referer: http://www.host.com"
+              />
             </el-form-item>
-            <el-form-item label="私有KEY" label-position="right">
-              <el-tooltip effect="light" placement="top-start">
-                <div slot="content">
-                  32位HEX格式KEY和32位IV值，IV值可空<br />示例：<br />ABABABABABBBBBBBABABABABABBBBBBBABABABABABBBBBBBABABABABABBBBBBB<br />或者：<br />ABABABABABBBBBBBABABABABABBBBBBB<br />
-                </div>
-                <el-input type="text" placeholder="[可空] KEY和IV值(HEX格式)"
-                          v-model="myKeyIV">
+            <el-form-item label="私有KEY">
+              <el-tooltip effect="light" placement="top-start" :visible="toolTipVisible">
+                <template #content>
+                  <div>
+                    32位HEX格式KEY和32位IV值，IV值可空<br />示例：<br />ABABABABABBBBBBBABABABABABBBBBBBABABABABABBBBBBBABABABABABBBBBBB<br />或者：<br />ABABABABABBBBBBBABABABABABBBBBBB<br />
+                  </div>
+                </template>
+                <el-input type="text"
+                          placeholder="[可空] KEY和IV值(HEX格式)"
+                          v-model="myKeyIV"
+                          @mouseenter="toolTipVisible = true"
+                          @mouseleave="toolTipVisible = false"
+                >
                 </el-input>
               </el-tooltip>
             </el-form-item>
-            <el-form-item label="合并完成" label-position="right">
-              <el-checkbox v-model="taskIsDelTs" label="删除TS片段"></el-checkbox>
+            <el-form-item label="合并完成">
+              <el-checkbox v-model="parserTask.delOnComplete" label="删除TS片段"></el-checkbox>
             </el-form-item>
           </el-form>
           <div slot="footer" class="dialog-footer">
             <el-row :gutter="20">
               <el-col :span="11" :offset="4">
-                <el-alert :title="addTaskMessage" type="error" :closable="false">
-                </el-alert>
+                <el-alert :title="addTaskMessage" type="error" :closable="false"/>
               </el-col>
               <el-col :span="8" :offset="1">
                 <el-button type="primary" @click="clickNewTaskOK"
@@ -247,10 +262,10 @@ function clickNewTask() {
           <el-form-item label="附加头" label-position="right">
             <el-input type="textarea" :rows="4" placeholder="[可空] 请输入一行一个Header，例如：
                 Origin: http://www.host.com
-                Referer: http://www.host.com" v-model="headers"></el-input>
+                Referer: http://www.host.com" v-model="parserTask.headers"/>
           </el-form-item>
-          <el-form-item label="合并完成" label-position="right">
-            <el-checkbox v-model="taskIsDelTs" label="删除TS片段"></el-checkbox>
+          <el-form-item label="合并完成">
+            <el-checkbox v-model="parserTask.delOnComplete" label="删除TS片段"/>
           </el-form-item>
           <el-form-item>
             <el-button class="mybutton" type="primary" @click="clickNewTaskMuti">批量下载
@@ -278,7 +293,7 @@ function clickNewTask() {
             <span style="line-height: 40px;float: right;">合并名称</span>
           </el-col>
           <el-col :span="20">
-            <el-input placeholder="[可空] 默认当前时间戳" v-model="tsTaskName" clearable
+            <el-input placeholder="[可空] 默认当前时间戳" v-model="parserTask.taskName" clearable
                       draggable="false"></el-input>
           </el-col>
         </el-row>
@@ -311,7 +326,7 @@ function clickNewTask() {
         <el-row :gutter="8" style="margin-top: 10px;margin-bottom: 5px;"
                 v-if="tsMergeStatus">
           <el-col :span="2" :offset="1">
-                                            <span v-if="tsMergeStatus !=='success'"
+            <span v-if="tsMergeStatus !=='success'"
                                                   style="line-height: 100px;float: right;">合并进度</span>
             <span v-if="tsMergeStatus ==='success'"
                   style="line-height: 40px;float: right;">查看文件</span>

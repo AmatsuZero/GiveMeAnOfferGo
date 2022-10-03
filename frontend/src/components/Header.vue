@@ -42,10 +42,7 @@ function clickLink (link: string) {
             <a class="mylink" href="https://github.com/AmatsuZero/GiveMeAnOfferGo/tree/m3u8"
                v-on:click.stop.prevent="clickLink">开放源码</a>
           </el-dropdown-item>
-          <el-dropdown-item>
-            <el-icon>
-              <Connection/>
-            </el-icon>
+          <el-dropdown-item :icon="Connection">
             <a class="mylink" href="https://github.com/AmatsuZero/GiveMeAnOfferGo/issues"
                v-on:click.stop.prevent="clickLink">点击加群</a>
           </el-dropdown-item>
@@ -61,6 +58,39 @@ function clickLink (link: string) {
 </template>
 
 <style scoped>
+.systemTool{
+  position: fixed;
+  right: 0;
+  top: 0;
+  margin-top: -6px;
+  margin-right: 0px;
+  -webkit-app-region: no-drag;
+}
 
+.systemTool .mylink{
+  color: #f3f3f3;
+  margin: 0 5px;
+  text-decoration: none;
+  font-size: 14px;
+}
+.systemTool {
+  padding:0 !important;
+  border:0 !important;
+  border-radius:0 !important;
+  color: #f3f3f3 !important;
+}
+.systemTool {
+  background-color: #D71526;
+}
+.systemTool .button{
+  width: 30px;
+  height: 30px;
+  background-color: #00000000;
+  font-size: large;
+}
+
+.systemTool {
+  margin-left: 0 !important;
+}
 
 </style>
