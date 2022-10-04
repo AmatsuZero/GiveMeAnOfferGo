@@ -1,0 +1,27 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Wails: Debug",
+            "type": "go",
+            "request": "launch",
+            "mode": "exec",
+            "preLaunchTask": "build",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "devserver": "localhost:63677",
+                "frontenddevserverurl": "http://localhost:3000", 
+            },
+            "windows": {
+                "program": "${workspaceFolder}/build/bin/m3u8-downloader.exe"
+            },
+            "osx": {
+                "program": "${workspaceFolder}/build/bin/m3u8-downloader.app",
+                "env": {
+                    "CGO_CFLAGS": "-mmacosx-version-min=10.13",
+                    "CGO_LDFLAGS": "-framework UniformTypeIdentifiers -mmacosx-version-min=10.13"
+                }
+            }
+        }
+    ]
+}
