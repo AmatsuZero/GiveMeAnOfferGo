@@ -8,6 +8,7 @@ import (
 	"GiveMeAnOffer/string/solve_the_equation"
 	string_rotation_lcci "GiveMeAnOffer/string/string-rotation-lcci"
 	swap_adjacent_in_lr_string "GiveMeAnOffer/string/swap-adjacent-in-lr-string"
+	subdomain_visit_count "GiveMeAnOffer/subdomain-visit-count"
 	"GiveMeAnOffer/tree/is_palindrome"
 	"testing"
 )
@@ -106,6 +107,13 @@ func TestReformatPhoneNumber(t *testing.T) {
 
 func TestCanTransform(t *testing.T) {
 	if !swap_adjacent_in_lr_string.CanTransform("RXXLRXRXL", "XRLXXRRLX") {
+		t.Fail()
+	}
+}
+
+func TestSubdomainsVisit(t *testing.T) {
+	ans := subdomain_visit_count.SubdomainVisits([]string{"900 google.mail.com", "50 yahoo.com", "1 intel.mail.com", "5 wiki.org"})
+	if len(ans) != 7 {
 		t.Fail()
 	}
 }
