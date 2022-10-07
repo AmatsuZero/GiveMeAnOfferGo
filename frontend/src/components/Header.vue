@@ -33,23 +33,25 @@ function clickLink (link: string) {
     <div class="systemTool">
       <el-dropdown trigger="click">
         <span class="el-dropdown-link">关于</span>
-        <el-dropdown-menu slot="dropdown">
-          <el-dropdown-item :icon="Link">
-            <a class="mylink" href="https://tools.heisir.cn/HLSDownload/"
-               v-on:click.stop.prevent="clickLink">官网</a>
-          </el-dropdown-item>
-          <el-dropdown-item :icon="Link">
-            <a class="mylink" href="https://github.com/AmatsuZero/GiveMeAnOfferGo/tree/m3u8"
-               v-on:click.stop.prevent="clickLink">开放源码</a>
-          </el-dropdown-item>
-          <el-dropdown-item :icon="Connection">
-            <a class="mylink" href="https://github.com/AmatsuZero/GiveMeAnOfferGo/issues"
-               v-on:click.stop.prevent="clickLink">点击加群</a>
-          </el-dropdown-item>
-          <el-dropdown-item :icon="Connection">
-            <a class="mylink" href="#" v-on:click.stop.prevent="clickStartHookUrl">资源嗅探</a>
-          </el-dropdown-item>
-        </el-dropdown-menu>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item :icon="Link">
+              <a class="mylink" href="https://tools.heisir.cn/HLSDownload/"
+                 v-on:click.stop.prevent="clickLink">官网</a>
+            </el-dropdown-item>
+            <el-dropdown-item :icon="Link">
+              <a class="mylink" href="https://github.com/AmatsuZero/GiveMeAnOfferGo/tree/m3u8"
+                 v-on:click.stop.prevent="clickLink">开放源码</a>
+            </el-dropdown-item>
+            <el-dropdown-item :icon="Connection">
+              <a class="mylink" href="https://github.com/AmatsuZero/GiveMeAnOfferGo/issues"
+                 v-on:click.stop.prevent="clickLink">点击加群</a>
+            </el-dropdown-item>
+            <el-dropdown-item :icon="Connection">
+              <a class="mylink" href="#" v-on:click.stop.prevent="clickStartHookUrl">资源嗅探</a>
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
       </el-dropdown>
       <el-button :icon="Setting" class="button" v-on:click="tabPane = 'setting'"></el-button>
       <el-button class="button" :icon="Close" v-on:click="clickClose"></el-button>
@@ -63,7 +65,7 @@ function clickLink (link: string) {
   right: 0;
   top: 0;
   margin-top: -6px;
-  margin-right: 0px;
+  margin-right: 0;
   -webkit-app-region: no-drag;
 }
 
@@ -80,7 +82,7 @@ function clickLink (link: string) {
   color: #f3f3f3 !important;
 }
 .systemTool {
-  background-color: #D71526;
+  background-color: #1535d7;
 }
 .systemTool .button{
   width: 30px;
