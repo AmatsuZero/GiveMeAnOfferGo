@@ -3,6 +3,7 @@ import { ElMessage } from 'element-plus';
 import { DownloadTask, MergeFileType, PlaylistItem } from "../models";
 import {OpenSelectTsDir, TaskAdd} from "../../wailsjs/go/main/App";
 import {main} from "../../wailsjs/go/models";
+import { EventsEmit } from "../../wailsjs/runtime";
 
 export default {
   props: {
@@ -29,10 +30,6 @@ export default {
 
     },
 
-    getPlaylistLabel: function (item: PlaylistItem): string {
-        return item.desc;
-    },
-
     dropM3U8File: function () {
 
     },
@@ -55,6 +52,12 @@ export default {
 
     },
   },
+
+  watch: {
+    playlistUri: function (uri: string) {
+      EventsEmit('variant-selected', uri);
+    }
+  }
 }
 </script>
 <script lang="ts" setup>
@@ -78,7 +81,7 @@ let addTaskMessage = ref('');
 let ts_dir = '';
 let playlists = ref(Array<PlaylistItem>());
 let myKeyIV = "";
-let playlistUri = "";
+let playlistUri = ref('');
 let toolTipVisible = ref(false);
 let tsMergeProgress = 0;
 
@@ -90,10 +93,9 @@ function clickOpenMergeTSDir () {
 
 function m3u8UrlChange() {
   playlists.value = [];
-  playlistUri = '';
+  playlistUri.value = '';
   addTaskMessage.value = "请输入M3U8视频源";
 }
-
 
 function clickNewTask() {
   dlg_newTask_visible.value = true;
@@ -113,17 +115,13 @@ function clickNewTaskOK() {
 }
 
 EventsOn("select-variant", (data) => {
-  const array = data["Info"] as Array<any>;
-  playlists.value = array.map(info => {
-    const i = new PlaylistItem();
-    i.uri = info["uri"];
-    i.desc = info["desc"];
-    return i;
-  })
+  playlists.value = data["Info"];
   addTaskMessage.value = "请选择一种画质";
 });
 
+function onSelectPlaylist() {
 
+}
 </script>
 
 <template>
@@ -203,10 +201,12 @@ EventsOn("select-variant", (data) => {
               </div>
             </el-form-item>
             <el-form-item v-if="playlists.length > 0" label="* 画质">
-              <el-select v-model="playlistUri" placeholder="选择视频源"
-                         style="width: 100%;">
+              <el-select v-model="playlistUri"
+                         placeholder="选择视频源"
+                         style="width: 100%;"
+                         default-first-option="true">
                 <el-option v-for="playlist in playlists" :key="playlist.uri"
-                           :label="getPlaylistLabel(playlist)" :value="playlist.uri"/>
+                           :label="playlist.desc" :value="playlist.uri"/>
               </el-select>
             </el-form-item>
             <el-form-item label="任务名">

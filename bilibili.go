@@ -103,8 +103,8 @@ type playUrlResp struct {
 type supportFormat struct {
 	Quality             int
 	Format, Superscript string
-	newDescription      string `json:"new_description"`
-	displayDescription  string `json:"display_description"`
+	NewDescription      string `json:"new_description"`
+	DisplayDescription  string `json:"display_description"`
 	Codecs              []string
 }
 
@@ -140,7 +140,7 @@ func (d *videoPageData) selectResolution(u *url.URL) (string, error) {
 
 	for _, format := range info.Data.SupportFormats {
 		i := &playListInfo{
-			Desc: format.Format,
+			Desc: format.NewDescription,
 		}
 		values.Set("qn", strconv.Itoa(format.Quality))
 		u.RawQuery = values.Encode()
@@ -151,16 +151,15 @@ func (d *videoPageData) selectResolution(u *url.URL) (string, error) {
 	values.Del("qn")
 	u.RawQuery = values.Encode()
 
-	ch := make(chan int)
+	ch := make(chan string)
 	runtime.EventsEmit(SharedApp.ctx, SelectVariant, msg)
 	runtime.EventsOnce(SharedApp.ctx, OnVariantSelected, func(optionalData ...interface{}) {
-		idx := optionalData[0].(int)
-		ch <- info.Data.AcceptQuality[idx]
+		ch <- optionalData[0].(string)
 	})
 
-	ans := <-ch
+	uri := <-ch
 
-	return strconv.Itoa(ans), nil
+	return uri, nil
 }
 
 func (d *videoPageData) download(u *url.URL) error {
