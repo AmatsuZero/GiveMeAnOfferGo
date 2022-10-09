@@ -30,7 +30,7 @@ export default {
     },
 
     getPlaylistLabel: function (item: PlaylistItem): string {
-        return item.uri;
+        return item.desc;
     },
 
     dropM3U8File: function () {
@@ -64,6 +64,7 @@ import {OpenSelectTsDir, TaskAdd} from "../../wailsjs/go/main/App";
 import {ElMessage, ElIcon} from "element-plus";
 import { ref, reactive } from 'vue';
 import {main} from "../../wailsjs/go/models";
+import { EventsOn } from "../../wailsjs/runtime";
 
 let ts_urls = Array<string>();
 const allVideos = Array<DownloadTask>();
@@ -107,7 +108,15 @@ function clickNewTaskOK() {
   TaskAdd(parserTask).catch(err => {
     console.error(err)
   });
+
+  addTaskMessage = "正在检查链接...";
 };
+
+EventsOn("select-variant", (data) => {
+  playlists = data["Info"];
+  addTaskMessage = "请选择一种画质";
+});
+
 
 </script>
 
@@ -187,7 +196,7 @@ function clickNewTaskOK() {
                 </el-input>
               </div>
             </el-form-item>
-            <el-form-item v-if="playlists.length > 0" label="* 画质">
+            <el-form-item label="* 画质">
               <el-select v-model="playlistUri" placeholder="选择视频源"
                          style="width: 100%;">
                 <el-option v-for="playlist in playlists" :key="playlist.uri"

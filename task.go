@@ -28,16 +28,26 @@ type ParserTask struct {
 	Headers       map[string]string `json:"headers"`
 }
 
+type playListInfo struct {
+	Uri  string `json:"uri"`
+	Desc string `json:"desc"`
+}
+
 type EventMessage struct {
 	Code    int
 	Message string
-	Info    interface{}
+	Info    []*playListInfo
 }
 
 func (t *ParserTask) Parse() error {
 	u, err := url.Parse(t.Url)
 	if err != nil {
 		return err
+	}
+
+	if u.Host == "www.bilibili.com" {
+		b := NewBilibiliTask(u)
+		return b.Parse()
 	}
 
 	isLocal := u.Scheme == "http" || u.Scheme == "https"
@@ -130,21 +140,22 @@ func (t *ParserTask) BuildReq(u string) (*http.Request, error) {
 
 func (t *ParserTask) selectVariant(l *m3u8.MasterPlaylist) {
 	// 等待前端选择
-	msg := EventMessage{
-		Code:    1,
-		Message: "",
-	}
-	playlist := map[string]int{}
-	for i, variant := range l.Variants {
-		playlist[variant.Resolution] = i
-	}
-	msg.Info = playlist
-	runtime.EventsEmit(SharedApp.ctx, SelectVariant, msg)
-	runtime.EventsOnce(SharedApp.ctx, OnVariantSelected, func(optionalData ...interface{}) {
-		res := optionalData[0].(string)
-		idx := playlist[res]
-		t.handleVariant(l.Variants[idx])
-	})
+	//msg := EventMessage{
+	//	Code:    1,
+	//	Message: "",
+	//}
+	//playlist := map[string]int{}
+	//for i, variant := range l.Variants {
+	//	playlist[variant.Resolution] = i
+	//}
+	//
+	//msg.Info = playlist
+	//runtime.EventsEmit(SharedApp.ctx, SelectVariant, msg)
+	//runtime.EventsOnce(SharedApp.ctx, OnVariantSelected, func(optionalData ...interface{}) {
+	//	res := optionalData[0].(string)
+	//	idx := playlist[res]
+	//	t.handleVariant(l.Variants[idx])
+	//})
 }
 
 func (t *ParserTask) handleVariant(v *m3u8.Variant) {
