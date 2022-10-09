@@ -58,7 +58,7 @@ export default {
 }
 </script>
 <script lang="ts" setup>
-import { Link, CirclePlusFilled, RemoveFilled, FolderOpened, Download } from "@element-plus/icons";
+import { Link, CirclePlusFilled, RemoveFilled, Download } from "@element-plus/icons";
 import {DownloadTask, MergeFileType, PlaylistItem} from "../models";
 import {OpenSelectTsDir, TaskAdd} from "../../wailsjs/go/main/App";
 import {ElMessage, ElIcon} from "element-plus";
@@ -74,9 +74,9 @@ let dlg_newTask_visible = ref(false);
 let tsMergeMp4Path = '';
 let tsMergeStatus = '';
 let m3u8_urls = '';
-let addTaskMessage = '';
+let addTaskMessage = ref('');
 let ts_dir = '';
-let playlists = Array<PlaylistItem>();
+let playlists = ref(Array<PlaylistItem>());
 let myKeyIV = "";
 let playlistUri = "";
 let toolTipVisible = ref(false);
@@ -89,9 +89,9 @@ function clickOpenMergeTSDir () {
 }
 
 function m3u8UrlChange() {
-  playlists = [];
+  playlists.value = [];
   playlistUri = '';
-  addTaskMessage = "请输入M3U8视频源";
+  addTaskMessage.value = "请输入M3U8视频源";
 }
 
 
@@ -109,12 +109,18 @@ function clickNewTaskOK() {
     console.error(err)
   });
 
-  addTaskMessage = "正在检查链接...";
-};
+  addTaskMessage.value = "正在检查链接...";
+}
 
 EventsOn("select-variant", (data) => {
-  playlists = data["Info"];
-  addTaskMessage = "请选择一种画质";
+  const array = data["Info"] as Array<any>;
+  playlists.value = array.map(info => {
+    const i = new PlaylistItem();
+    i.uri = info["uri"];
+    i.desc = info["desc"];
+    return i;
+  })
+  addTaskMessage.value = "请选择一种画质";
 });
 
 
@@ -196,7 +202,7 @@ EventsOn("select-variant", (data) => {
                 </el-input>
               </div>
             </el-form-item>
-            <el-form-item label="* 画质">
+            <el-form-item v-if="playlists.length > 0" label="* 画质">
               <el-select v-model="playlistUri" placeholder="选择视频源"
                          style="width: 100%;">
                 <el-option v-for="playlist in playlists" :key="playlist.uri"
@@ -246,18 +252,20 @@ EventsOn("select-variant", (data) => {
               <el-checkbox v-model="parserTask.delOnComplete" label="删除TS片段"></el-checkbox>
             </el-form-item>
           </el-form>
-          <div slot="footer" class="dialog-footer">
-            <el-row :gutter="20">
-              <el-col :span="11" :offset="4">
-                <el-alert :title="addTaskMessage" type="error" :closable="false"/>
-              </el-col>
-              <el-col :span="8" :offset="1">
-                <el-button type="primary" @click="clickNewTaskOK"
-                           style="width: 100%;">确 定
-                </el-button>
-              </el-col>
-            </el-row>
-          </div>
+          <template #footer>
+            <div class="dialog-footer">
+              <el-row :gutter="20">
+                <el-col :span="11" :offset="4">
+                  <el-alert :title="addTaskMessage" type="error" :closable="false"/>
+                </el-col>
+                <el-col :span="8" :offset="1">
+                  <el-button type="primary" @click="clickNewTaskOK"
+                             style="width: 100%;">确 定
+                  </el-button>
+                </el-col>
+              </el-row>
+            </div>
+          </template>
         </el-dialog>
       </el-tab-pane>
       <el-tab-pane label="M3U8批量下载">
