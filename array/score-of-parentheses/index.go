@@ -10,9 +10,9 @@ func ScoreOfParentheses(s string) int {
 			v := st[len(st)-1]
 			st = st[:len(st)-1]
 			if v == 0 { // A为空串
-				st[len(st)-1] = 1
+				st[len(st)-1] += 1
 			} else {
-				st[len(st)-1] = 2 * v
+				st[len(st)-1] += 2 * v
 			}
 		}
 	}
