@@ -8,7 +8,7 @@ export class DownloadTask {
     id = "";
     url = "";
     taskName = "";
-    time = 0;
+    time = "";
     status = "";
     videoPath = "";
 }

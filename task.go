@@ -18,6 +18,7 @@ const (
 	TaskAddEvent      = "task-add-reply"
 	SelectVariant     = "select-variant"
 	OnVariantSelected = "variant-selected"
+	TaskNotifyCreate  = "task-notify-create"
 )
 
 type ParserTask struct {

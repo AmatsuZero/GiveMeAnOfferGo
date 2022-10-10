@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"github.com/skratchdot/open-golang/open"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"net"
 	"net/http"
@@ -159,4 +160,11 @@ func (a *App) SniffLinks(u string) ([]string, error) {
 	}
 	a.sniffer = NewSniffer(u)
 	return a.sniffer.GetLinks()
+}
+
+func (a *App) Open(link string) error {
+	if len(link) == 0 {
+		link = a.config.PathDownloader
+	}
+	return open.Run(link)
 }

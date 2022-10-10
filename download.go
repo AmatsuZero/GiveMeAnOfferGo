@@ -218,7 +218,24 @@ type CommonDownloader struct {
 	M3U8DownloadQueue
 }
 
+type DownloadTaskUIItem struct {
+	TaskName string `json:"taskName"`
+	Time     string `json:"time"`
+	Status   string `json:"status"`
+	Url      string `json:"url"`
+}
+
 func (c *CommonDownloader) StartDownload(config *ParserTask, urls []string) error {
+
+	item := DownloadTaskUIItem{
+		TaskName: config.TaskName,
+		Time:     time.Now().Format("2006-01-02 15:04:05"),
+		Status:   "初始化...",
+		Url:      config.Url,
+	}
+
+	runtime.EventsEmit(SharedApp.ctx, TaskNotifyCreate, item)
+
 	err := c.preDownload(config)
 	if err != nil {
 		return err

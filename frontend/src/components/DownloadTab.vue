@@ -1,7 +1,7 @@
 <script lang="ts">
 import { ElMessage } from 'element-plus';
 import { DownloadTask, MergeFileType, PlaylistItem } from "../models";
-import {OpenSelectTsDir, TaskAdd} from "../../wailsjs/go/main/App";
+import {Open, OpenSelectTsDir, TaskAdd} from "../../wailsjs/go/main/App";
 import {main} from "../../wailsjs/go/models";
 
 export default {
@@ -17,8 +17,8 @@ export default {
 
     },
 
-    clickItemOptData: function () {
-
+    clickItemOptData: function (link: string) {
+        Open(link);
     },
 
     clickSelectM3U8: function () {
@@ -98,6 +98,7 @@ function clickNewTask() {
 }
 
 const parserTask = reactive(new main.ParserTask());
+parserTask.delOnComplete = true;
 
 function clickNewTaskOK() {
   if (playlistUri.value.length > 0) {
@@ -114,6 +115,12 @@ function clickNewTaskOK() {
 EventsOn("select-variant", (data) => {
   playlists.value = data["Info"];
   addTaskMessage.value = data["Message"];
+});
+
+EventsOn("task-notify-create", data => {
+  const item = data as DownloadTask;
+  allVideos.push(item);
+  dlg_newTask_visible.value = false;
 });
 
 </script>
@@ -159,8 +166,8 @@ EventsOn("select-variant", (data) => {
             </div>
             <div class="opt">
               <div class="top">
-                <input class="opendir" opt="opendir" :data="o.dir" type="button"
-                       value="打开文件夹" @click="clickItemOptData">
+                <input class="opendir" :data="o.dir" type="button"
+                       value="打开文件夹" @click="clickItemOptData(o.videoPath)">
               </div>
               <div class="bottom">
                 <input class="del" opt="delvideo" :data="o.id" type="button"
@@ -172,9 +179,10 @@ EventsOn("select-variant", (data) => {
               </div>
             </div>
           </li>
-          <el-alert v-if="!allVideos.length"
+          <el-alert v-if="allVideos.length == 0"
                     style="margin-top: 10px; height: 100px; line-height: 1;"
-                    title="您还没有添加下载任务，在浏览器里嗅探到M3U8(HLS协议)视频流后，可以在这里缓存下载，快来试试吧。" type="success"
+                    title="您还没有添加下载任务，在浏览器里嗅探到M3U8(HLS协议)视频流后，可以在这里缓存下载，快来试试吧。"
+                    type="success"
                     effect="light" :closable="false" :center="true" show-icon/>
         </ul>
         <el-dialog title="新建下载任务"
