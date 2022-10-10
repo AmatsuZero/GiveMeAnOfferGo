@@ -29,3 +29,7 @@ export function StartMergeTs(arg1) {
 export function TaskAdd(arg1) {
   return window['go']['main']['App']['TaskAdd'](arg1);
 }
+
+export function TaskAddMuti(arg1) {
+  return window['go']['main']['App']['TaskAddMuti'](arg1);
+}

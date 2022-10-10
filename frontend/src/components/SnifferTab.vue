@@ -7,11 +7,33 @@ export default {
     return {
       browserVideoUrls: Array<VideoItem>(),
       currentUserAgent: "",
-      navigatorInput: "",
       navigatorUrl: ""
     }
   }
 }
+</script>
+
+<script lang="ts" setup>
+import { ref } from 'vue';
+import {InterceptItem} from "../models";
+import {EventsOn} from "../../wailsjs/runtime";
+import { SniffLinks } from "../../wailsjs/go/main/App"
+
+const interceptURLs = ref(Array<InterceptItem>());
+
+const navigatorInput = ref("")
+
+function clickNavigate() {
+  SniffLinks(navigatorInput.value);
+}
+
+EventsOn('intercept-url', function (item) {
+  const i = new InterceptItem();
+  i.url = item["url"];
+  i.status = item["status"];
+  interceptURLs.value.push(i);
+});
+
 </script>
 
 <template>
@@ -20,11 +42,13 @@ export default {
     <el-container>
       <el-container>
         <el-header class="navigatorTop">
-          <el-input type="text" v-model="navigatorInput" placeholder="请输入 url" clearable @change="clickNaviagte"></el-input>
+          <el-input type="text" v-model="navigatorInput" placeholder="请输入 url" clearable @change="clickNavigate"></el-input>
         </el-header>
         <el-main style="padding: 0;">
-          <webview id="browser" style="height: 100%;" :src="navigatorUrl"
-                   :useragent="currentUserAgent"></webview>
+          <el-table :data="interceptURLs" style="width: 100%">
+            <el-table-column prop="status" label="Status"/>
+            <el-table-column prop="url" label="Url"/>
+          </el-table>
         </el-main>
       </el-container>
       <el-aside class="videoPanel" v-if="browserVideoUrls && browserVideoUrls.length" width="300px">

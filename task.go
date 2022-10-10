@@ -52,9 +52,11 @@ func (t *ParserTask) Parse() error {
 	}
 
 	if u.Host == "www.bilibili.com" {
-		b := NewBilibiliTask(u)
-		b.ParserTask = t
+		b := t.NewBilibiliTask(u)
 		return b.Parse()
+	} else if u.Host == "www.chinaacc.com" {
+		c := t.NewChinaAACCTask()
+		return c.Parse()
 	}
 
 	isLocal := u.Scheme == "http" || u.Scheme == "https"
@@ -72,6 +74,32 @@ func (t *ParserTask) Parse() error {
 	}
 
 	return err
+}
+
+func (t *ParserTask) NewChinaAACCTask() *ChinaAACCParserTask {
+	return &ChinaAACCParserTask{t}
+}
+
+func (t *ParserTask) NewBilibiliTask(u *url.URL) *BilibiliParserTask {
+	ret := &BilibiliParserTask{
+		ParserTask: t,
+	}
+
+	segments := strings.Split(u.Path, "/")
+	n := 0
+	for _, val := range segments {
+		if len(val) > 0 {
+			segments[n] = val
+			n++
+		}
+	}
+	segments = segments[:n]
+
+	if strings.Contains(u.Path, "/video/") {
+		ret.vid = segments[1]
+		ret.taskType = bilibiliTaskType(segments[0])
+	}
+	return ret
 }
 
 func (t *ParserTask) parseLocalFile(path string) error {

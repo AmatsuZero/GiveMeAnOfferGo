@@ -15,3 +15,5 @@ export function SniffLinks(arg1:string):Promise<Array<string>>;
 export function StartMergeTs(arg1:main.MergeFilesConfig):Promise<Error>;
 
 export function TaskAdd(arg1:main.ParserTask):Promise<Error>;
+
+export function TaskAddMuti(arg1:Array<main.ParserTask>):Promise<Error>;

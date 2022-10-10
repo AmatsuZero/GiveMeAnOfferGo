@@ -266,25 +266,6 @@ type BilibiliParserTask struct {
 	taskType bilibiliTaskType
 }
 
-func NewBilibiliTask(u *url.URL) *BilibiliParserTask {
-	t := &BilibiliParserTask{}
-	segments := strings.Split(u.Path, "/")
-	n := 0
-	for _, val := range segments {
-		if len(val) > 0 {
-			segments[n] = val
-			n++
-		}
-	}
-	segments = segments[:n]
-
-	if strings.Contains(u.Path, "/video/") {
-		t.vid = segments[1]
-		t.taskType = bilibiliTaskType(segments[0])
-	}
-	return t
-}
-
 func (t *BilibiliParserTask) Parse() error {
 	// 获取视频信息
 	infoURL := baseURl.JoinPath(videoInfo)

@@ -77,6 +77,7 @@ let myKeyIV = "";
 let playlistUri = ref('');
 let toolTipVisible = ref(false);
 let tsMergeProgress = 0;
+let headers = ref("");
 
 function clickOpenMergeTSDir () {
   OpenSelectTsDir("").then(files => {
@@ -122,6 +123,20 @@ EventsOn("task-notify-create", data => {
   allVideos.push(item);
   dlg_newTask_visible.value = false;
 });
+
+function onHeadersChange(value: string | number) {
+  if (value === undefined || typeof value !== "string") {
+    return;
+  }
+
+  const headers = value.split("\n");
+  const obj = new Map<string, string>();
+  for (const header of headers) {
+      const arr = header.split(":")
+      obj.set(arr[0].trim(), arr[1].trim())
+  }
+  parserTask.headers = Object.fromEntries(obj);
+}
 
 </script>
 
@@ -228,10 +243,11 @@ EventsOn("task-notify-create", data => {
             <el-form-item label="附加头">
               <el-input type="textarea"
                         :rows="4"
-                        v-model="parserTask.headers"
+                        v-model="headers"
                         placeholder="[可空] 请输入一行一个Header，例如:
-                                                      Origin: http://www.host.com
-                                                                  Referer: http://www.host.com"
+                        Origin: http://www.host.com
+                        Referer: http://www.host.com"
+                        @change="onHeadersChange"
               />
             </el-form-item>
             <el-form-item label="私有KEY">

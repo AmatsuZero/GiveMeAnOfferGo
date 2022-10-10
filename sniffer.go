@@ -73,10 +73,10 @@ func (s *Sniffer) interceptM3u8(ctx context.Context) func(interface{}) {
 	return func(event interface{}) {
 		switch ev := event.(type) {
 		case *network.EventResponseReceived:
-			runtime.LogInfof(SharedApp.ctx, "🔍网页请求：%v", ev.Response.URL)
+			runtime.EventsEmit(SharedApp.ctx, "intercept-url", ev.Response)
 			ext := path.Ext(ev.Response.URL)
 			switch ext {
-			case ".m3u8", ".mp4":
+			case ".m3u8", ".mp4", ".flv", ".mp3", ".mpd", "wav":
 				s.resourceLinks[ev.Response.URL] = true
 			default:
 				return

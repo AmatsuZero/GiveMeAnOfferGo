@@ -154,6 +154,13 @@ func (a *App) TaskAdd(task ParserTask) error {
 	return task.Parse()
 }
 
+func (a *App) TaskAddMuti(tasks []ParserTask) error {
+	for _, task := range tasks {
+		task.Parse()
+	}
+	return nil
+}
+
 func (a *App) SniffLinks(u string) ([]string, error) {
 	if a.sniffer != nil && a.sniffer.Cancel != nil {
 		a.sniffer.Cancel()

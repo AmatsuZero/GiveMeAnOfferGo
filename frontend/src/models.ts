@@ -22,3 +22,8 @@ export class PlaylistItem {
     uri = "";
     desc = "";
 }
+
+export class InterceptItem {
+    url = "";
+    status = 0;
+}
