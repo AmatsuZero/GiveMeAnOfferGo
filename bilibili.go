@@ -5,14 +5,20 @@ import (
 	"errors"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"net/url"
+	"os"
+	"path"
+	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 const (
 	baseUri     = "http://api.bilibili.com"
 	videoStream = "/x/player/playurl"
 	videoInfo   = "/x/web-interface/view"
+	pageList    = "/x/player/pagelist"
 )
 
 var baseURl *url.URL
@@ -60,7 +66,9 @@ type videoInfoResp struct {
 	}
 }
 
-func (v *videoInfoResp) download() error {
+func (v *videoInfoResp) download(t *ParserTask) error {
+	t.TaskName = v.Data.Title
+
 	u := baseURl.JoinPath(videoStream)
 	values := u.Query()
 	if len(v.Data.Bvid) > 0 {
@@ -78,7 +86,22 @@ func (v *videoInfoResp) download() error {
 	if err != nil {
 		return err
 	}
-	println(res)
+
+	wg := &sync.WaitGroup{}
+	wg.Add(int(v.Data.Videos))
+
+	for _, page := range v.Data.Pages {
+		tmp, e := u.Parse(u.String())
+		if e != nil {
+			return err
+		}
+		vars := tmp.Query()
+		vars.Add("qn", res)
+		tmp.RawQuery = vars.Encode()
+		go page.download(u, wg, t)
+	}
+
+	wg.Wait()
 	return err
 }
 
@@ -98,6 +121,57 @@ type playUrlResp struct {
 			BackupUrl    []string `json:"backup_url"`
 		}
 	}
+}
+
+func (r *playUrlResp) download(t *ParserTask, title string) error {
+
+	downloader := &CommonDownloader{}
+	dict := map[string]int64{}
+	var list []string
+
+	for _, item := range r.Data.Durl {
+		list = append(list, item.Url)
+		dict[path.Base(item.Url)] = item.Order
+	}
+
+	err := downloader.StartDownload(t, list)
+	if err != nil {
+		return err
+	}
+
+	// 遍历下载文件夹，调整顺序
+	files, err := os.ReadDir(downloader.DownloadDir)
+	var fileList []string
+	if err != nil {
+		return err
+	}
+
+	for _, f := range files {
+		fileList = append(fileList, filepath.Join(downloader.DownloadDir, f.Name()))
+	}
+
+	sort.Slice(fileList, func(i, j int) bool {
+		lhs, rhs := path.Base(fileList[i]), path.Base(fileList[j])
+		return dict[lhs] < dict[rhs]
+	})
+
+	merger := &MergeFilesConfig{
+		Files:     fileList,
+		TsName:    title,
+		MergeType: MergeTypeSpeed,
+	}
+
+	err = merger.Merge()
+	if err != nil {
+		return err
+	}
+
+	if t.DelOnComplete {
+		err = os.RemoveAll(downloader.DownloadDir)
+		runtime.LogInfo(SharedApp.ctx, "临时文件删除完成")
+	}
+
+	return err
 }
 
 type supportFormat struct {
@@ -135,21 +209,15 @@ func (d *videoPageData) selectResolution(u *url.URL) (string, error) {
 
 	msg := EventMessage{
 		Code:    1,
-		Message: "",
+		Message: "请选择一种画质",
 	}
 
 	for _, format := range info.Data.SupportFormats {
-		i := &playListInfo{
+		msg.Info = append(msg.Info, &playListInfo{
 			Desc: format.NewDescription,
-		}
-		values.Set("qn", strconv.Itoa(format.Quality))
-		u.RawQuery = values.Encode()
-		i.Uri = u.String()
-		msg.Info = append(msg.Info, i)
+			Uri:  strconv.Itoa(format.Quality),
+		})
 	}
-
-	values.Del("qn")
-	u.RawQuery = values.Encode()
 
 	ch := make(chan string)
 	runtime.EventsEmit(SharedApp.ctx, SelectVariant, msg)
@@ -157,13 +225,33 @@ func (d *videoPageData) selectResolution(u *url.URL) (string, error) {
 		ch <- optionalData[0].(string)
 	})
 
-	uri := <-ch
+	res := <-ch
 
-	return uri, nil
+	return res, nil
 }
 
-func (d *videoPageData) download(u *url.URL) error {
-	return nil
+func (d *videoPageData) download(u *url.URL, g *sync.WaitGroup, t *ParserTask) error {
+	defer g.Done()
+
+	values := u.Query()
+	values.Add("cid", strconv.Itoa(int(d.Cid)))
+	u.RawQuery = values.Encode()
+
+	// 获取指定清晰度的 url 列表
+	resp, err := SharedApp.client.Get(u.String())
+	if err != nil {
+		return err
+	}
+
+	var info playUrlResp
+	err = json.NewDecoder(resp.Body).Decode(&info)
+	if err != nil {
+		return err
+	}
+
+	t.Headers["Referer"] = "https://www.bilibili.com"
+	t.Headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36"
+	return info.download(t, d.Part)
 }
 
 type bilibiliTaskType string
@@ -173,6 +261,7 @@ const (
 )
 
 type BilibiliParserTask struct {
+	*ParserTask
 	vid      string
 	taskType bilibiliTaskType
 }
@@ -218,7 +307,7 @@ func (t *BilibiliParserTask) Parse() error {
 		return err
 	}
 
-	err = info.download()
+	err = info.download(t.ParserTask)
 
 	if err != nil {
 		return err

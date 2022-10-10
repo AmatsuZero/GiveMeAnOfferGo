@@ -3,7 +3,6 @@ import { ElMessage } from 'element-plus';
 import { DownloadTask, MergeFileType, PlaylistItem } from "../models";
 import {OpenSelectTsDir, TaskAdd} from "../../wailsjs/go/main/App";
 import {main} from "../../wailsjs/go/models";
-import { EventsEmit } from "../../wailsjs/runtime";
 
 export default {
   props: {
@@ -52,12 +51,6 @@ export default {
 
     },
   },
-
-  watch: {
-    playlistUri: function (uri: string) {
-      EventsEmit('variant-selected', uri);
-    }
-  }
 }
 </script>
 <script lang="ts" setup>
@@ -67,7 +60,7 @@ import {OpenSelectTsDir, TaskAdd} from "../../wailsjs/go/main/App";
 import {ElMessage, ElIcon} from "element-plus";
 import { ref, reactive } from 'vue';
 import {main} from "../../wailsjs/go/models";
-import { EventsOn } from "../../wailsjs/runtime";
+import { EventsOn, EventsEmit } from "../../wailsjs/runtime";
 
 let ts_urls = Array<string>();
 const allVideos = Array<DownloadTask>();
@@ -107,21 +100,22 @@ function clickNewTask() {
 const parserTask = reactive(new main.ParserTask());
 
 function clickNewTaskOK() {
-  TaskAdd(parserTask).catch(err => {
-    console.error(err)
-  });
+  if (playlistUri.value.length > 0) {
+    EventsEmit('variant-selected', playlistUri.value);
+  } else {
+    TaskAdd(parserTask).catch(err => {
+      console.error(err)
+    });
 
-  addTaskMessage.value = "正在检查链接...";
+    addTaskMessage.value = "正在检查链接...";
+  }
 }
 
 EventsOn("select-variant", (data) => {
   playlists.value = data["Info"];
-  addTaskMessage.value = "请选择一种画质";
+  addTaskMessage.value = data["Message"];
 });
 
-function onSelectPlaylist() {
-
-}
 </script>
 
 <template>

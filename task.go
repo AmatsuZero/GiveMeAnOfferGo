@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -40,6 +41,10 @@ type EventMessage struct {
 }
 
 func (t *ParserTask) Parse() error {
+	if t.Headers == nil {
+		t.Headers = make(map[string]string)
+	}
+
 	u, err := url.Parse(t.Url)
 	if err != nil {
 		return err
@@ -47,6 +52,7 @@ func (t *ParserTask) Parse() error {
 
 	if u.Host == "www.bilibili.com" {
 		b := NewBilibiliTask(u)
+		b.ParserTask = t
 		return b.Parse()
 	}
 
@@ -61,7 +67,7 @@ func (t *ParserTask) Parse() error {
 		}
 	default:
 		q := &CommonDownloader{}
-		q.StartDownload(t, []string{t.Url})
+		return q.StartDownload(t, []string{t.Url})
 	}
 
 	return err
@@ -138,45 +144,42 @@ func (t *ParserTask) BuildReq(u string) (*http.Request, error) {
 	return req, nil
 }
 
-func (t *ParserTask) selectVariant(l *m3u8.MasterPlaylist) {
+func (t *ParserTask) selectVariant(l *m3u8.MasterPlaylist) error {
 	// 等待前端选择
-	//msg := EventMessage{
-	//	Code:    1,
-	//	Message: "",
-	//}
-	//playlist := map[string]int{}
-	//for i, variant := range l.Variants {
-	//	playlist[variant.Resolution] = i
-	//}
-	//
-	//msg.Info = playlist
-	//runtime.EventsEmit(SharedApp.ctx, SelectVariant, msg)
-	//runtime.EventsOnce(SharedApp.ctx, OnVariantSelected, func(optionalData ...interface{}) {
-	//	res := optionalData[0].(string)
-	//	idx := playlist[res]
-	//	t.handleVariant(l.Variants[idx])
-	//})
+	msg := EventMessage{
+		Code:    1,
+		Message: "",
+	}
+
+	for i, variant := range l.Variants {
+		msg.Info = append(msg.Info, &playListInfo{
+			Desc: variant.Resolution,
+			Uri:  strconv.Itoa(i),
+		})
+	}
+
+	ch := make(chan int)
+	runtime.EventsEmit(SharedApp.ctx, SelectVariant, msg)
+	runtime.EventsOnce(SharedApp.ctx, OnVariantSelected, func(optionalData ...interface{}) {
+		res := optionalData[0].(string)
+		i, _ := strconv.Atoi(res)
+		ch <- i
+	})
+
+	idx := <-ch
+	return t.handleVariant(l.Variants[idx])
 }
 
-func (t *ParserTask) handleVariant(v *m3u8.Variant) {
+func (t *ParserTask) handleVariant(v *m3u8.Variant) error {
 	if v.Chunklist != nil {
-		err := t.handleMediaPlayList(v.Chunklist)
-		if err != nil {
-			runtime.LogError(SharedApp.ctx, err.Error())
-		}
-		return
+		return t.handleMediaPlayList(v.Chunklist)
 	}
 	req, err := t.BuildReq(v.URI)
-	if err != nil {
-		runtime.LogError(SharedApp.ctx, err.Error())
-		return
-	}
+	return err
 
 	t.Url = req.URL.String()
 	err = t.Parse()
-	if err != nil {
-		runtime.LogError(SharedApp.ctx, err.Error())
-	}
+	return err
 }
 
 func (t *ParserTask) handleMediaPlayList(mpl *m3u8.MediaPlaylist) error {
@@ -198,7 +201,6 @@ func (t *ParserTask) handleMediaPlayList(mpl *m3u8.MediaPlaylist) error {
 		Message: info,
 	})
 
-	<-queue.Done
 	runtime.LogInfof(SharedApp.ctx, "切片下载完成，一共%v个", len(queue.tasks))
 
 	merger := NewMergeConfigFromDownloadQueue(queue)
@@ -237,9 +239,8 @@ func (t *ParserTask) getPlayerList() error {
 	}
 
 	if listType == m3u8.MASTER {
-		t.selectVariant(playlist.(*m3u8.MasterPlaylist))
+		return t.selectVariant(playlist.(*m3u8.MasterPlaylist))
 	} else {
 		return t.handleMediaPlayList(playlist.(*m3u8.MediaPlaylist))
 	}
-	return nil
 }

@@ -66,8 +66,8 @@ func (t *DownloadTask) download() error {
 	}
 
 	if t.decrypt != nil {
-		buffer, err := t.decrypt.Decrypt(resp.Body)
-		if err != nil {
+		buffer, e := t.decrypt.Decrypt(resp.Body)
+		if e != nil {
 			runtime.LogError(SharedApp.ctx, "解密失败")
 			return err
 		}
@@ -106,7 +106,6 @@ type M3U8DownloadQueue struct {
 	tasks         []*DownloadTask
 	TotalDuration float64
 	ctx           context.Context
-	Done          chan bool
 	DownloadDir   string
 
 	keys map[string][]byte
@@ -170,7 +169,6 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 	}
 
 	wg.Wait()
-	q.Done <- true
 }
 
 func (q *M3U8DownloadQueue) startDownloadLive(config *ParserTask, list *m3u8.MediaPlaylist) {
@@ -188,7 +186,6 @@ func (q *M3U8DownloadQueue) preDownload(config *ParserTask) (err error) {
 		name = fmt.Sprintf("%v", time.Now().Unix())
 	}
 
-	q.Done = make(chan bool)
 	q.DownloadDir = filepath.Join(SharedApp.config.PathDownloader, name)
 	if _, err = os.Stat(q.DownloadDir); errors.Is(err, os.ErrNotExist) {
 		err = os.Mkdir(q.DownloadDir, os.ModePerm)
@@ -221,18 +218,20 @@ type CommonDownloader struct {
 	M3U8DownloadQueue
 }
 
-func (c *CommonDownloader) StartDownload(config *ParserTask, urls []string) {
+func (c *CommonDownloader) StartDownload(config *ParserTask, urls []string) error {
 	err := c.preDownload(config)
 	if err != nil {
-		runtime.LogError(SharedApp.ctx, err.Error())
-		return
+		return err
 	}
 
 	for idx, u := range urls {
-		req, err := http.NewRequest("GET", u, nil)
-		if err != nil {
-			runtime.LogInfof(SharedApp.ctx, "生成请求失败：%v", u)
-			continue
+		req, e := http.NewRequest("GET", u, nil)
+		for k, v := range config.Headers {
+			req.Header.Add(k, v)
+		}
+
+		if e != nil {
+			return err
 		}
 
 		dst := path.Base(req.URL.Path)
@@ -255,5 +254,6 @@ func (c *CommonDownloader) StartDownload(config *ParserTask, urls []string) {
 	}
 
 	wg.Wait()
-	c.Done <- true
+
+	return nil
 }

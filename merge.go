@@ -92,10 +92,10 @@ func (c *MergeFilesConfig) Merge() error {
 
 	output := c.TsName
 	if len(output) == 0 {
-		output = "output.mp4"
+		output = "output"
 	}
 
-	output = filepath.Join(SharedApp.config.PathDownloader, output)
+	output = filepath.Join(SharedApp.config.PathDownloader, output+".mp4")
 	cmdStr := fmt.Sprintf("ffmpeg -loglevel quiet -f concat -safe 0 -i %v -vcodec %v -acodec %v %v", f.Name(), videoCodec, audioCodec, output)
 	args := strings.Split(cmdStr, " ")
 	msg, err := Cmd(args[0], args[1:])
