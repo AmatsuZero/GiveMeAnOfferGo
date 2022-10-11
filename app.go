@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
@@ -150,14 +151,25 @@ func (a *App) OpenConfigDir() (string, error) {
 	return dir, err
 }
 
-func (a *App) TaskAdd(task ParserTask) error {
+func (a *App) TaskAdd(task *ParserTask) error {
 	return task.Parse()
 }
 
-func (a *App) TaskAddMuti(tasks []ParserTask) error {
-	for _, task := range tasks {
-		task.Parse()
+func (a *App) TaskAddMuti(tasks []*ParserTask) error {
+	if len(tasks) == 0 {
+		return nil
 	}
+
+	wg := &sync.WaitGroup{}
+
+	for _, task := range tasks {
+		go func(t *ParserTask, g *sync.WaitGroup) {
+			g.Add(1)
+			t.Parse()
+			g.Done()
+		}(task, wg)
+	}
+	wg.Wait()
 	return nil
 }
 

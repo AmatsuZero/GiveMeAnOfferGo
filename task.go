@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -59,25 +58,23 @@ func (t *ParserTask) Parse() error {
 		return c.Parse()
 	}
 
-	isLocal := u.Scheme == "http" || u.Scheme == "https"
-	ext := path.Ext(t.Url)
-	switch ext {
-	case ".m3u8":
+	if strings.Contains(u.Path, ".m3u8") {
+		isLocal := u.Scheme == "http" || u.Scheme == "https"
 		if !isLocal {
 			return t.parseLocalFile(u.String())
 		} else {
 			return t.getPlayerList()
 		}
-	default:
+	} else {
 		q := &CommonDownloader{}
 		return q.StartDownload(t, []string{t.Url})
 	}
-
-	return err
 }
 
 func (t *ParserTask) NewChinaAACCTask() *ChinaAACCParserTask {
-	return &ChinaAACCParserTask{t}
+	return &ChinaAACCParserTask{
+		ParserTask: t,
+	}
 }
 
 func (t *ParserTask) NewBilibiliTask(u *url.URL) *BilibiliParserTask {

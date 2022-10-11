@@ -5,7 +5,7 @@ import (
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
-	"path"
+	"strings"
 	"time"
 )
 
@@ -32,7 +32,10 @@ func (s *Sniffer) GetLinks() ([]string, error) {
 	allocCtx, cancel := chromedp.NewExecAllocator(SharedApp.ctx, opts...)
 	defer cancel()
 
-	taskCtx, cancel := chromedp.NewContext(allocCtx)
+	taskCtx, cancel := chromedp.NewContext(allocCtx, chromedp.WithLogf(func(s string, i ...interface{}) {
+		runtime.LogInfof(SharedApp.ctx, s, i)
+	}))
+
 	defer cancel()
 	s.Cancel = cancel
 
@@ -45,7 +48,7 @@ func (s *Sniffer) GetLinks() ([]string, error) {
 		return nil, err
 	}
 
-	chromedp.ListenTarget(taskCtx, s.interceptM3u8(taskCtx))
+	chromedp.ListenTarget(taskCtx, s.interceptResource(taskCtx))
 
 	runtime.LogInfof(SharedApp.ctx, "开始嗅探 URL：", s.Link)
 
@@ -67,20 +70,20 @@ func (s *Sniffer) GetLinks() ([]string, error) {
 	return links, nil
 }
 
-func (s *Sniffer) interceptM3u8(ctx context.Context) func(interface{}) {
+func (s *Sniffer) interceptResource(ctx context.Context) func(interface{}) {
 	s.resourceLinks = make(map[string]bool)
-
+	suffixes := []string{".m3u8", ".mp4", ".flv", ".mp3", ".mpd", "wav"}
 	return func(event interface{}) {
 		switch ev := event.(type) {
 		case *network.EventResponseReceived:
 			runtime.EventsEmit(SharedApp.ctx, "intercept-url", ev.Response)
-			ext := path.Ext(ev.Response.URL)
-			switch ext {
-			case ".m3u8", ".mp4", ".flv", ".mp3", ".mpd", "wav":
-				s.resourceLinks[ev.Response.URL] = true
-			default:
-				return
+			for _, suffix := range suffixes {
+				if strings.Contains(ev.Response.URL, suffix) {
+					s.resourceLinks[ev.Response.URL] = true
+				}
 			}
+		default:
+			return
 		}
 	}
 }
