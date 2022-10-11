@@ -214,12 +214,17 @@ func (t *ParserTask) handleMediaPlayList(mpl *m3u8.MediaPlaylist) error {
 
 	queue := &M3U8DownloadQueue{}
 
+	ch := make(chan bool)
 	if mpl.Closed {
-		go queue.StartDownload(t, mpl)
+		go func(c chan bool) {
+			queue.StartDownload(t, mpl)
+			c <- true
+		}(ch)
 		d := time.Unix(int64(queue.TotalDuration), 0).Format("15:07:51")
 		info = fmt.Sprintf("点播资源解析成功，有%v个片段，时长：%v，，即将开始缓存...", cnt, d)
 	} else {
 		info = "直播资源解析成功，即将开始缓存..."
+		ch <- true
 	}
 
 	runtime.EventsEmit(SharedApp.ctx, TaskAddEvent, EventMessage{
@@ -227,6 +232,7 @@ func (t *ParserTask) handleMediaPlayList(mpl *m3u8.MediaPlaylist) error {
 		Message: info,
 	})
 
+	<-ch
 	runtime.LogInfof(SharedApp.ctx, "切片下载完成，一共%v个", len(queue.tasks))
 
 	merger := NewMergeConfigFromDownloadQueue(queue)

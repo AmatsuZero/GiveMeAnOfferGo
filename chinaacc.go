@@ -10,13 +10,13 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
 type ChinaAACCParserTask struct {
 	*ParserTask
-	cookies   []*http.Cookie
-	chromeCtx context.Context
+	cookies []*http.Cookie
 }
 
 func (t *ChinaAACCParserTask) getCookies() error {
@@ -33,13 +33,7 @@ func (t *ChinaAACCParserTask) getCookies() error {
 	return nil
 }
 
-func (t *ChinaAACCParserTask) Parse() error {
-	// 获取cookie
-	err := t.getCookies()
-	if err != nil {
-		return err
-	}
-
+func createChromeContext() (context.Context, context.CancelFunc) {
 	options := []chromedp.ExecAllocatorOption{
 		chromedp.Flag("headless", true), // debug使用
 		chromedp.Flag("blink-settings", "imagesEnabled=false"),
@@ -52,15 +46,20 @@ func (t *ChinaAACCParserTask) Parse() error {
 	c, _ := chromedp.NewExecAllocator(SharedApp.ctx, options...)
 
 	// create context
-	chromeCtx, cancel := chromedp.NewContext(c, chromedp.WithLogf(func(s string, i ...interface{}) {
+	chromeCtx, _ := chromedp.NewContext(c, chromedp.WithLogf(func(s string, i ...interface{}) {
 		runtime.LogInfof(SharedApp.ctx, s, i)
 	}))
 
 	//创建一个上下文，超时时间为40s
-	timeoutCtx, cancel := context.WithTimeout(chromeCtx, 40*time.Hour)
-	defer cancel()
+	return context.WithTimeout(chromeCtx, 40*time.Second)
+}
 
-	t.chromeCtx = timeoutCtx
+func (t *ChinaAACCParserTask) Parse() error {
+	// 获取cookie
+	err := t.getCookies()
+	if err != nil {
+		return err
+	}
 
 	content, err := t.getHttpHtmlContent()
 	if err != nil {
@@ -72,20 +71,28 @@ func (t *ChinaAACCParserTask) Parse() error {
 		return err
 	}
 
+	wg := &sync.WaitGroup{}
+
 	// 获取所有 m3u8 链接
 	for _, task := range tasks {
-		chromedp.ListenTarget(t.chromeCtx, t.interceptResource(task))
-		err = chromedp.Run(t.chromeCtx,
-			t.setCookies(),
-			network.Enable(),
-			chromedp.Navigate(task.Url),
-			chromedp.WaitVisible("#catalog", chromedp.ByID),
-		)
-		if err != nil {
-			return err
-		}
+		wg.Add(1)
+		go func(g *sync.WaitGroup, tt *ParserTask) {
+			timeoutCtx, cancel := createChromeContext()
+			defer cancel()
+			chromedp.ListenTarget(timeoutCtx, t.interceptResource(tt))
+			e := chromedp.Run(timeoutCtx,
+				t.setCookies(),
+				network.Enable(),
+				chromedp.Navigate(tt.Url),
+				chromedp.WaitVisible("#catalog", chromedp.ByID),
+			)
+			if e != nil {
+				runtime.LogErrorf(SharedApp.ctx, "获取链接失败：%v", e)
+			}
+			wg.Done()
+		}(wg, task)
 	}
-
+	wg.Wait()
 	return SharedApp.TaskAddMuti(tasks)
 }
 
@@ -118,7 +125,9 @@ func (t *ChinaAACCParserTask) setCookies() chromedp.ActionFunc {
 // 获取网站上爬取的数据
 func (t *ChinaAACCParserTask) getHttpHtmlContent() (string, error) {
 	var htmlContent string
-	err := chromedp.Run(t.chromeCtx,
+	timeoutCtx, cancel := createChromeContext()
+	defer cancel()
+	err := chromedp.Run(timeoutCtx,
 		t.setCookies(),
 		chromedp.Navigate(t.Url),
 		chromedp.WaitVisible("#catalog", chromedp.ByID),
