@@ -116,11 +116,18 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 
 	var cipher *Cipher
 	keys := map[string][]byte{}
+	var mutex sync.RWMutex
+
 	queryKey := func(u string) ([]byte, bool) {
-		return keys[u], false
+		mutex.RLock()
+		b, ok := keys[u]
+		mutex.RUnlock()
+		return b, ok
 	}
 	setKey := func(u string, key []byte) {
+		mutex.Lock()
 		keys[u] = key
+		mutex.Unlock()
 	}
 
 	for _, seg := range list.Segments {

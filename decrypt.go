@@ -69,9 +69,10 @@ func (c *Cipher) Generate() error {
 	if c.block != nil {
 		return nil
 	}
-
-	b, ok := c.queryKey(c.KeyReq.RequestURI)
-	if !ok {
+	var b []byte
+	if len(c.MyKeyIV) > 0 {
+		b = []byte(c.MyKeyIV)
+	} else if _, ok := c.queryKey(c.KeyReq.RequestURI); !ok {
 		req := c.KeyReq
 		if c.Ctx != nil {
 			req = req.WithContext(c.Ctx)
@@ -100,12 +101,9 @@ func (c *Cipher) Generate() error {
 		}
 
 		c.setKey(c.KeyReq.RequestURI, b)
+	} else {
+		b, _ = c.queryKey(c.KeyReq.RequestURI)
 	}
-
-	if b == nil && len(c.MyKeyIV) > 0 {
-		b = []byte(c.MyKeyIV)
-	}
-
 	block, err := aes.NewCipher(b)
 	if err != nil {
 		return err

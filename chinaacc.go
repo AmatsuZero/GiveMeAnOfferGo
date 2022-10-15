@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
@@ -10,7 +11,6 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -71,37 +71,50 @@ func (t *ChinaAACCParserTask) Parse() error {
 		return err
 	}
 
-	wg := &sync.WaitGroup{}
-
-	// 获取所有 m3u8 链接
+	// 资源链接有效时间很短，每个页面单独提取，然后立刻下载
 	for _, task := range tasks {
-		wg.Add(1)
-		go func(g *sync.WaitGroup, tt *ParserTask) {
-			timeoutCtx, cancel := createChromeContext()
-			defer cancel()
-			chromedp.ListenTarget(timeoutCtx, t.interceptResource(tt))
-			e := chromedp.Run(timeoutCtx,
-				t.setCookies(),
-				network.Enable(),
-				chromedp.Navigate(tt.Url),
-				chromedp.WaitVisible("#catalog", chromedp.ByID),
-			)
-			if e != nil {
-				runtime.LogErrorf(SharedApp.ctx, "获取链接失败：%v", e)
-			}
-			wg.Done()
-		}(wg, task)
+		timeoutCtx, cancel := createChromeContext()
+		// 提取 m3u8 链接
+		chromedp.ListenTarget(timeoutCtx, t.interceptResource(task))
+		e := chromedp.Run(timeoutCtx,
+			t.setCookies(),
+			network.Enable(),
+			chromedp.Navigate(task.Url),
+			chromedp.WaitVisible("#catalog", chromedp.ByID),
+		)
+		if e != nil {
+			runtime.LogErrorf(SharedApp.ctx, "❌获取链接失败：%v", e)
+		}
+		cancel()
+		// 下载
+		e = task.Parse()
+		if e != nil {
+			runtime.LogErrorf(SharedApp.ctx, "❌下载课程失败：%v", task.TaskName)
+		}
 	}
-	wg.Wait()
-	return SharedApp.TaskAddMuti(tasks)
+	return err
 }
 
 func (t *ChinaAACCParserTask) interceptResource(task *ParserTask) func(interface{}) {
 	return func(event interface{}) {
+		var keyRequestID network.RequestID
+
 		switch ev := event.(type) {
 		case *network.EventRequestWillBeSent:
 			if strings.Contains(ev.Request.URL, ".m3u8") {
 				task.Url = ev.Request.URL
+				runtime.LogInfof(SharedApp.ctx, "提取到网校 m3u8 资源链接：%v")
+			} else if strings.Contains(ev.Request.URL, "getKeyForHls") { // 获取密钥的链接
+				keyRequestID = ev.RequestID
+			}
+		case *network.EventResponseReceived:
+			if len(keyRequestID) > 0 && ev.RequestID == keyRequestID {
+				b, err := network.GetResponseBody(keyRequestID).MarshalJSON()
+				if err != nil {
+					runtime.LogError(SharedApp.ctx, err.Error())
+				} else {
+					task.KeyIV = string(b)
+				}
 			}
 		}
 	}
@@ -147,7 +160,12 @@ func (t *ChinaAACCParserTask) scrapeLinks(htmlContent string) (tasks []*ParserTa
 	}
 
 	dom.Find("#list1").Children().Each(func(i int, selection *goquery.Selection) {
-		task := &ParserTask{Headers: t.Headers}
+		task := &ParserTask{
+			Headers:       t.Headers,
+			DelOnComplete: t.DelOnComplete,
+			Prefix:        t.Prefix,
+			KeyIV:         t.KeyIV,
+		}
 		u, ok := selection.Attr("href")
 		if !ok {
 			return
@@ -155,12 +173,13 @@ func (t *ChinaAACCParserTask) scrapeLinks(htmlContent string) (tasks []*ParserTa
 
 		task.Url = "https://www.chinaacc.com" + u
 
-		reg := regexp.MustCompile("[\u4e00-\u9fa5]{1,}") //我们要匹配中文的匹配规则
+		reg := regexp.MustCompile("[\u4e00-\u9fa5]+") //我们要匹配中文的匹配规则
 		name := reg.FindAllString(selection.Text(), -1)
 		if len(name) > 0 {
 			task.TaskName = name[0]
+		} else {
+			task.TaskName = fmt.Sprintf("%v", time.Now().Unix())
 		}
-
 		tasks = append(tasks, task)
 	})
 

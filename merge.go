@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 type MergeType string
@@ -24,9 +25,10 @@ type MergeFilesConfig struct {
 	TsName    string    `json:"taskName"`
 }
 
-func NewMergeConfigFromDownloadQueue(q *M3U8DownloadQueue) *MergeFilesConfig {
+func NewMergeConfigFromDownloadQueue(q *M3U8DownloadQueue, fileName string) *MergeFilesConfig {
 	config := &MergeFilesConfig{
 		MergeType: MergeTypeSpeed,
+		TsName:    fileName,
 	}
 
 	sort.Slice(q.tasks, func(i, j int) bool {
@@ -92,7 +94,7 @@ func (c *MergeFilesConfig) Merge() error {
 
 	output := c.TsName
 	if len(output) == 0 {
-		output = "output"
+		output = fmt.Sprintf("%v", time.Now().Unix())
 	}
 
 	output = filepath.Join(SharedApp.config.PathDownloader, output+".mp4")

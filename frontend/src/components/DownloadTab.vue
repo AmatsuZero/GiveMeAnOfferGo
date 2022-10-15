@@ -73,7 +73,6 @@ let m3u8_urls = '';
 let addTaskMessage = ref('');
 let ts_dir = '';
 let playlists = ref(Array<PlaylistItem>());
-let myKeyIV = "";
 let playlistUri = ref('');
 let toolTipVisible = ref(false);
 let tsMergeProgress = 0;
@@ -194,7 +193,7 @@ function onHeadersChange(value: string | number) {
               </div>
             </div>
           </li>
-          <el-alert v-if="allVideos.length == 0"
+          <el-alert v-if="allVideos.length === 0"
                     style="margin-top: 10px; height: 100px; line-height: 1;"
                     title="您还没有添加下载任务，在浏览器里嗅探到M3U8(HLS协议)视频流后，可以在这里缓存下载，快来试试吧。"
                     type="success"
@@ -259,7 +258,7 @@ function onHeadersChange(value: string | number) {
                 </template>
                 <el-input type="text"
                           placeholder="[可空] KEY和IV值(HEX格式)"
-                          v-model="myKeyIV"
+                          v-model="parserTask.keyIV"
                           @mouseenter="toolTipVisible = true"
                           @mouseleave="toolTipVisible = false"
                 >

@@ -235,7 +235,7 @@ func (t *ParserTask) handleMediaPlayList(mpl *m3u8.MediaPlaylist) error {
 	<-ch
 	runtime.LogInfof(SharedApp.ctx, "切片下载完成，一共%v个", len(queue.tasks))
 
-	merger := NewMergeConfigFromDownloadQueue(queue)
+	merger := NewMergeConfigFromDownloadQueue(queue, t.TaskName)
 	err := merger.Merge()
 	if err != nil {
 		return err
