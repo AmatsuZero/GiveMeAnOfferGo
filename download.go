@@ -17,11 +17,30 @@ import (
 )
 
 type DownloadTask struct {
+	ProgressTracker
 	Req     *http.Request
 	Idx     uint64
 	Dst     string
 	cancel  context.CancelFunc
 	decrypt *Cipher
+	Done    bool
+}
+
+type ProgressTracker struct {
+	io.Reader
+	Total   int64
+	Current int64
+}
+
+func (t *DownloadTask) Read(p []byte) (n int, err error) {
+	n, err = t.Reader.Read(p)
+	t.Current += int64(n)
+	//runtime.LogPrint(SharedApp.ctx, fmt.Sprintf("开始下载: %v", t.Req.URL.String()))
+	//runtime.LogInfof(SharedApp.ctx, "\r正在下载，下载进度：%.2f%%", float64(t.Current*10000/t.Total)/100)
+	if t.Current == t.Total {
+		//runtime.LogInfof(SharedApp.ctx, "\r下载完成，下载进度：%.2f%%", float64(t.Current*10000/t.Total)/100)
+	}
+	return
 }
 
 func (t *DownloadTask) download() error {
@@ -71,17 +90,21 @@ func (t *DownloadTask) download() error {
 			runtime.LogError(SharedApp.ctx, "解密失败")
 			return err
 		}
+		t.Reader = buffer
+		t.Total = int64(buffer.Len())
 		_, err = io.Copy(out, buffer)
 	} else {
-		_, err = io.Copy(out, resp.Body)
+		t.Reader = resp.Body
+		t.Total = resp.ContentLength
+		_, err = io.Copy(out, t)
 	}
 
 	if err != nil {
 		runtime.LogErrorf(SharedApp.ctx, "Received HTTP %v for %v", resp.StatusCode, t.Req.URL.String())
 		return err
 	}
-	runtime.LogPrint(SharedApp.ctx, fmt.Sprintf("下载完成: %v", t.Req.URL.String()))
 
+	t.Done = true
 	return nil
 }
 
@@ -97,9 +120,10 @@ func (t *DownloadTask) Start(g *sync.WaitGroup) {
 }
 
 func (t *DownloadTask) Stop() {
-	if t.cancel != nil {
+	if !t.Done && t.cancel != nil {
 		t.cancel()
 	}
+	t.Done = true
 }
 
 type M3U8DownloadQueue struct {
@@ -169,26 +193,50 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 		}
 	}
 
+	if len(q.tasks) == 0 {
+		return
+	}
+
 	wg := &sync.WaitGroup{}
-	wg.Add(int(list.Count()))
+	wg.Add(len(q.tasks))
 
 	for _, task := range q.tasks {
 		go task.Start(wg)
 	}
 
 	wg.Wait()
+	runtime.LogInfof(SharedApp.ctx, "完成了%v个切片任务的下载", len(q.tasks))
 }
 
 func (q *M3U8DownloadQueue) startDownloadLive(config *ParserTask, list *m3u8.MediaPlaylist) {
 	shouldStop := false
+	var tasks []*DownloadTask
+
 	runtime.EventsOn(SharedApp.ctx, StopLiveStreamDownload, func(optionalData ...interface{}) { // 收到停止直播下载的通知
 		shouldStop = true
+		for _, task := range q.tasks {
+			task.Stop()
+		}
 	})
 
 	// 直播链接就是不停的分段下载
-	for !shouldStop {
+	for !(shouldStop || list.Closed) {
 		q.startDownloadVOD(config, list)
+		needWait := len(q.tasks) == 0
+		tasks = append(tasks, q.tasks...)
+		if needWait { // 如果本次没有新增任务，睡一小会儿
+			time.Sleep(time.Second)
+		}
+		playlist, _, err := config.retrieveM3U8List()
+		if err != nil {
+			runtime.LogError(SharedApp.ctx, "获取直播 m3u8 列表失败")
+		} else {
+			list = playlist.(*m3u8.MediaPlaylist)
+			runtime.LogInfof(SharedApp.ctx, "刷新了直播 m3u8 链接")
+		}
 	}
+	// 将所有任务传过去, 后面文件合并用
+	q.tasks = tasks
 }
 
 func (q *M3U8DownloadQueue) preDownload(config *ParserTask) (err error) {
@@ -271,6 +319,10 @@ func (c *CommonDownloader) StartDownload(config *ParserTask, urls []string) erro
 		}
 
 		c.tasks = append(c.tasks, task)
+	}
+
+	if len(c.tasks) == 0 {
+		return err
 	}
 
 	wg := &sync.WaitGroup{}

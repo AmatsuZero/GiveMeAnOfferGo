@@ -17,7 +17,7 @@ export default {
 
     },
 
-    clickItemOptData: function (link: string) {
+    openTask: function (link: string) {
         Open(link);
     },
 
@@ -30,10 +30,6 @@ export default {
     },
 
     dropM3U8File: function () {
-
-    },
-
-    clickPlayMergeMp4: function () {
 
     },
 
@@ -123,6 +119,20 @@ EventsOn("task-notify-create", data => {
   dlg_newTask_visible.value = false;
 });
 
+function clickPlayMergeMp4() {
+
+}
+
+function stopItem(task: DownloadTask) {
+  EventsEmit('stop-live-stream-download');
+}
+
+function deleteTask(task: DownloadTask) {
+
+}
+
+function playTask(task: DownloadTask) {}
+
 function onHeadersChange(value: string | number) {
   if (value === undefined || typeof value !== "string") {
     return;
@@ -180,16 +190,12 @@ function onHeadersChange(value: string | number) {
             </div>
             <div class="opt">
               <div class="top">
-                <input class="opendir" :data="o.dir" type="button"
-                       value="打开文件夹" @click="clickItemOptData(o.videoPath)">
+                <input class="opendir" type="button" value="打开文件夹" @click="openTask(o.videoPath)">
               </div>
               <div class="bottom">
-                <input class="del" opt="delvideo" :data="o.id" type="button"
-                       value="删除" @click="clickItemOptData"/>
-                <input class="play" opt="playvideo" :data="o.videoPath"
-                       type="button" value="播放" @click="clickItemOptData"/>
-                <input class="StartStop" opt="StartOrStop" :data="o.id"
-                       type="button" value="停止" @click="clickItemOptData"/>
+                <input class="del" type="button" value="删除" @click="deleteTask(o)"/>
+                <input class="play" type="button" value="播放" @click="playTask(o)"/>
+                <input class="StartStop" type="button" value="停止" @click="stopItem(o)"/>
               </div>
             </div>
           </li>

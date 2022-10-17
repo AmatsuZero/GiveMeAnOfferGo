@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/grafov/m3u8"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -113,7 +114,7 @@ func (t *ParserTask) parseLocalFile(path string) error {
 	case m3u8.MEDIA:
 		return t.handleMediaPlayList(p.(*m3u8.MediaPlaylist))
 	case m3u8.MASTER:
-		t.selectVariant(p.(*m3u8.MasterPlaylist))
+		return t.selectVariant(p.(*m3u8.MasterPlaylist))
 	}
 	return nil
 }
@@ -202,7 +203,9 @@ func (t *ParserTask) handleVariant(v *m3u8.Variant) error {
 		return t.handleMediaPlayList(v.Chunklist)
 	}
 	req, err := t.BuildReq(v.URI)
-	return err
+	if err != nil {
+		return err
+	}
 
 	t.Url = req.URL.String()
 	err = t.Parse()
@@ -250,27 +253,31 @@ func (t *ParserTask) handleMediaPlayList(mpl *m3u8.MediaPlaylist) error {
 	return err
 }
 
-func (t *ParserTask) getPlayerList() error {
+func (t *ParserTask) retrieveM3U8List() (m3u8.Playlist, m3u8.ListType, error) {
 	req, err := t.BuildReq(t.Url)
 	if err != nil {
-		return err
+		return nil, 0, err
 	}
 
 	resp, err := SharedApp.client.Do(req)
 	if err != nil {
-		return err
+		return nil, 0, err
 	}
+	defer func(Body io.ReadCloser) {
+		err = Body.Close()
+		if err != nil {
+			runtime.LogError(SharedApp.ctx, err.Error())
+		}
+	}(resp.Body)
 
-	playlist, listType, err := m3u8.DecodeFrom(resp.Body, true)
+	return m3u8.DecodeFrom(resp.Body, true)
+}
+
+func (t *ParserTask) getPlayerList() error {
+	playlist, listType, err := t.retrieveM3U8List()
 	if err != nil {
 		return err
 	}
-
-	err = resp.Body.Close()
-	if err != nil {
-		return err
-	}
-
 	if listType == m3u8.MASTER {
 		return t.selectVariant(playlist.(*m3u8.MasterPlaylist))
 	} else {

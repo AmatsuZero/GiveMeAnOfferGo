@@ -36,7 +36,9 @@ func NewMergeConfigFromDownloadQueue(q *M3U8DownloadQueue, fileName string) *Mer
 	})
 
 	for _, task := range q.tasks {
-		config.Files = append(config.Files, task.Dst)
+		if task.Done {
+			config.Files = append(config.Files, task.Dst)
+		}
 	}
 
 	return config
