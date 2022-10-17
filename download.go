@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -163,7 +164,8 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 				continue
 			}
 
-			dst := path.Base(req.URL.Path)
+			dst := strconv.Itoa(int(seg.SeqId))
+			dst += path.Ext(req.URL.Path)
 			dst = filepath.Join(q.DownloadDir, dst)
 			task := &DownloadTask{
 				Req: req,
@@ -219,13 +221,17 @@ func (q *M3U8DownloadQueue) startDownloadLive(config *ParserTask, list *m3u8.Med
 		}
 	})
 
+	var interval time.Duration = 1 // 重试间隔
 	// 直播链接就是不停的分段下载
 	for !(shouldStop || list.Closed) {
 		q.startDownloadVOD(config, list)
 		needWait := len(q.tasks) == 0
 		tasks = append(tasks, q.tasks...)
 		if needWait { // 如果本次没有新增任务，睡一小会儿
-			time.Sleep(time.Second)
+			time.Sleep(interval * time.Second)
+			interval += 2
+		} else {
+			interval = 1
 		}
 		playlist, _, err := config.retrieveM3U8List()
 		if err != nil {

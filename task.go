@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"github.com/grafov/m3u8"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -273,10 +275,35 @@ func (t *ParserTask) retrieveM3U8List() (m3u8.Playlist, m3u8.ListType, error) {
 	return m3u8.DecodeFrom(resp.Body, true)
 }
 
+func (t *ParserTask) handleFor509Error(err error) (m3u8.Playlist, m3u8.ListType, error) {
+	e, ok := err.(*url.Error)
+	if !ok {
+		return nil, 0, err
+	}
+	if _, ok = e.Err.(x509.CertificateInvalidError); !ok {
+		return nil, 0, err
+	}
+	result, err := runtime.MessageDialog(SharedApp.ctx, runtime.MessageDialogOptions{
+		Type:          runtime.QuestionDialog,
+		Title:         "遇到证书错误",
+		Message:       "是否忽略?",
+		DefaultButton: "No",
+	})
+	if err != nil || result == "No" {
+		return nil, 0, err
+	}
+	tr := SharedApp.client.Transport.(*http.Transport)
+	tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} // 忽略证书错误
+	return t.retrieveM3U8List()
+}
+
 func (t *ParserTask) getPlayerList() error {
 	playlist, listType, err := t.retrieveM3U8List()
 	if err != nil {
-		return err
+		playlist, listType, err = t.handleFor509Error(err)
+		if err != nil {
+			return err
+		}
 	}
 	if listType == m3u8.MASTER {
 		return t.selectVariant(playlist.(*m3u8.MasterPlaylist))

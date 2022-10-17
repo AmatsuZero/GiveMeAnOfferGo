@@ -165,8 +165,11 @@ func (a *App) TaskAddMuti(tasks []*ParserTask) error {
 	for _, task := range tasks {
 		go func(t *ParserTask, g *sync.WaitGroup) {
 			g.Add(1)
-			t.Parse()
-			g.Done()
+			defer g.Done()
+			err := t.Parse()
+			if err != nil {
+				return
+			}
 		}(task, wg)
 	}
 	wg.Wait()
