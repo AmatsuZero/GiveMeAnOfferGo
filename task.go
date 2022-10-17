@@ -14,10 +14,11 @@ import (
 )
 
 const (
-	TaskAddEvent      = "task-add-reply"
-	SelectVariant     = "select-variant"
-	OnVariantSelected = "variant-selected"
-	TaskNotifyCreate  = "task-notify-create"
+	TaskAddEvent           = "task-add-reply"
+	SelectVariant          = "select-variant"
+	OnVariantSelected      = "variant-selected"
+	TaskNotifyCreate       = "task-notify-create"
+	StopLiveStreamDownload = "stop-live-stream-download"
 )
 
 type ParserTask struct {
@@ -58,7 +59,7 @@ func (t *ParserTask) Parse() error {
 		return c.Parse()
 	}
 
-	if strings.Contains(u.Path, ".m3u8") {
+	if strings.Contains(u.Path, ".m3u8") || strings.Contains(u.Path, ".m3u") {
 		isLocal := u.Scheme == "http" || u.Scheme == "https"
 		if !isLocal {
 			return t.parseLocalFile(u.String())
@@ -216,16 +217,16 @@ func (t *ParserTask) handleMediaPlayList(mpl *m3u8.MediaPlaylist) error {
 
 	ch := make(chan bool)
 	if mpl.Closed {
-		go func(c chan bool) {
-			queue.StartDownload(t, mpl)
-			c <- true
-		}(ch)
 		d := time.Unix(int64(queue.TotalDuration), 0).Format("15:07:51")
 		info = fmt.Sprintf("点播资源解析成功，有%v个片段，时长：%v，，即将开始缓存...", cnt, d)
 	} else {
 		info = "直播资源解析成功，即将开始缓存..."
-		ch <- true
 	}
+
+	go func(c chan bool) {
+		queue.StartDownload(t, mpl)
+		c <- true
+	}(ch)
 
 	runtime.EventsEmit(SharedApp.ctx, TaskAddEvent, EventMessage{
 		Code:    0,

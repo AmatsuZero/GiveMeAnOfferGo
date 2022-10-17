@@ -107,8 +107,8 @@ type M3U8DownloadQueue struct {
 	TotalDuration float64
 	ctx           context.Context
 	DownloadDir   string
-
-	keys map[string][]byte
+	keys          map[string][]byte
+	tasksSet      map[uint64]bool
 }
 
 func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.MediaPlaylist) {
@@ -131,7 +131,7 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 	}
 
 	for _, seg := range list.Segments {
-		if seg != nil {
+		if seg != nil && !q.tasksSet[seg.SeqId] {
 			q.TotalDuration += seg.Duration
 			req, err := config.BuildReq(seg.URI)
 			if err != nil {
@@ -157,6 +157,7 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 				task.decrypt = cipher
 			}
 			q.tasks = append(q.tasks, task)
+			q.tasksSet[seg.SeqId] = true // 记录下载任务
 		}
 	}
 
@@ -179,12 +180,15 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 }
 
 func (q *M3U8DownloadQueue) startDownloadLive(config *ParserTask, list *m3u8.MediaPlaylist) {
-	// tasksSet := map[string]bool{}
+	shouldStop := false
+	runtime.EventsOn(SharedApp.ctx, StopLiveStreamDownload, func(optionalData ...interface{}) { // 收到停止直播下载的通知
+		shouldStop = true
+	})
 
-	//var downloadSeg func(seg *m3u8.MediaSegment)
-	//for _, segment := range list.Segments {
-	//
-	//}
+	// 直播链接就是不停的分段下载
+	for !shouldStop {
+		q.startDownloadVOD(config, list)
+	}
 }
 
 func (q *M3U8DownloadQueue) preDownload(config *ParserTask) (err error) {
@@ -192,7 +196,7 @@ func (q *M3U8DownloadQueue) preDownload(config *ParserTask) (err error) {
 	if len(name) == 0 {
 		name = fmt.Sprintf("%v", time.Now().Unix())
 	}
-
+	q.tasksSet = map[uint64]bool{}
 	q.DownloadDir = filepath.Join(SharedApp.config.PathDownloader, name)
 	if _, err = os.Stat(q.DownloadDir); errors.Is(err, os.ErrNotExist) {
 		err = os.Mkdir(q.DownloadDir, os.ModePerm)
@@ -203,6 +207,15 @@ func (q *M3U8DownloadQueue) preDownload(config *ParserTask) (err error) {
 			task.Stop()
 		}
 	}
+
+	item := DownloadTaskUIItem{
+		TaskName: config.TaskName,
+		Time:     time.Now().Format("2006-01-02 15:04:05"),
+		Status:   "初始化...",
+		Url:      config.Url,
+	}
+
+	runtime.EventsEmit(SharedApp.ctx, TaskNotifyCreate, item)
 
 	return
 }
@@ -233,16 +246,6 @@ type DownloadTaskUIItem struct {
 }
 
 func (c *CommonDownloader) StartDownload(config *ParserTask, urls []string) error {
-
-	item := DownloadTaskUIItem{
-		TaskName: config.TaskName,
-		Time:     time.Now().Format("2006-01-02 15:04:05"),
-		Status:   "初始化...",
-		Url:      config.Url,
-	}
-
-	runtime.EventsEmit(SharedApp.ctx, TaskNotifyCreate, item)
-
 	err := c.preDownload(config)
 	if err != nil {
 		return err
