@@ -18,6 +18,10 @@ export function OpenSelectTsDir(arg1) {
   return window['go']['main']['App']['OpenSelectTsDir'](arg1);
 }
 
+export function Play(arg1) {
+  return window['go']['main']['App']['Play'](arg1);
+}
+
 export function SniffLinks(arg1) {
   return window['go']['main']['App']['SniffLinks'](arg1);
 }

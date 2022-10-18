@@ -10,6 +10,8 @@ export function OpenSelectM3U8():Promise<string>;
 
 export function OpenSelectTsDir(arg1:string):Promise<Array<string>>;
 
+export function Play(arg1:string):Promise<Error>;
+
 export function SniffLinks(arg1:string):Promise<Array<string>>;
 
 export function StartMergeTs(arg1:main.MergeFilesConfig):Promise<Error>;

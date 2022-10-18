@@ -1,7 +1,7 @@
 <script lang="ts">
 import { ElMessage } from 'element-plus';
 import { DownloadTask, MergeFileType, PlaylistItem } from "../models";
-import {Open, OpenSelectTsDir, TaskAdd} from "../../wailsjs/go/main/App";
+import {Open, OpenSelectTsDir, TaskAdd } from "../../wailsjs/go/main/App";
 import {main} from "../../wailsjs/go/models";
 
 export default {
@@ -52,7 +52,7 @@ export default {
 <script lang="ts" setup>
 import { Link, CirclePlusFilled, RemoveFilled, Download } from "@element-plus/icons";
 import {DownloadTask, MergeFileType, PlaylistItem} from "../models";
-import {OpenSelectTsDir, TaskAdd} from "../../wailsjs/go/main/App";
+import {OpenSelectTsDir, TaskAdd, Play } from "../../wailsjs/go/main/App";
 import {ElMessage, ElIcon} from "element-plus";
 import { ref, reactive } from 'vue';
 import {main} from "../../wailsjs/go/models";
@@ -124,14 +124,17 @@ function clickPlayMergeMp4() {
 }
 
 function stopItem(task: DownloadTask) {
-  EventsEmit('stop-live-stream-download');
+  EventsEmit('stop-live-stream-download', task.url);
 }
 
 function deleteTask(task: DownloadTask) {
 
 }
 
-function playTask(task: DownloadTask) {}
+function playTask(task: DownloadTask) {
+  const file = task.isDone ? task.videoPath : task.url;
+  Play(file).catch(e => console.error(e));
+}
 
 function onHeadersChange(value: string | number) {
   if (value === undefined || typeof value !== "string") {
@@ -355,11 +358,11 @@ function onHeadersChange(value: string | number) {
           </el-col>
           <el-col :span="3" :offset="1">
             <el-button class="mybutton" type="primary" @click="clickStartMergeTS"
-                       :disabled="ts_urls.length==0">开始合并</el-button>
+                       :disabled="ts_urls.length===0">开始合并</el-button>
           </el-col>
           <el-col :span="2">
             <el-button class="mybutton" type="danger" @click="clickClearMergeTS"
-                       :disabled="ts_urls.length==0">清空</el-button>
+                       :disabled="ts_urls.length===0">清空</el-button>
           </el-col>
         </el-row>
 
@@ -371,7 +374,7 @@ function onHeadersChange(value: string | number) {
             <span v-if="tsMergeStatus ==='success'"
                   style="line-height: 40px;float: right;">查看文件</span>
           </el-col>
-          <el-col :span="6" v-if="tsMergeStatus !='success'">
+          <el-col :span="6" v-if="tsMergeStatus !=='success'">
             <el-progress type="circle" :percentage="tsMergeProgress" status="success"
                          :width="100"></el-progress>
           </el-col>

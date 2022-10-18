@@ -190,3 +190,11 @@ func (a *App) Open(link string) error {
 	}
 	return open.Run(link)
 }
+
+func (a *App) Play(file string) error {
+	msg, err := Cmd("ffplay", []string{file})
+	if err == nil {
+		runtime.LogInfof(a.ctx, "播放文件 %v \n %v", file, msg)
+	}
+	return err
+}
