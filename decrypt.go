@@ -10,6 +10,7 @@ import (
 	"golang.org/x/net/context"
 	"io"
 	"net/http"
+	"net/url"
 )
 
 type Cipher struct {
@@ -25,15 +26,25 @@ type Cipher struct {
 	setKey   func(u string, key []byte)
 }
 
-func NewCipherFromKey(key *m3u8.Key, myKeyIV string, queryKey func(u string) ([]byte, bool), setKey func(u string, key []byte)) (*Cipher, error) {
+func NewCipherFromKey(config *ParserTask, key *m3u8.Key, queryKey func(u string) ([]byte, bool), setKey func(u string, key []byte)) (*Cipher, error) {
 	if key == nil || key.Method == "NONE" {
 		return nil, nil
+	}
+
+	u, err := url.Parse(key.URI)
+	if err != nil {
+		return nil, err
+	}
+
+	if u.Scheme == "" || u.Host == "" {
+		u, _ = url.Parse(config.Url)
+		key.URI = fmt.Sprintf("%v://%v%v", u.Scheme, u.Host, key.URI)
 	}
 
 	decrypt := &Cipher{
 		Method:  key.Method,
 		IV:      key.IV,
-		MyKeyIV: myKeyIV,
+		MyKeyIV: config.KeyIV,
 	}
 	req, err := http.NewRequest("GET", key.URI, nil)
 	req = req.WithContext(SharedApp.ctx)

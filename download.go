@@ -174,7 +174,7 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 				Dst: dst,
 			}
 
-			decrypt, err := NewCipherFromKey(seg.Key, config.KeyIV, queryKey, setKey)
+			decrypt, err := NewCipherFromKey(config, seg.Key, queryKey, setKey)
 			if decrypt != nil {
 				task.decrypt = decrypt
 				if cipher == nil {
