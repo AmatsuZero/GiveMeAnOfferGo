@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 )
 
@@ -156,23 +155,6 @@ func (a *App) TaskAdd(task *ParserTask) error {
 }
 
 func (a *App) TaskAddMuti(tasks []*ParserTask) error {
-	if len(tasks) == 0 {
-		return nil
-	}
-
-	wg := &sync.WaitGroup{}
-
-	for _, task := range tasks {
-		go func(t *ParserTask, g *sync.WaitGroup) {
-			g.Add(1)
-			defer g.Done()
-			err := t.Parse()
-			if err != nil {
-				return
-			}
-		}(task, wg)
-	}
-	wg.Wait()
 	return nil
 }
 

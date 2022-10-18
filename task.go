@@ -6,11 +6,13 @@ import (
 	"crypto/x509"
 	"fmt"
 	"github.com/grafov/m3u8"
+	"github.com/jamesnetherton/m3u"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -62,17 +64,60 @@ func (t *ParserTask) Parse() error {
 		return c.Parse()
 	}
 
-	if strings.Contains(u.Path, ".m3u8") || strings.Contains(u.Path, ".m3u") {
+	ext := path.Ext(u.Path)
+	switch {
+	case ext == ".m3u": // m3u 文件需要单独处理：https://baike.baidu.com/item/m3u%E6%96%87%E4%BB%B6/365977
+		return t.handleM3UList()
+	case strings.Contains(u.Path, "m3u8"):
 		isLocal := u.Scheme == "http" || u.Scheme == "https"
 		if !isLocal {
 			return t.parseLocalFile(u.String())
 		} else {
 			return t.getPlayerList()
 		}
-	} else {
+	default:
 		q := &CommonDownloader{}
 		return q.StartDownload(t, []string{t.Url})
 	}
+}
+
+func (t *ParserTask) handleM3UList() error {
+	playlist, err := m3u.Parse(t.Url)
+	if err != nil {
+		return err
+	}
+
+	if err != nil {
+		return err
+	}
+
+	tasks := make([]*ParserTask, 0, len(playlist.Tracks))
+	for _, track := range playlist.Tracks {
+		tasks = append(tasks, &ParserTask{
+			Url:           track.URI,
+			TaskName:      track.Name,
+			Headers:       t.Headers,
+			DelOnComplete: t.DelOnComplete,
+			Prefix:        t.Prefix,
+			KeyIV:         t.KeyIV,
+		})
+	}
+
+	return t.handleMultiTasks(tasks)
+}
+
+func (t *ParserTask) handleMultiTasks(tasks []*ParserTask) error {
+	if len(tasks) == 0 {
+		return nil
+	}
+
+	//wg := &sync.WaitGroup{}
+
+	for _, task := range tasks {
+		task.Parse()
+	}
+	//wg.Wait()
+	return nil
 }
 
 func (t *ParserTask) NewChinaAACCTask() *ChinaAACCParserTask {

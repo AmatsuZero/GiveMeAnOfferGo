@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/avast/retry-go"
+	"github.com/flytam/filenamify"
 	"github.com/grafov/m3u8"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"io"
@@ -39,7 +40,7 @@ func (t *DownloadTask) Read(p []byte) (n int, err error) {
 	//runtime.LogPrint(SharedApp.ctx, fmt.Sprintf("开始下载: %v", t.Req.URL.String()))
 	//runtime.LogInfof(SharedApp.ctx, "\r正在下载，下载进度：%.2f%%", float64(t.Current*10000/t.Total)/100)
 	if t.Current == t.Total {
-		//runtime.LogInfof(SharedApp.ctx, "\r下载完成，下载进度：%.2f%%", float64(t.Current*10000/t.Total)/100)
+		runtime.LogInfof(SharedApp.ctx, "\r下载完成，下载进度：%.2f%%", float64(t.Current*10000/t.Total)/100)
 	}
 	return
 }
@@ -255,9 +256,19 @@ func (q *M3U8DownloadQueue) preDownload(config *ParserTask) (err error) {
 		name = fmt.Sprintf("%v", time.Now().Unix())
 	}
 	q.tasksSet = map[uint64]bool{}
-	q.DownloadDir = filepath.Join(SharedApp.config.PathDownloader, name)
+	// 处理非法文件名
+	output, err := filenamify.Filenamify(name, filenamify.Options{})
+	if err != nil {
+		return err
+	}
+	q.DownloadDir = filepath.Join(SharedApp.config.PathDownloader, output)
+
 	if _, err = os.Stat(q.DownloadDir); errors.Is(err, os.ErrNotExist) {
 		err = os.Mkdir(q.DownloadDir, os.ModePerm)
+	}
+
+	if err != nil {
+		return err
 	}
 
 	if len(q.tasks) > 0 {
