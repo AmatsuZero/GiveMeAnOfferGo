@@ -59,7 +59,7 @@ import {main} from "../../wailsjs/go/models";
 import { EventsOn, EventsEmit } from "../../wailsjs/runtime";
 
 let ts_urls = Array<string>();
-const allVideos = Array<DownloadTask>();
+const allVideos = ref(Array<DownloadTask>());
 let downloadSpeed = '0 MB/s';
 let tsMergeType = MergeFileType.Speed;
 let dlg_newTask_visible = ref(false);
@@ -115,7 +115,7 @@ EventsOn("select-variant", (data) => {
 
 EventsOn("task-notify-create", data => {
   const item = data as DownloadTask;
-  allVideos.push(item);
+  allVideos.value.push(item);
   dlg_newTask_visible.value = false;
 });
 

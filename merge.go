@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/flytam/filenamify"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"os"
 	"os/exec"
@@ -59,7 +60,13 @@ func Cmd(commandName string, params []string) (string, error) {
 }
 
 func (c *MergeFilesConfig) Merge() error {
-	name := c.TsName
+	fileName := c.TsName // 处理非法文件名
+	fileName, err := filenamify.Filenamify(fileName, filenamify.Options{})
+	if err != nil {
+		return err
+	}
+	fileName = strings.ReplaceAll(fileName, " ", "") // 移除空格
+	name := fileName
 	if len(name) == 0 {
 		name = "*"
 	}
@@ -94,7 +101,7 @@ func (c *MergeFilesConfig) Merge() error {
 		break
 	}
 
-	output := c.TsName
+	output := fileName
 	if len(output) == 0 {
 		output = fmt.Sprintf("%v", time.Now().Unix())
 	}

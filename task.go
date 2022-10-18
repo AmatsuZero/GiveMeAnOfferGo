@@ -111,12 +111,12 @@ func (t *ParserTask) handleMultiTasks(tasks []*ParserTask) error {
 		return nil
 	}
 
-	//wg := &sync.WaitGroup{}
-
 	for _, task := range tasks {
-		task.Parse()
+		err := task.Parse()
+		if err != nil {
+			runtime.LogInfof(SharedApp.ctx, "❌下载任务失败：%v", t.Url)
+		}
 	}
-	//wg.Wait()
 	return nil
 }
 

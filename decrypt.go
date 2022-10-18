@@ -51,6 +51,11 @@ func (c *Cipher) Decrypt(body io.Reader) (*bytes.Buffer, error) {
 	// cbc解密模式
 	src, err := io.ReadAll(body)
 	blockSize := c.block.BlockSize()
+
+	if len(src)%blockSize != 0 {
+		return nil, fmt.Errorf("crypto/cipher: input not full blocks, len: %v, block size: %v", len(src), blockSize)
+	}
+
 	key, _ := c.queryKey(c.KeyReq.RequestURI)
 	var iv []byte
 	if len(c.IV) == 0 {

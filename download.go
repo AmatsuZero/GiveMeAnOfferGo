@@ -40,7 +40,7 @@ func (t *DownloadTask) Read(p []byte) (n int, err error) {
 	//runtime.LogPrint(SharedApp.ctx, fmt.Sprintf("开始下载: %v", t.Req.URL.String()))
 	//runtime.LogInfof(SharedApp.ctx, "\r正在下载，下载进度：%.2f%%", float64(t.Current*10000/t.Total)/100)
 	if t.Current == t.Total {
-		runtime.LogInfof(SharedApp.ctx, "\r下载完成，下载进度：%.2f%%", float64(t.Current*10000/t.Total)/100)
+		//runtime.LogInfof(SharedApp.ctx, "\r下载完成，下载进度：%.2f%%", float64(t.Current*10000/t.Total)/100)
 	}
 	return
 }
@@ -89,7 +89,7 @@ func (t *DownloadTask) download() error {
 	if t.decrypt != nil {
 		buffer, e := t.decrypt.Decrypt(resp.Body)
 		if e != nil {
-			runtime.LogError(SharedApp.ctx, "解密失败")
+			runtime.LogErrorf(SharedApp.ctx, "解密失败: %v", e.Error())
 			return err
 		}
 		t.Reader = buffer
@@ -100,7 +100,7 @@ func (t *DownloadTask) download() error {
 		t.Total = resp.ContentLength
 		_, err = io.Copy(out, t)
 	}
-
+	runtime.LogPrint(SharedApp.ctx, fmt.Sprintf("下载完成: %v", t.Req.URL.String()))
 	if err != nil {
 		runtime.LogErrorf(SharedApp.ctx, "Received HTTP %v for %v", resp.StatusCode, t.Req.URL.String())
 		return err
@@ -312,6 +312,7 @@ type DownloadTaskUIItem struct {
 	Time     string `json:"time"`
 	Status   string `json:"status"`
 	Url      string `json:"url"`
+	IsDone   bool   `json:"isDone"`
 }
 
 func (c *CommonDownloader) StartDownload(config *ParserTask, urls []string) error {
