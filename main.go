@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"os"
 	"runtime"
 
 	"github.com/wailsapp/wails/v2"
@@ -16,6 +17,17 @@ var SharedApp *App
 func main() {
 	// Create an instance of the app structure
 	SharedApp = NewApp()
+
+	for _, arg := range os.Args { // 检查是否以命令行模式启动
+		if arg == "--headless" {
+			cli := NewCli()
+			err := cli.Execute()
+			if err != nil {
+				println("Error:", err.Error())
+			}
+			return
+		}
+	}
 
 	// Create application with options
 	err := wails.Run(&options.App{
