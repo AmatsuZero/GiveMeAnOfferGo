@@ -7,7 +7,6 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"net/http"
 	"regexp"
 	"strings"
@@ -47,7 +46,7 @@ func createChromeContext() (context.Context, context.CancelFunc) {
 
 	// create context
 	chromeCtx, _ := chromedp.NewContext(c, chromedp.WithLogf(func(s string, i ...interface{}) {
-		runtime.LogInfof(SharedApp.ctx, s, i)
+		SharedApp.LogInfof(s, i)
 	}))
 
 	//创建一个上下文，超时时间为40s
@@ -83,13 +82,13 @@ func (t *ChinaAACCParserTask) Parse() error {
 			chromedp.WaitVisible("#catalog", chromedp.ByID),
 		)
 		if e != nil {
-			runtime.LogErrorf(SharedApp.ctx, "❌获取链接失败：%v", e)
+			SharedApp.LogErrorf("❌获取链接失败：%v", e)
 		}
 		cancel()
 		// 下载
 		e = task.Parse()
 		if e != nil {
-			runtime.LogErrorf(SharedApp.ctx, "❌下载课程失败：%v", task.TaskName)
+			SharedApp.LogErrorf("❌下载课程失败：%v", task.TaskName)
 		}
 	}
 	return err
@@ -103,7 +102,7 @@ func (t *ChinaAACCParserTask) interceptResource(task *ParserTask) func(interface
 		case *network.EventRequestWillBeSent:
 			if strings.Contains(ev.Request.URL, ".m3u8") {
 				task.Url = ev.Request.URL
-				runtime.LogInfof(SharedApp.ctx, "提取到网校 m3u8 资源链接：%v")
+				SharedApp.LogInfof("提取到网校 m3u8 资源链接：%v")
 			} else if strings.Contains(ev.Request.URL, "getKeyForHls") { // 获取密钥的链接
 				keyRequestID = ev.RequestID
 			}
@@ -111,7 +110,7 @@ func (t *ChinaAACCParserTask) interceptResource(task *ParserTask) func(interface
 			if len(keyRequestID) > 0 && ev.RequestID == keyRequestID {
 				b, err := network.GetResponseBody(keyRequestID).MarshalJSON()
 				if err != nil {
-					runtime.LogError(SharedApp.ctx, err.Error())
+					SharedApp.LogError(err.Error())
 				} else {
 					task.KeyIV = string(b)
 				}

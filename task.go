@@ -114,7 +114,7 @@ func (t *ParserTask) handleMultiTasks(tasks []*ParserTask) error {
 	for _, task := range tasks {
 		err := task.Parse()
 		if err != nil {
-			runtime.LogInfof(SharedApp.ctx, "❌下载任务失败：%v", t.Url)
+			SharedApp.LogInfof("❌下载任务失败：%v", t.Url)
 		}
 	}
 	return nil
@@ -234,8 +234,8 @@ func (t *ParserTask) selectVariant(l *m3u8.MasterPlaylist) error {
 	}
 
 	ch := make(chan int)
-	runtime.EventsEmit(SharedApp.ctx, SelectVariant, msg)
-	runtime.EventsOnce(SharedApp.ctx, OnVariantSelected, func(optionalData ...interface{}) {
+	SharedApp.EventsEmit(SelectVariant, msg)
+	SharedApp.EventsOnce(OnVariantSelected, func(optionalData ...interface{}) {
 		res := optionalData[0].(string)
 		i, _ := strconv.Atoi(res)
 		ch <- i
@@ -278,24 +278,24 @@ func (t *ParserTask) handleMediaPlayList(mpl *m3u8.MediaPlaylist) error {
 		c <- true
 	}(ch)
 
-	runtime.EventsEmit(SharedApp.ctx, TaskAddEvent, EventMessage{
+	SharedApp.EventsEmit(TaskAddEvent, EventMessage{
 		Code:    0,
 		Message: info,
 	})
 
 	<-ch
-	runtime.LogInfof(SharedApp.ctx, "切片下载完成，一共%v个", len(queue.tasks))
+	SharedApp.LogInfof("切片下载完成，一共%v个", len(queue.tasks))
 
 	merger := NewMergeConfigFromDownloadQueue(queue, t.TaskName)
 	err := merger.Merge()
 	if err != nil {
 		return err
 	}
-	runtime.LogInfo(SharedApp.ctx, "切片合并完成")
+	SharedApp.LogInfo("切片合并完成")
 
 	if t.DelOnComplete {
 		err = os.RemoveAll(queue.DownloadDir)
-		runtime.LogInfo(SharedApp.ctx, "切片删除完成")
+		SharedApp.LogInfo("切片删除完成")
 	}
 	return err
 }
@@ -313,7 +313,7 @@ func (t *ParserTask) retrieveM3U8List() (m3u8.Playlist, m3u8.ListType, error) {
 	defer func(Body io.ReadCloser) {
 		err = Body.Close()
 		if err != nil {
-			runtime.LogError(SharedApp.ctx, err.Error())
+			SharedApp.LogError(err.Error())
 		}
 	}(resp.Body)
 
@@ -328,7 +328,7 @@ func (t *ParserTask) handleFor509Error(err error) (m3u8.Playlist, m3u8.ListType,
 	if _, ok = e.Err.(x509.CertificateInvalidError); !ok {
 		return nil, 0, err
 	}
-	result, err := runtime.MessageDialog(SharedApp.ctx, runtime.MessageDialogOptions{
+	result, err := SharedApp.MessageDialog(runtime.MessageDialogOptions{
 		Type:          runtime.QuestionDialog,
 		Title:         "遇到证书错误",
 		Message:       "是否忽略?",

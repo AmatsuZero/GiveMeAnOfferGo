@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/skratchdot/open-golang/open"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"net"
@@ -33,12 +34,12 @@ func init() {
 
 // App struct
 type App struct {
-	config    *UserConfig
-	ctx       context.Context
-	client    *http.Client
-	stopTasks context.CancelFunc
-
-	sniffer *Sniffer
+	config       *UserConfig
+	ctx          context.Context
+	client       *http.Client
+	stopTasks    context.CancelFunc
+	headlessMode bool
+	sniffer      *Sniffer
 }
 
 // NewApp creates a new App application struct
@@ -155,6 +156,12 @@ func (a *App) TaskAdd(task *ParserTask) error {
 }
 
 func (a *App) TaskAddMuti(tasks []*ParserTask) error {
+	for _, task := range tasks {
+		e := task.Parse()
+		if e != nil {
+			runtime.LogErrorf(a.ctx, "下载任务失败:%v", e.Error())
+		}
+	}
 	return nil
 }
 
@@ -179,4 +186,64 @@ func (a *App) Play(file string) error {
 		runtime.LogInfof(a.ctx, "播放文件 %v \n %v", file, msg)
 	}
 	return err
+}
+
+func (a *App) EventsEmit(eventName string, optionalData ...interface{}) {
+	if a.headlessMode {
+		return
+	}
+	runtime.EventsEmit(a.ctx, eventName, optionalData...)
+}
+
+func (a *App) EventsOnce(eventName string, callback func(optionalData ...interface{})) {
+	if a.headlessMode {
+		return
+	}
+	runtime.EventsOnce(a.ctx, eventName, callback)
+}
+
+func (a *App) MessageDialog(dialogOptions runtime.MessageDialogOptions) (string, error) {
+	if a.headlessMode {
+		return "", nil
+	}
+	return runtime.MessageDialog(a.ctx, dialogOptions)
+}
+
+func (a *App) EventsOn(eventName string, callback func(optionalData ...interface{})) {
+	if a.headlessMode {
+		return
+	}
+	runtime.EventsOn(a.ctx, eventName, callback)
+}
+
+func (a *App) LogInfof(format string, args ...interface{}) {
+	if a.headlessMode {
+		fmt.Printf("INFO | "+format+"\n", args...)
+	} else {
+		runtime.LogInfof(a.ctx, format, args...)
+	}
+}
+
+func (a *App) LogInfo(message string) {
+	if a.headlessMode {
+		fmt.Println("INFO | " + message)
+	} else {
+		runtime.LogInfo(a.ctx, message)
+	}
+}
+
+func (a *App) LogError(message string) {
+	if a.headlessMode {
+		fmt.Println("ERR | " + message)
+	} else {
+		runtime.LogError(a.ctx, message)
+	}
+}
+
+func (a *App) LogErrorf(format string, args ...interface{}) {
+	if a.headlessMode {
+		fmt.Printf("ERR | "+format+"\n", args...)
+	} else {
+		runtime.LogInfof(a.ctx, format, args...)
+	}
 }

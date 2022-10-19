@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"strings"
 	"time"
 )
@@ -33,7 +32,7 @@ func (s *Sniffer) GetLinks() ([]string, error) {
 	defer cancel()
 
 	taskCtx, cancel := chromedp.NewContext(allocCtx, chromedp.WithLogf(func(s string, i ...interface{}) {
-		runtime.LogInfof(SharedApp.ctx, s, i)
+		SharedApp.LogInfof(s, i)
 	}))
 
 	defer cancel()
@@ -50,7 +49,7 @@ func (s *Sniffer) GetLinks() ([]string, error) {
 
 	chromedp.ListenTarget(taskCtx, s.interceptResource(taskCtx))
 
-	runtime.LogInfof(SharedApp.ctx, "开始嗅探 URL：", s.Link)
+	SharedApp.LogInfof("开始嗅探 URL：", s.Link)
 
 	err := chromedp.Run(taskCtx,
 		network.Enable(),
@@ -64,7 +63,7 @@ func (s *Sniffer) GetLinks() ([]string, error) {
 
 	// 去重
 	var links []string
-	for l, _ := range s.resourceLinks {
+	for l := range s.resourceLinks {
 		links = append(links, l)
 	}
 	return links, nil
@@ -76,7 +75,7 @@ func (s *Sniffer) interceptResource(ctx context.Context) func(interface{}) {
 	return func(event interface{}) {
 		switch ev := event.(type) {
 		case *network.EventResponseReceived:
-			runtime.EventsEmit(SharedApp.ctx, "intercept-url", ev.Response)
+			SharedApp.EventsEmit("intercept-url", ev.Response)
 			for _, suffix := range suffixes {
 				if strings.Contains(ev.Response.URL, suffix) {
 					s.resourceLinks[ev.Response.URL] = true

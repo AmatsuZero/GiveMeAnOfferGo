@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"net/url"
 	"os"
 	"path"
@@ -98,7 +97,12 @@ func (v *videoInfoResp) download(t *ParserTask) error {
 		vars := tmp.Query()
 		vars.Add("qn", res)
 		tmp.RawQuery = vars.Encode()
-		go page.download(u, wg, t)
+		go func() {
+			err = page.download(u, wg, t)
+			if err != nil {
+				SharedApp.LogInfof("B站任务下载失败：%v", err)
+			}
+		}()
 	}
 
 	wg.Wait()
@@ -168,7 +172,7 @@ func (r *playUrlResp) download(t *ParserTask, title string) error {
 
 	if t.DelOnComplete {
 		err = os.RemoveAll(downloader.DownloadDir)
-		runtime.LogInfo(SharedApp.ctx, "临时文件删除完成")
+		SharedApp.LogInfo("临时文件删除完成")
 	}
 
 	return err
@@ -220,8 +224,8 @@ func (d *videoPageData) selectResolution(u *url.URL) (string, error) {
 	}
 
 	ch := make(chan string)
-	runtime.EventsEmit(SharedApp.ctx, SelectVariant, msg)
-	runtime.EventsOnce(SharedApp.ctx, OnVariantSelected, func(optionalData ...interface{}) {
+	SharedApp.EventsEmit(SelectVariant, msg)
+	SharedApp.EventsOnce(OnVariantSelected, func(optionalData ...interface{}) {
 		ch <- optionalData[0].(string)
 	})
 

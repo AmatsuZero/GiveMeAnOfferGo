@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"os"
 	"path/filepath"
 )
@@ -38,7 +37,7 @@ func NewConfig(path string) (*UserConfig, error) {
 	defer func(file *os.File) {
 		err = file.Close()
 		if err != nil {
-			runtime.LogError(SharedApp.ctx, err.Error())
+			SharedApp.LogError(err.Error())
 		}
 	}(file)
 	var tmp UserConfig

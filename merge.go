@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/flytam/filenamify"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -111,12 +110,12 @@ func (c *MergeFilesConfig) Merge() error {
 	args := strings.Split(cmdStr, " ")
 	msg, err := Cmd(args[0], args[1:])
 	if err != nil {
-		runtime.LogError(SharedApp.ctx, fmt.Sprintf("videoConvert failed, %v, output: %v\n", err, msg))
+		SharedApp.LogErrorf("videoConvert failed, %v, output: %v\n", err, msg)
 	}
 	defer func(name string) {
 		err = os.Remove(name)
 		if err != nil {
-			runtime.LogInfof(SharedApp.ctx, "删除合并文件临时列表失败：%v", err.Error())
+			SharedApp.LogErrorf("删除合并文件临时列表失败：%v", err.Error())
 		}
 	}(f.Name())
 	return err

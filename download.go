@@ -7,7 +7,6 @@ import (
 	"github.com/avast/retry-go"
 	"github.com/flytam/filenamify"
 	"github.com/grafov/m3u8"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"io"
 	"net/http"
 	"os"
@@ -51,45 +50,45 @@ func (t *DownloadTask) download() error {
 		t.decrypt.Ctx = t.Req.Context()
 		err := t.decrypt.Generate()
 		if err != nil {
-			runtime.LogError(SharedApp.ctx, fmt.Sprintf("创建解密信息失败：%v", err))
+			SharedApp.LogError(fmt.Sprintf("创建解密信息失败：%v", err))
 			return err
 		}
 	}
 
 	out, err := os.Create(t.Dst)
 	if err != nil {
-		runtime.LogError(SharedApp.ctx, err.Error())
+		SharedApp.LogError(err.Error())
 		return err
 	}
 	defer func(out *os.File) {
 		err = out.Close()
 		if err != nil {
-			runtime.LogError(SharedApp.ctx, err.Error())
+			SharedApp.LogError(err.Error())
 		}
 	}(out)
 
 	resp, err := SharedApp.client.Do(t.Req)
 	if err != nil {
-		runtime.LogError(SharedApp.ctx, fmt.Sprintf("下载失败：%v", err))
+		SharedApp.LogError(fmt.Sprintf("下载失败：%v", err))
 		return err
 	}
 	defer func(Body io.ReadCloser) {
 		err = Body.Close()
 		if err != nil {
-			runtime.LogError(SharedApp.ctx, err.Error())
+			SharedApp.LogError(err.Error())
 		}
 	}(resp.Body)
 
 	if resp.StatusCode != 200 {
 		info := fmt.Sprintf("下载失败：Received HTTP %v for %v", resp.StatusCode, t.Req.URL.String())
-		runtime.LogError(SharedApp.ctx, info)
+		SharedApp.LogError(info)
 		return fmt.Errorf(info)
 	}
 
 	if t.decrypt != nil {
 		buffer, e := t.decrypt.Decrypt(resp.Body)
 		if e != nil {
-			runtime.LogErrorf(SharedApp.ctx, "解密失败: %v", e.Error())
+			SharedApp.LogErrorf("解密失败: %v", e.Error())
 			return err
 		}
 		t.Reader = buffer
@@ -100,9 +99,9 @@ func (t *DownloadTask) download() error {
 		t.Total = resp.ContentLength
 		_, err = io.Copy(out, t)
 	}
-	runtime.LogPrint(SharedApp.ctx, fmt.Sprintf("下载完成: %v", t.Req.URL.String()))
+	SharedApp.LogInfof("下载完成: %v", t.Req.URL.String())
 	if err != nil {
-		runtime.LogErrorf(SharedApp.ctx, "Received HTTP %v for %v", resp.StatusCode, t.Req.URL.String())
+		SharedApp.LogErrorf("Received HTTP %v for %v", resp.StatusCode, t.Req.URL.String())
 		return err
 	}
 
@@ -161,7 +160,7 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 			q.TotalDuration += seg.Duration
 			req, err := config.BuildReq(seg.URI)
 			if err != nil {
-				runtime.LogError(SharedApp.ctx, fmt.Sprintf("生成 Segments 请求出粗：%v", err))
+				SharedApp.LogErrorf("生成 Segments 请求出粗：%v", err)
 				continue
 			}
 
@@ -192,7 +191,7 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 	if cipher != nil {
 		err := cipher.Generate()
 		if err != nil {
-			runtime.LogError(SharedApp.ctx, fmt.Sprintf("生成解密结构体出错：%v", err))
+			SharedApp.LogErrorf("生成解密结构体出错：%v", err)
 		}
 	}
 
@@ -208,14 +207,14 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 	}
 
 	wg.Wait()
-	runtime.LogInfof(SharedApp.ctx, "完成了%v个切片任务的下载", len(q.tasks))
+	SharedApp.LogInfof("完成了%v个切片任务的下载", len(q.tasks))
 }
 
 func (q *M3U8DownloadQueue) startDownloadLive(config *ParserTask, list *m3u8.MediaPlaylist) {
 	shouldStop := false
 	var tasks []*DownloadTask
 
-	runtime.EventsOn(SharedApp.ctx, StopLiveStreamDownload, func(optionalData ...interface{}) { // 收到停止直播下载的通知
+	SharedApp.EventsOn(StopLiveStreamDownload, func(optionalData ...interface{}) { // 收到停止直播下载的通知
 		u := optionalData[0].(string)
 		if u != config.Url { // 只停止自己的任务
 			return
@@ -240,10 +239,10 @@ func (q *M3U8DownloadQueue) startDownloadLive(config *ParserTask, list *m3u8.Med
 		}
 		playlist, _, err := config.retrieveM3U8List()
 		if err != nil {
-			runtime.LogError(SharedApp.ctx, "获取直播 m3u8 列表失败")
+			SharedApp.LogError("获取直播 m3u8 列表失败")
 		} else {
 			list = playlist.(*m3u8.MediaPlaylist)
-			runtime.LogInfof(SharedApp.ctx, "刷新了直播 m3u8 链接")
+			SharedApp.LogInfo("刷新了直播 m3u8 链接")
 		}
 	}
 	// 将所有任务传过去, 后面文件合并用
@@ -284,7 +283,7 @@ func (q *M3U8DownloadQueue) preDownload(config *ParserTask) (err error) {
 		Url:      config.Url,
 	}
 
-	runtime.EventsEmit(SharedApp.ctx, TaskNotifyCreate, item)
+	SharedApp.EventsEmit(TaskNotifyCreate, item)
 
 	return
 }
@@ -292,7 +291,7 @@ func (q *M3U8DownloadQueue) preDownload(config *ParserTask) (err error) {
 func (q *M3U8DownloadQueue) StartDownload(config *ParserTask, list *m3u8.MediaPlaylist) {
 	err := q.preDownload(config)
 	if err != nil {
-		runtime.LogError(SharedApp.ctx, err.Error())
+		SharedApp.LogError(err.Error())
 		return
 	}
 
