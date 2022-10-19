@@ -91,7 +91,7 @@ func (c *Cli) parse(cmd *cobra.Command, args []string) error {
 			Headers:       nil,
 		})
 	}
-
+	defer fmt.Println("解析结束")
 	return SharedApp.TaskAddMuti(tasks)
 }
 

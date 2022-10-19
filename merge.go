@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -67,9 +66,6 @@ func (c *MergeFilesConfig) Merge() error {
 		return err
 	}
 	fileName = strings.ReplaceAll(fileName, " ", "") // 移除空格
-	if runtime.GOOS == "linux" {
-		return c.linuxMerge(fileName)
-	}
 
 	name := fileName
 	if len(name) == 0 {
@@ -112,7 +108,7 @@ func (c *MergeFilesConfig) Merge() error {
 	}
 
 	output = filepath.Join(SharedApp.config.PathDownloader, output+".mp4")
-	cmdStr := fmt.Sprintf("ffmpeg -loglevel quiet -f concat -safe 0 -i %v -vcodec %v -acodec %v %v", f.Name(), videoCodec, audioCodec, output)
+	cmdStr := fmt.Sprintf("ffmpeg -f concat -safe 0 -i %v -vcodec %v -acodec %v %v", f.Name(), videoCodec, audioCodec, output)
 	args := strings.Split(cmdStr, " ")
 	msg, err := Cmd(args[0], args[1:])
 	if err != nil {

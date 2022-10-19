@@ -224,8 +224,10 @@ func (a *App) EventsOn(eventName string, callback func(optionalData ...interface
 
 func (a *App) LogInfof(format string, args ...interface{}) {
 	cli := a.ctx.Value(CliKey).(*Cli)
-	if cli != nil && *cli.verbose {
-		fmt.Printf("INFO | "+format+"\n", args...)
+	if cli != nil {
+		if *cli.verbose {
+			fmt.Printf("INFO | "+format+"\n", args...)
+		}
 	} else {
 		runtime.LogInfof(a.ctx, format, args...)
 	}
@@ -233,8 +235,10 @@ func (a *App) LogInfof(format string, args ...interface{}) {
 
 func (a *App) LogInfo(message string) {
 	cli := a.ctx.Value(CliKey).(*Cli)
-	if cli != nil && *cli.verbose {
-		fmt.Println("INFO | " + message)
+	if cli != nil {
+		if *cli.verbose {
+			fmt.Println("INFO | " + message)
+		}
 	} else {
 		runtime.LogInfo(a.ctx, message)
 	}
