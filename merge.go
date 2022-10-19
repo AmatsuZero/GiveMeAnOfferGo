@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -108,8 +109,12 @@ func (c *MergeFilesConfig) Merge() error {
 	}
 
 	output = filepath.Join(SharedApp.config.PathDownloader, output+".mp4")
-	cmdStr := fmt.Sprintf("ffmpeg -f concat -safe 0 -i %v -vcodec %v -acodec %v %v", f.Name(), videoCodec, audioCodec, output)
+	cmdStr := fmt.Sprintf("ffmpeg -loglevel quiet -f concat -safe 0 -i %v -vcodec %v -acodec %v", f.Name(), videoCodec, audioCodec)
 	args := strings.Split(cmdStr, " ")
+	if runtime.GOOS == "linux" { // FIX：linux 主机合并失败
+		args = append(args, "-bsf:a", "aac_adtstoasc")
+	}
+	args = append(args, output)
 	msg, err := Cmd(args[0], args[1:])
 	if err != nil {
 		SharedApp.LogErrorf("video merge failed, %v, output: %v\n", err, msg)
@@ -120,20 +125,5 @@ func (c *MergeFilesConfig) Merge() error {
 			SharedApp.LogErrorf("删除合并文件临时列表失败：%v", err.Error())
 		}
 	}(f.Name())
-	return err
-}
-
-func (c *MergeFilesConfig) linuxMerge(output string) error {
-	if len(output) == 0 {
-		output = fmt.Sprintf("%v", time.Now().Unix())
-	}
-	output = filepath.Join(SharedApp.config.PathDownloader, output+".mp4")
-	cmdStr := fmt.Sprintf("ffmpeg -i %v -bsf:a aac_adtstoasc -c copy %v", strings.Join(c.Files, "|"), output)
-	fmt.Println(cmdStr)
-	args := strings.Split(cmdStr, " ")
-	msg, err := Cmd(args[0], args[1:])
-	if err != nil {
-		SharedApp.LogErrorf("video merge failed, %v, output: %v\n", err, msg)
-	}
 	return err
 }
