@@ -68,16 +68,16 @@ func (a *App) startup(ctx context.Context) {
 
 	config, err := NewConfig(configFilePath)
 	if err != nil {
-		runtime.LogError(a.ctx, err.Error())
+		a.LogError(err.Error())
 	} else if config.ConfigProxy != nil {
 		// 写入代理配置
 		err = os.Setenv("HTTP_PROXY", config.ConfigProxy.http)
 		if err != nil {
-			runtime.LogError(ctx, err.Error())
+			a.LogError(err.Error())
 		}
 		err = os.Setenv("HTTPS_PROXY", config.ConfigProxy.https)
 		if err != nil {
-			runtime.LogError(ctx, err.Error())
+			a.LogError(err.Error())
 		}
 	}
 	a.config = config
@@ -159,7 +159,7 @@ func (a *App) TaskAddMuti(tasks []*ParserTask) error {
 	for _, task := range tasks {
 		e := task.Parse()
 		if e != nil {
-			runtime.LogErrorf(a.ctx, "下载任务失败:%v", e.Error())
+			a.LogErrorf("下载任务失败:%v", e.Error())
 		}
 	}
 	return nil
@@ -183,7 +183,7 @@ func (a *App) Open(link string) error {
 func (a *App) Play(file string) error {
 	msg, err := Cmd("ffplay", []string{file})
 	if err == nil {
-		runtime.LogInfof(a.ctx, "播放文件 %v \n %v", file, msg)
+		a.LogInfof("播放文件 %v \n %v", file, msg)
 	}
 	return err
 }
@@ -244,6 +244,6 @@ func (a *App) LogErrorf(format string, args ...interface{}) {
 	if a.headlessMode {
 		fmt.Printf("ERR | "+format+"\n", args...)
 	} else {
-		runtime.LogInfof(a.ctx, format, args...)
+		runtime.LogErrorf(a.ctx, format, args...)
 	}
 }
