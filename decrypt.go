@@ -25,6 +25,14 @@ type Cipher struct {
 	setKey   func(u string, key []byte)
 }
 
+type DecryptError struct{}
+
+func (e DecryptError) Error() string {
+	return "crypto/cipher: input not full blocks"
+}
+
+var NotFullBlocksError = DecryptError{}
+
 func NewCipherFromKey(config *ParserTask, key *m3u8.Key, queryKey func(u string) ([]byte, bool), setKey func(u string, key []byte)) (*Cipher, error) {
 	if key == nil || key.Method == "NONE" {
 		return nil, nil
@@ -63,7 +71,7 @@ func (c *Cipher) Decrypt(body io.Reader) (*bytes.Buffer, error) {
 	blockSize := c.block.BlockSize()
 
 	if len(src)%blockSize != 0 {
-		return nil, fmt.Errorf("crypto/cipher: input not full blocks, len: %v, block size: %v", len(src), blockSize)
+		return nil, NotFullBlocksError
 	}
 
 	key, _ := c.queryKey(c.KeyReq.RequestURI)
@@ -107,7 +115,10 @@ func (c *Cipher) Generate() error {
 		}(resp.Body)
 
 		if resp.StatusCode != 200 {
-			return fmt.Errorf("下载失败：Received HTTP %v for %v", resp.StatusCode, c.KeyReq.URL.String())
+			return NetworkError{
+				Code: resp.StatusCode,
+				URL:  c.KeyReq.URL.String(),
+			}
 		}
 
 		b, err = io.ReadAll(resp.Body)

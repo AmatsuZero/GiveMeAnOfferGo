@@ -273,8 +273,9 @@ func (t *ParserTask) handleMediaPlayList(mpl *m3u8.MediaPlaylist) error {
 		info = "直播资源解析成功，即将开始缓存..."
 	}
 
+	var err error
 	go func(c chan bool) {
-		queue.StartDownload(t, mpl)
+		err = queue.StartDownload(t, mpl)
 		c <- true
 	}(ch)
 
@@ -284,10 +285,14 @@ func (t *ParserTask) handleMediaPlayList(mpl *m3u8.MediaPlaylist) error {
 	})
 
 	<-ch
+	if err != nil {
+		return err
+	}
+
 	SharedApp.LogInfof("切片下载完成，一共%v个", len(queue.tasks))
 
 	merger := NewMergeConfigFromDownloadQueue(queue, t.TaskName)
-	err := merger.Merge()
+	err = merger.Merge()
 	if err != nil {
 		return err
 	}

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/manifoldco/promptui"
 	"os"
 	"path/filepath"
 	"strings"
@@ -102,4 +103,12 @@ func (c *Cli) printVersion(cmd *cobra.Command, args []string) {
 func (c *Cli) Execute() error {
 	defer SharedApp.shutdown(c.ctx)
 	return c.rootCmd.Execute()
+}
+
+func (c *Cli) MessageDialog() (string, error) {
+	prompt := promptui.Prompt{
+		Label: "",
+	}
+
+	return prompt.Run()
 }

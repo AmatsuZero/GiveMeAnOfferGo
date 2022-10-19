@@ -33,6 +33,15 @@ type ProgressTracker struct {
 	Current int64
 }
 
+type NetworkError struct {
+	Code int
+	URL  string
+}
+
+func (e NetworkError) Error() string {
+	return fmt.Sprintf("下载失败：Received HTTP %v for %v", e.Code, e.URL)
+}
+
 func (t *DownloadTask) Read(p []byte) (n int, err error) {
 	n, err = t.Reader.Read(p)
 	t.Current += int64(n)
@@ -45,6 +54,10 @@ func (t *DownloadTask) Read(p []byte) (n int, err error) {
 }
 
 func (t *DownloadTask) download() error {
+	defer func() {
+		t.Done = true
+	}()
+
 	// 解密
 	if t.decrypt != nil {
 		t.decrypt.Ctx = t.Req.Context()
@@ -69,7 +82,6 @@ func (t *DownloadTask) download() error {
 
 	resp, err := SharedApp.client.Do(t.Req)
 	if err != nil {
-		SharedApp.LogError(fmt.Sprintf("下载失败：%v", err))
 		return err
 	}
 	defer func(Body io.ReadCloser) {
@@ -80,16 +92,16 @@ func (t *DownloadTask) download() error {
 	}(resp.Body)
 
 	if resp.StatusCode != 200 {
-		info := fmt.Sprintf("下载失败：Received HTTP %v for %v", resp.StatusCode, t.Req.URL.String())
-		SharedApp.LogError(info)
-		return fmt.Errorf(info)
+		return NetworkError{
+			Code: resp.StatusCode,
+			URL:  t.Req.URL.String(),
+		}
 	}
 
 	if t.decrypt != nil {
 		buffer, e := t.decrypt.Decrypt(resp.Body)
 		if e != nil {
-			SharedApp.LogErrorf("解密失败: %v", e.Error())
-			return err
+			return e
 		}
 		t.Reader = buffer
 		t.Total = int64(buffer.Len())
@@ -105,19 +117,33 @@ func (t *DownloadTask) download() error {
 		return err
 	}
 
-	t.Done = true
 	return nil
 }
 
-func (t *DownloadTask) Start(g *sync.WaitGroup) {
+func (t *DownloadTask) Start(g *sync.WaitGroup) error {
 	ctx, cancel := context.WithCancel(SharedApp.ctx)
 	t.Req = t.Req.WithContext(ctx)
 	t.cancel = cancel
-	_ = retry.Do(t.download, retry.Context(ctx), retry.DelayType(func(n uint, err error, config *retry.Config) time.Duration {
-		return retry.BackOffDelay(n, err, config)
-	}))
+	err := retry.Do(t.download,
+		retry.Context(ctx),
+		retry.RetryIf(func(err error) bool {
+			_, ok := err.(NetworkError)
+			if ok {
+				e := err.(NetworkError)
+				return e.Code < 400 || e.Code >= 500
+			}
+			if errors.Is(err, NotFullBlocksError) {
+				return false
+			}
+			return true
+		}),
+		retry.Attempts(3), // 重试三次
+		retry.DelayType(func(n uint, err error, config *retry.Config) time.Duration {
+			return 3 * time.Second
+		}))
 
 	g.Done()
+	return err
 }
 
 func (t *DownloadTask) Stop() {
@@ -136,7 +162,7 @@ type M3U8DownloadQueue struct {
 	tasksSet      map[uint64]bool
 }
 
-func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.MediaPlaylist) {
+func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.MediaPlaylist) error {
 	q.tasks = nil
 
 	var cipher *Cipher
@@ -196,21 +222,40 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 	}
 
 	if len(q.tasks) == 0 {
-		return
+		return nil
 	}
 
 	wg := &sync.WaitGroup{}
-	wg.Add(len(q.tasks))
 
+	var err error
 	for _, task := range q.tasks {
-		go task.Start(wg)
+		go func(t *DownloadTask) {
+			if err != nil {
+				return
+			}
+			wg.Add(1)
+			err = task.Start(wg)
+			if err != nil { // 出现了错误，直接停掉其他任务，结束
+				SharedApp.LogError(err.Error())
+				q.cleanup()
+			}
+		}(task)
 	}
 
 	wg.Wait()
 	SharedApp.LogInfof("完成了%v个切片任务的下载", len(q.tasks))
+	return err
 }
 
-func (q *M3U8DownloadQueue) startDownloadLive(config *ParserTask, list *m3u8.MediaPlaylist) {
+func (q *M3U8DownloadQueue) cleanup() {
+	// 停掉所有任务
+	for _, task := range q.tasks {
+		task.Stop()
+	}
+	os.RemoveAll(q.DownloadDir)
+}
+
+func (q *M3U8DownloadQueue) startDownloadLive(config *ParserTask, list *m3u8.MediaPlaylist) error {
 	shouldStop := false
 	var tasks []*DownloadTask
 
@@ -228,7 +273,10 @@ func (q *M3U8DownloadQueue) startDownloadLive(config *ParserTask, list *m3u8.Med
 	var interval time.Duration = 1 // 重试间隔
 	// 直播链接就是不停的分段下载
 	for !(shouldStop || list.Closed) {
-		q.startDownloadVOD(config, list)
+		err := q.startDownloadVOD(config, list)
+		if err != nil {
+			return err
+		}
 		needWait := len(q.tasks) == 0
 		tasks = append(tasks, q.tasks...)
 		if needWait { // 如果本次没有新增任务，睡一小会儿
@@ -247,6 +295,8 @@ func (q *M3U8DownloadQueue) startDownloadLive(config *ParserTask, list *m3u8.Med
 	}
 	// 将所有任务传过去, 后面文件合并用
 	q.tasks = tasks
+
+	return nil
 }
 
 func (q *M3U8DownloadQueue) preDownload(config *ParserTask) (err error) {
@@ -288,17 +338,16 @@ func (q *M3U8DownloadQueue) preDownload(config *ParserTask) (err error) {
 	return
 }
 
-func (q *M3U8DownloadQueue) StartDownload(config *ParserTask, list *m3u8.MediaPlaylist) {
+func (q *M3U8DownloadQueue) StartDownload(config *ParserTask, list *m3u8.MediaPlaylist) error {
 	err := q.preDownload(config)
 	if err != nil {
-		SharedApp.LogError(err.Error())
-		return
+		return err
 	}
 
 	if list.Closed {
-		q.startDownloadVOD(config, list)
+		return q.startDownloadVOD(config, list)
 	} else {
-		q.startDownloadLive(config, list)
+		return q.startDownloadLive(config, list)
 	}
 }
 
@@ -354,6 +403,5 @@ func (c *CommonDownloader) StartDownload(config *ParserTask, urls []string) erro
 	}
 
 	wg.Wait()
-
 	return nil
 }
