@@ -10,6 +10,7 @@ require (
 	github.com/flytam/filenamify v1.1.1
 	github.com/grafov/m3u8 v0.11.1
 	github.com/jamesnetherton/m3u v0.4.0
+	github.com/manifoldco/promptui v0.9.0
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	github.com/spf13/cobra v1.6.0
 	github.com/wailsapp/wails/v2 v2.1.0
@@ -36,7 +37,6 @@ require (
 	github.com/leaanthony/gosod v1.0.3 // indirect
 	github.com/leaanthony/slicer v1.6.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/manifoldco/promptui v0.9.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.16 // indirect
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect

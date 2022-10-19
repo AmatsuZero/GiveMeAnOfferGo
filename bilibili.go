@@ -97,12 +97,12 @@ func (v *videoInfoResp) download(t *ParserTask) error {
 		vars := tmp.Query()
 		vars.Add("qn", res)
 		tmp.RawQuery = vars.Encode()
-		go func() {
-			err = page.download(u, wg, t)
+		go func(p *videoPageData) {
+			err = p.download(u, wg, t)
 			if err != nil {
 				SharedApp.LogInfof("B站任务下载失败：%v", err)
 			}
-		}()
+		}(page)
 	}
 
 	wg.Wait()

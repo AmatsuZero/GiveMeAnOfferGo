@@ -112,12 +112,7 @@ func (t *DownloadTask) download() error {
 		_, err = io.Copy(out, t)
 	}
 	SharedApp.LogInfof("下载完成: %v", t.Req.URL.String())
-	if err != nil {
-		SharedApp.LogErrorf("Received HTTP %v for %v", resp.StatusCode, t.Req.URL.String())
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (t *DownloadTask) Start(g *sync.WaitGroup) error {
@@ -132,10 +127,7 @@ func (t *DownloadTask) Start(g *sync.WaitGroup) error {
 				e := err.(NetworkError)
 				return e.Code < 400 || e.Code >= 500
 			}
-			if errors.Is(err, NotFullBlocksError) {
-				return false
-			}
-			return true
+			return false
 		}),
 		retry.Attempts(3), // 重试三次
 		retry.DelayType(func(n uint, err error, config *retry.Config) time.Duration {
@@ -160,6 +152,7 @@ type M3U8DownloadQueue struct {
 	DownloadDir   string
 	keys          map[string][]byte
 	tasksSet      map[uint64]bool
+	concurrentCnt int
 }
 
 func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.MediaPlaylist) error {
@@ -218,6 +211,7 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 		err := cipher.Generate()
 		if err != nil {
 			SharedApp.LogErrorf("生成解密结构体出错：%v", err)
+			return err
 		}
 	}
 
@@ -228,17 +222,17 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 	wg := &sync.WaitGroup{}
 
 	var err error
+	ch := make(chan struct{}, q.concurrentCnt)
 	for _, task := range q.tasks {
+		ch <- struct{}{}
+		wg.Add(1)
 		go func(t *DownloadTask) {
-			if err != nil {
-				return
-			}
-			wg.Add(1)
-			err = task.Start(wg)
+			err = t.Start(wg)
 			if err != nil { // 出现了错误，直接停掉其他任务，结束
 				SharedApp.LogError(err.Error())
-				q.cleanup()
+				q.Stop()
 			}
+			<-ch
 		}(task)
 	}
 
@@ -247,12 +241,15 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 	return err
 }
 
-func (q *M3U8DownloadQueue) cleanup() {
+func (q *M3U8DownloadQueue) Stop() {
+	if _, err := os.Stat(q.DownloadDir); errors.Is(err, os.ErrNotExist) {
+		return
+	}
 	// 停掉所有任务
 	for _, task := range q.tasks {
 		task.Stop()
 	}
-	os.RemoveAll(q.DownloadDir)
+	_ = os.RemoveAll(q.DownloadDir)
 }
 
 func (q *M3U8DownloadQueue) startDownloadLive(config *ParserTask, list *m3u8.MediaPlaylist) error {
@@ -301,6 +298,7 @@ func (q *M3U8DownloadQueue) startDownloadLive(config *ParserTask, list *m3u8.Med
 
 func (q *M3U8DownloadQueue) preDownload(config *ParserTask) (err error) {
 	name := config.TaskName
+	q.concurrentCnt = 10
 	if len(name) == 0 {
 		name = fmt.Sprintf("%v", time.Now().Unix())
 	}
@@ -396,10 +394,17 @@ func (c *CommonDownloader) StartDownload(config *ParserTask, urls []string) erro
 	}
 
 	wg := &sync.WaitGroup{}
-	wg.Add(len(c.tasks))
-
+	ch := make(chan struct{}, c.concurrentCnt)
 	for _, task := range c.tasks {
-		go task.Start(wg)
+		wg.Add(1)
+		go func(t *DownloadTask) {
+			defer wg.Done()
+			err = t.Start(wg)
+			if err != nil {
+				SharedApp.LogError(err.Error())
+			}
+			<-ch
+		}(task)
 	}
 
 	wg.Wait()

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/skratchdot/open-golang/open"
@@ -37,11 +38,12 @@ func init() {
 
 // App struct
 type App struct {
-	config    *UserConfig
-	ctx       context.Context
-	client    *http.Client
-	stopTasks context.CancelFunc
-	sniffer   *Sniffer
+	config         *UserConfig
+	ctx            context.Context
+	client         *http.Client
+	stopTasks      context.CancelFunc
+	sniffer        *Sniffer
+	concurrentLock chan struct{}
 }
 
 // NewApp creates a new App application struct
@@ -83,6 +85,7 @@ func (a *App) startup(ctx context.Context) {
 		}
 	}
 	a.config = config
+	a.concurrentLock = make(chan struct{}, config.ConCurrentCnt)
 }
 
 func (a *App) shutdown(ctx context.Context) {
@@ -154,15 +157,24 @@ func (a *App) OpenConfigDir() (string, error) {
 }
 
 func (a *App) TaskAdd(task *ParserTask) error {
-	return task.Parse()
+	err := task.Parse()
+	return err
 }
 
 func (a *App) TaskAddMuti(tasks []*ParserTask) error {
+	var wg sync.WaitGroup
 	for _, task := range tasks {
-		e := task.Parse()
-		if e != nil {
-			a.LogErrorf("下载任务失败:%v", e.Error())
-		}
+		a.concurrentLock <- struct{}{}
+		wg.Add(1)
+
+		go func(t *ParserTask) {
+			defer wg.Done()
+			e := t.Parse()
+			if e != nil {
+				a.LogErrorf("下载任务失败:%v", e.Error())
+			}
+			<-a.concurrentLock
+		}(task)
 	}
 	return nil
 }
@@ -190,8 +202,16 @@ func (a *App) Play(file string) error {
 	return err
 }
 
+func (a *App) getCli() *Cli {
+	val := a.ctx.Value(CliKey)
+	if val == nil {
+		return nil
+	}
+	return val.(*Cli)
+}
+
 func (a *App) EventsEmit(eventName string, optionalData ...interface{}) {
-	cli := a.ctx.Value(CliKey).(*Cli)
+	cli := a.getCli()
 	if cli != nil {
 		return
 	}
@@ -199,7 +219,7 @@ func (a *App) EventsEmit(eventName string, optionalData ...interface{}) {
 }
 
 func (a *App) EventsOnce(eventName string, callback func(optionalData ...interface{})) {
-	cli := a.ctx.Value(CliKey).(*Cli)
+	cli := a.getCli()
 	if cli != nil {
 		return
 	}
@@ -215,7 +235,7 @@ func (a *App) MessageDialog(dialogOptions runtime.MessageDialogOptions) (string,
 }
 
 func (a *App) EventsOn(eventName string, callback func(optionalData ...interface{})) {
-	cli := a.ctx.Value(CliKey).(*Cli)
+	cli := a.getCli()
 	if cli != nil {
 		return
 	}
@@ -223,7 +243,7 @@ func (a *App) EventsOn(eventName string, callback func(optionalData ...interface
 }
 
 func (a *App) LogInfof(format string, args ...interface{}) {
-	cli := a.ctx.Value(CliKey).(*Cli)
+	cli := a.getCli()
 	if cli != nil {
 		if *cli.verbose {
 			fmt.Printf("INFO | "+format+"\n", args...)
@@ -234,7 +254,7 @@ func (a *App) LogInfof(format string, args ...interface{}) {
 }
 
 func (a *App) LogInfo(message string) {
-	cli := a.ctx.Value(CliKey).(*Cli)
+	cli := a.getCli()
 	if cli != nil {
 		if *cli.verbose {
 			fmt.Println("INFO | " + message)
@@ -245,7 +265,7 @@ func (a *App) LogInfo(message string) {
 }
 
 func (a *App) LogError(message string) {
-	cli := a.ctx.Value(CliKey).(*Cli)
+	cli := a.getCli()
 	if cli != nil {
 		fmt.Println("ERR | " + message)
 	} else {
@@ -254,7 +274,7 @@ func (a *App) LogError(message string) {
 }
 
 func (a *App) LogErrorf(format string, args ...interface{}) {
-	cli := a.ctx.Value(CliKey).(*Cli)
+	cli := a.getCli()
 	if cli != nil {
 		fmt.Printf("ERR | "+format+"\n", args...)
 	} else {

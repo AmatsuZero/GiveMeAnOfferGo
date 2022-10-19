@@ -16,6 +16,7 @@ type Cli struct {
 	parserTask    *ParserTask
 	delOnComplete *bool
 	verbose       *bool
+	concurrentCnt *int
 	ctx           context.Context
 }
 
@@ -39,8 +40,9 @@ func NewCli() *Cli {
 
 	base, _ := os.UserHomeDir()
 	rootCmd.PersistentFlags().StringVar(&SharedApp.config.PathDownloader, "downloadDir", filepath.Join(base, "Downloads"), "设置下载文件夹")
-	rootCmd.PersistentFlags().BoolP("headless", "", true, "无 UI 启动")
-	cli.verbose = rootCmd.PersistentFlags().BoolP("vebose", "v", false, "是否打印日志信息")
+	rootCmd.PersistentFlags().Bool("headless", true, "无 UI 启动")
+	cli.concurrentCnt = rootCmd.PersistentFlags().IntP("concurrent", "n", 3, "并发任务下载数量")
+	cli.verbose = rootCmd.PersistentFlags().BoolP("verbose", "v", false, "是否打印日志信息")
 
 	versionCmd := &cobra.Command{
 		Use:   "version",
@@ -57,7 +59,7 @@ func NewCli() *Cli {
 
 	cli.parserTask = new(ParserTask)
 	parseCmd.PersistentFlags().StringVar(&cli.parserTask.Url, "url", "", "设置 m3u8 地址, 多个地址用分号分割")
-	parseCmd.MarkFlagRequired("url")
+	_ = parseCmd.MarkFlagRequired("url")
 
 	cli.delOnComplete = parseCmd.Flags().BoolP("delOnComplete", "d", true, "合并完成后是否删除 ts 文件")
 	parseCmd.PersistentFlags().StringVar(&cli.parserTask.KeyIV, "keyIV", "", "设置自定义密钥")
@@ -72,6 +74,7 @@ func NewCli() *Cli {
 }
 
 func (c *Cli) parse(cmd *cobra.Command, args []string) error {
+	SharedApp.concurrentLock = make(chan struct{}, *c.concurrentCnt)
 	adders := strings.Split(c.parserTask.Url, ",")
 	if len(adders) == 0 {
 		return fmt.Errorf("输入 m3u8 地址")

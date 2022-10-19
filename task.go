@@ -50,7 +50,6 @@ func (t *ParserTask) Parse() error {
 	if t.Headers == nil {
 		t.Headers = make(map[string]string)
 	}
-
 	u, err := url.Parse(t.Url)
 	if err != nil {
 		return err
@@ -103,21 +102,7 @@ func (t *ParserTask) handleM3UList() error {
 		})
 	}
 
-	return t.handleMultiTasks(tasks)
-}
-
-func (t *ParserTask) handleMultiTasks(tasks []*ParserTask) error {
-	if len(tasks) == 0 {
-		return nil
-	}
-
-	for _, task := range tasks {
-		err := task.Parse()
-		if err != nil {
-			SharedApp.LogInfof("❌下载任务失败：%v", t.Url)
-		}
-	}
-	return nil
+	return SharedApp.TaskAddMuti(tasks)
 }
 
 func (t *ParserTask) NewChinaAACCTask() *ChinaAACCParserTask {

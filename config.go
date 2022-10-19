@@ -13,6 +13,7 @@ type ProxyConfig struct {
 type UserConfig struct {
 	PathDownloader string       `json:"SaveVideoDir"`
 	ConfigProxy    *ProxyConfig `json:"config_proxy"`
+	ConCurrentCnt  int          `json:"ConCurrentCnt"`
 	savePath       string
 }
 
@@ -22,6 +23,7 @@ func defaultConfig(savePath string) *UserConfig {
 		PathDownloader: filepath.Join(base, "Downloads"),
 		ConfigProxy:    nil,
 		savePath:       savePath,
+		ConCurrentCnt:  3,
 	}
 }
 
@@ -55,7 +57,12 @@ func (c *UserConfig) Save() error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func(f *os.File) {
+		err = f.Close()
+		if err != nil {
+			SharedApp.LogError(err.Error())
+		}
+	}(f)
 	_, err = f.Write(data)
 	return err
 }
