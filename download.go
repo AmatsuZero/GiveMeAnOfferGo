@@ -114,8 +114,8 @@ func (t *DownloadTask) Start(g *sync.WaitGroup) {
 	ctx, cancel := context.WithCancel(SharedApp.ctx)
 	t.Req = t.Req.WithContext(ctx)
 	t.cancel = cancel
-	_ = retry.Do(t.download, retry.Context(ctx), retry.DelayType(func(n uint, config *retry.Config) time.Duration {
-		return retry.BackOffDelay(n, config)
+	_ = retry.Do(t.download, retry.Context(ctx), retry.DelayType(func(n uint, err error, config *retry.Config) time.Duration {
+		return retry.BackOffDelay(n, err, config)
 	}))
 
 	g.Done()
