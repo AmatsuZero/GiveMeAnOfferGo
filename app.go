@@ -4,16 +4,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/skratchdot/open-golang/open"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/skratchdot/open-golang/open"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 var configFilePath string
+
+type AppCtxKey string
 
 func init() {
 	configFilePath, _ = os.UserConfigDir()
@@ -34,12 +37,11 @@ func init() {
 
 // App struct
 type App struct {
-	config       *UserConfig
-	ctx          context.Context
-	client       *http.Client
-	stopTasks    context.CancelFunc
-	headlessMode bool
-	sniffer      *Sniffer
+	config    *UserConfig
+	ctx       context.Context
+	client    *http.Client
+	stopTasks context.CancelFunc
+	sniffer   *Sniffer
 }
 
 // NewApp creates a new App application struct
@@ -117,10 +119,10 @@ func (a *App) OpenSelectTsDir(dir string) ([]string, error) {
 		Title: "请选择欲合并的TS文件",
 		Filters: []runtime.FileFilter{
 			{
-				"视频片段", "*.ts",
+				DisplayName: "视频片段", Pattern: "*.ts",
 			},
 			{
-				"所有文件", "*",
+				DisplayName: "所有文件", Pattern: "*",
 			},
 		},
 	})
@@ -189,35 +191,40 @@ func (a *App) Play(file string) error {
 }
 
 func (a *App) EventsEmit(eventName string, optionalData ...interface{}) {
-	if a.headlessMode {
+	cli := a.ctx.Value(CliKey).(*Cli)
+	if cli != nil {
 		return
 	}
 	runtime.EventsEmit(a.ctx, eventName, optionalData...)
 }
 
 func (a *App) EventsOnce(eventName string, callback func(optionalData ...interface{})) {
-	if a.headlessMode {
+	cli := a.ctx.Value(CliKey).(*Cli)
+	if cli != nil {
 		return
 	}
 	runtime.EventsOnce(a.ctx, eventName, callback)
 }
 
 func (a *App) MessageDialog(dialogOptions runtime.MessageDialogOptions) (string, error) {
-	if a.headlessMode {
+	cli := a.ctx.Value(CliKey).(*Cli)
+	if cli != nil {
 		return "", nil
 	}
 	return runtime.MessageDialog(a.ctx, dialogOptions)
 }
 
 func (a *App) EventsOn(eventName string, callback func(optionalData ...interface{})) {
-	if a.headlessMode {
+	cli := a.ctx.Value(CliKey).(*Cli)
+	if cli != nil {
 		return
 	}
 	runtime.EventsOn(a.ctx, eventName, callback)
 }
 
 func (a *App) LogInfof(format string, args ...interface{}) {
-	if a.headlessMode {
+	cli := a.ctx.Value(CliKey).(*Cli)
+	if cli != nil && *cli.verbose {
 		fmt.Printf("INFO | "+format+"\n", args...)
 	} else {
 		runtime.LogInfof(a.ctx, format, args...)
@@ -225,7 +232,8 @@ func (a *App) LogInfof(format string, args ...interface{}) {
 }
 
 func (a *App) LogInfo(message string) {
-	if a.headlessMode {
+	cli := a.ctx.Value(CliKey).(*Cli)
+	if cli != nil && *cli.verbose {
 		fmt.Println("INFO | " + message)
 	} else {
 		runtime.LogInfo(a.ctx, message)
@@ -233,7 +241,8 @@ func (a *App) LogInfo(message string) {
 }
 
 func (a *App) LogError(message string) {
-	if a.headlessMode {
+	cli := a.ctx.Value(CliKey).(*Cli)
+	if cli != nil {
 		fmt.Println("ERR | " + message)
 	} else {
 		runtime.LogError(a.ctx, message)
@@ -241,7 +250,8 @@ func (a *App) LogError(message string) {
 }
 
 func (a *App) LogErrorf(format string, args ...interface{}) {
-	if a.headlessMode {
+	cli := a.ctx.Value(CliKey).(*Cli)
+	if cli != nil {
 		fmt.Printf("ERR | "+format+"\n", args...)
 	} else {
 		runtime.LogErrorf(a.ctx, format, args...)

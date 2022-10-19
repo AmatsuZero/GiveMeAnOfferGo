@@ -5,11 +5,12 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"fmt"
-	"github.com/grafov/m3u8"
-	"golang.org/x/net/context"
 	"io"
 	"net/http"
 	"net/url"
+
+	"github.com/grafov/m3u8"
+	"golang.org/x/net/context"
 )
 
 type Cipher struct {
@@ -17,7 +18,6 @@ type Cipher struct {
 	IV     string
 	Method string
 	Ctx    context.Context
-	len    int
 
 	MyKeyIV  string
 	block    cipher.Block

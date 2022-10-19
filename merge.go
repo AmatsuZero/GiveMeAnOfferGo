@@ -3,13 +3,15 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/flytam/filenamify"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/flytam/filenamify"
 )
 
 type MergeType string
@@ -65,6 +67,10 @@ func (c *MergeFilesConfig) Merge() error {
 		return err
 	}
 	fileName = strings.ReplaceAll(fileName, " ", "") // 移除空格
+	if runtime.GOOS == "linux" {
+		return c.linuxMerge(fileName)
+	}
+
 	name := fileName
 	if len(name) == 0 {
 		name = "*"
@@ -110,7 +116,7 @@ func (c *MergeFilesConfig) Merge() error {
 	args := strings.Split(cmdStr, " ")
 	msg, err := Cmd(args[0], args[1:])
 	if err != nil {
-		SharedApp.LogErrorf("videoConvert failed, %v, output: %v\n", err, msg)
+		SharedApp.LogErrorf("video merge failed, %v, output: %v\n", err, msg)
 	}
 	defer func(name string) {
 		err = os.Remove(name)
@@ -118,5 +124,20 @@ func (c *MergeFilesConfig) Merge() error {
 			SharedApp.LogErrorf("删除合并文件临时列表失败：%v", err.Error())
 		}
 	}(f.Name())
+	return err
+}
+
+func (c *MergeFilesConfig) linuxMerge(output string) error {
+	if len(output) == 0 {
+		output = fmt.Sprintf("%v", time.Now().Unix())
+	}
+	output = filepath.Join(SharedApp.config.PathDownloader, output+".mp4")
+	cmdStr := fmt.Sprintf("ffmpeg -i %v -bsf:a aac_adtstoasc -c copy %v", strings.Join(c.Files, "|"), output)
+	fmt.Println(cmdStr)
+	args := strings.Split(cmdStr, " ")
+	msg, err := Cmd(args[0], args[1:])
+	if err != nil {
+		SharedApp.LogErrorf("video merge failed, %v, output: %v\n", err, msg)
+	}
 	return err
 }

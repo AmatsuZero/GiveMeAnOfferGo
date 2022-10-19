@@ -3,25 +3,28 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/spf13/cobra"
 )
 
 type Cli struct {
 	rootCmd       *cobra.Command
-	downloadDir   string
 	parserTask    *ParserTask
 	delOnComplete *bool
+	verbose       *bool
 	ctx           context.Context
 }
 
+const CliKey AppCtxKey = "cli"
+
 func NewCli() *Cli {
 	ctx := context.Background()
-	ctx = context.WithValue(ctx, "mode", "headless")
 	cli := &Cli{ctx: ctx}
-	SharedApp.headlessMode = true
+
+	ctx = context.WithValue(ctx, CliKey, cli)
 	SharedApp.startup(ctx)
 
 	rootCmd := &cobra.Command{
@@ -36,6 +39,7 @@ func NewCli() *Cli {
 	base, _ := os.UserHomeDir()
 	rootCmd.PersistentFlags().StringVar(&SharedApp.config.PathDownloader, "downloadDir", filepath.Join(base, "Downloads"), "设置下载文件夹")
 	rootCmd.PersistentFlags().BoolP("headless", "", true, "无 UI 启动")
+	cli.verbose = rootCmd.PersistentFlags().BoolP("vebose", "v", false, "是否打印日志信息")
 
 	versionCmd := &cobra.Command{
 		Use:   "version",
