@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/manifoldco/promptui"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/manifoldco/promptui"
 
 	"github.com/spf13/cobra"
 )
@@ -96,6 +97,9 @@ func (c *Cli) parse(cmd *cobra.Command, args []string) error {
 		})
 	}
 	defer fmt.Println("解析结束")
+	if len(tasks) == 1 {
+		return SharedApp.TaskAdd(tasks[0])
+	}
 	return SharedApp.TaskAddMuti(tasks)
 }
 

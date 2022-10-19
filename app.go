@@ -171,11 +171,12 @@ func (a *App) TaskAddMuti(tasks []*ParserTask) error {
 			defer wg.Done()
 			e := t.Parse()
 			if e != nil {
-				a.LogErrorf("下载任务失败:%v", e.Error())
+				a.LogErrorf("下载任务失败:%v, 原因：%v", t.Url, e.Error())
 			}
 			<-a.concurrentLock
 		}(task)
 	}
+	wg.Wait()
 	return nil
 }
 
