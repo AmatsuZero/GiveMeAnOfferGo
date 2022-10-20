@@ -64,66 +64,6 @@ type videoInfoResp struct {
 	}
 }
 
-func (v *videoInfoResp) parse(t *ParserTask) (*ParseResult, error) {
-	t.TaskName = v.Data.Title
-
-	u := baseURl.JoinPath(videoStream)
-	values := u.Query()
-	if len(v.Data.Bvid) > 0 {
-		values.Add("bvid", v.Data.Bvid)
-	} else {
-		values.Add("aid", strconv.Itoa(int(v.Data.Aid)))
-	}
-	u.RawQuery = values.Encode()
-
-	if len(v.Data.Pages) == 0 {
-		return nil, errors.New("no page data")
-	}
-
-	resolution, err := v.Data.Pages[0].selectResolution(u)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, page := range v.Data.Pages {
-		tmp, _ := u.Parse(u.String()) // 拷贝一份原来的 URL
-		vars := tmp.Query()
-		vars.Add("qn", resolution)
-		tmp.RawQuery = vars.Encode()
-		go func(p *videoPageData) {
-			err = p.download(u, wg, t)
-			if err != nil {
-				SharedApp.logInfof("B站任务下载失败：%v", err)
-			}
-		}(page)
-	}
-}
-
-func (v *videoInfoResp) download(t *ParserTask) error {
-
-	wg := &sync.WaitGroup{}
-	wg.Add(int(v.Data.Videos))
-
-	for _, page := range v.Data.Pages {
-		tmp, e := u.Parse(u.String())
-		if e != nil {
-			return err
-		}
-		vars := tmp.Query()
-		vars.Add("qn", res)
-		tmp.RawQuery = vars.Encode()
-		go func(p *videoPageData) {
-			err = p.download(u, wg, t)
-			if err != nil {
-				SharedApp.logInfof("B站任务下载失败：%v", err)
-			}
-		}(page)
-	}
-
-	wg.Wait()
-	return err
-}
-
 type playUrlResp struct {
 	baseResp
 	Data struct {
@@ -250,51 +190,6 @@ func (d *videoPageData) selectResolution(u *url.URL) (string, error) {
 	return res, nil
 }
 
-func (d *videoPageData) parse(u *url.URL, t *ParserTask) (*ParseResult, error) {
-	values := u.Query()
-	values.Add("cid", strconv.Itoa(int(d.Cid)))
-	u.RawQuery = values.Encode()
-
-	// 获取指定清晰度的 url 列表
-	resp, err := SharedApp.client.Get(u.String())
-	if err != nil {
-		return nil, err
-	}
-
-	info := new(playUrlResp)
-	err = json.NewDecoder(resp.Body).Decode(&info)
-	if err != nil {
-		return nil, err
-	}
-	t.Headers["Referer"] = "https://www.bilibili.com"
-	t.Headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36"
-
-}
-
-func (d *videoPageData) download(u *url.URL, g *sync.WaitGroup, t *ParserTask) error {
-	defer g.Done()
-
-	values := u.Query()
-	values.Add("cid", strconv.Itoa(int(d.Cid)))
-	u.RawQuery = values.Encode()
-
-	// 获取指定清晰度的 url 列表
-	resp, err := SharedApp.client.Get(u.String())
-	if err != nil {
-		return err
-	}
-
-	var info playUrlResp
-	err = json.NewDecoder(resp.Body).Decode(&info)
-	if err != nil {
-		return err
-	}
-
-	t.Headers["Referer"] = "https://www.bilibili.com"
-	t.Headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36"
-	return info.download(t, d.Part)
-}
-
 type bilibiliTaskType string
 
 const (
@@ -303,11 +198,13 @@ const (
 
 type BilibiliParserTask struct {
 	*ParserTask
-	vid      string
-	taskType bilibiliTaskType
+	vid       string
+	taskType  bilibiliTaskType
+	Urls      []string
+	OrderDict map[string]int64
 }
 
-func (t *BilibiliParserTask) parse() (*ParseResult, error) {
+func (t *BilibiliParserTask) Parse() (*ParseResult, error) {
 	// 获取视频信息
 	infoURL := baseURl.JoinPath(videoInfo)
 	values := infoURL.Query()
@@ -329,5 +226,95 @@ func (t *BilibiliParserTask) parse() (*ParseResult, error) {
 		return nil, err
 	}
 
-	return info.parse(t.ParserTask)
+	return info.parse(t)
+}
+
+func (v *videoInfoResp) parse(t *BilibiliParserTask) (*ParseResult, error) {
+	t.TaskName = v.Data.Title
+
+	u := baseURl.JoinPath(videoStream)
+	values := u.Query()
+	if len(v.Data.Bvid) > 0 {
+		values.Add("bvid", v.Data.Bvid)
+	} else {
+		values.Add("aid", strconv.Itoa(int(v.Data.Aid)))
+	}
+	values.Add("fnval", "0")
+	u.RawQuery = values.Encode()
+
+	if len(v.Data.Pages) == 0 {
+		return nil, errors.New("no page data")
+	}
+
+	resolution, err := v.Data.Pages[0].selectResolution(u)
+	if err != nil {
+		return nil, err
+	}
+
+	var rs []*BilibiliParserTask
+	wg := &sync.WaitGroup{}
+
+	for _, page := range v.Data.Pages {
+		tmp, _ := u.Parse(u.String()) // 拷贝一份原来的 URL
+		vars := tmp.Query()
+		vars.Add("qn", resolution)
+		tmp.RawQuery = vars.Encode()
+		wg.Add(1)
+		go func(p *videoPageData, u *url.URL) {
+			defer wg.Done()
+			r, e := p.parse(u, t)
+			if e != nil {
+				SharedApp.logErrorf("B站分P解析失败: %v", e)
+				return
+			}
+			rs = append(rs, r)
+		}(page, tmp)
+	}
+	wg.Wait()
+
+	return &ParseResult{Type: TaskTypeBilibili, Data: rs}, nil
+}
+
+func (d *videoPageData) parse(u *url.URL, t *BilibiliParserTask) (*BilibiliParserTask, error) {
+	values := u.Query()
+	values.Add("cid", strconv.Itoa(int(d.Cid)))
+	u.RawQuery = values.Encode()
+
+	// 获取指定清晰度的 url 列表
+	resp, err := SharedApp.client.Get(u.String())
+	if err != nil {
+		return nil, err
+	}
+	info := new(playUrlResp)
+	err = json.NewDecoder(resp.Body).Decode(&info)
+	if err != nil {
+		return nil, err
+	}
+
+	t, err = info.parse(t, d.Part)
+	if err != nil {
+		return nil, err
+	}
+	t.Url = u.String()
+	return t, nil
+}
+
+func (r *playUrlResp) parse(t *BilibiliParserTask, title string) (*BilibiliParserTask, error) {
+	var list []string
+	dict := map[string]int64{}
+	for _, item := range r.Data.Durl {
+		list = append(list, item.Url)
+		dict[path.Base(item.Url)] = item.Order
+	}
+	ret := &BilibiliParserTask{
+		ParserTask: t.ParserTask,
+		vid:        t.vid,
+		taskType:   t.taskType,
+		Urls:       list,
+		OrderDict:  dict,
+	}
+	ret.TaskName = title
+	ret.Headers["Referer"] = "https://www.bilibili.com"
+	ret.Headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36"
+	return ret, nil
 }

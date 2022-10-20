@@ -231,6 +231,9 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 	var err error
 
 	ch := make(chan struct{}, q.concurrentCnt)
+	q.NotifyItem.Status = fmt.Sprintf("下载中... %v/%v", ops, cnt)
+	SharedApp.eventsEmit(TaskStatusUpdate, q.NotifyItem)
+
 	for _, task := range q.tasks {
 		ch <- struct{}{}
 		wg.Add(1)
@@ -402,6 +405,9 @@ func (c *CommonDownloader) StartDownload(config *ParserTask, urls []string) erro
 	ch := make(chan struct{}, c.concurrentCnt)
 	var ops uint64
 	cnt := len(c.tasks)
+
+	c.NotifyItem.Status = fmt.Sprintf("下载中... %v/%v", ops, cnt)
+	SharedApp.eventsEmit(TaskStatusUpdate, c.NotifyItem)
 
 	for _, task := range c.tasks {
 		wg.Add(1)

@@ -8,8 +8,9 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
-	"strconv"
+	"sort"
 	"sync"
 	"time"
 
@@ -179,66 +180,76 @@ func (a *App) TaskAdd(task *ParserTask) error {
 	case TaskTypeM3U:
 		err = a.handleM3UTask(ret)
 	case TaskTypeBilibili:
-		err = a.handleBilibiliTask(task, ret)
+		err = a.handleBilibiliTask(ret)
 	}
 	return err
 }
 
-func (a *App) handleBilibiliTask(task *ParserTask, result *ParseResult) (err error) {
-	info := result.Data.(*videoInfoResp)
+func (a *App) handleBilibiliTask(result *ParseResult) error {
+	tasks := result.Data.([]*BilibiliParserTask)
+	for _, task := range tasks {
+		go func(t *BilibiliParserTask) {
+			item := &DownloadTaskUIItem{
+				TaskName: t.TaskName,
+				Time:     time.Now().Format("2006-01-02 15:04:05"),
+				Status:   "初始化...",
+				Url:      t.Url,
+			}
+			a.eventsEmit(TaskNotifyCreate, item)
 
-	task.TaskName = info.Data.Title
+			downloader := &CommonDownloader{}
+			downloader.NotifyItem = item
+			err := downloader.StartDownload(t.ParserTask, t.Urls)
 
-	u := baseURl.JoinPath(videoStream)
-	values := u.Query()
-	if len(info.Data.Bvid) > 0 {
-		values.Add("bvid", info.Data.Bvid)
-	} else {
-		values.Add("aid", strconv.Itoa(int(info.Data.Aid)))
+			if err != nil {
+				item.Status = "下载失败，请检查链接有效性"
+				a.eventsEmit(TaskFinish, item)
+				return
+			}
+
+			// 遍历下载文件夹，调整顺序
+			files, err := os.ReadDir(downloader.DownloadDir)
+			var fileList []string
+			if err != nil {
+				item.Status = "读取文件夹失败"
+				a.eventsEmit(TaskFinish, item)
+				return
+			}
+
+			for _, f := range files {
+				fileList = append(fileList, filepath.Join(downloader.DownloadDir, f.Name()))
+			}
+
+			sort.Slice(fileList, func(i, j int) bool {
+				lhs, rhs := path.Base(fileList[i]), path.Base(fileList[j])
+				return t.OrderDict[lhs] < t.OrderDict[rhs]
+			})
+
+			merger := &MergeFilesConfig{
+				Files:     fileList,
+				TsName:    t.TaskName,
+				MergeType: MergeTypeSpeed,
+			}
+
+			output, err := merger.Merge()
+			if err != nil {
+				item.Status = "合并出错，请尝试手动合并"
+				a.eventsEmit(TaskFinish, item)
+				return
+			}
+
+			if t.DelOnComplete {
+				err = os.RemoveAll(downloader.DownloadDir)
+				SharedApp.logInfo("临时文件删除完成")
+			}
+
+			item.Status = "已完成"
+			item.IsDone = true
+			item.VideoPath = output
+			a.eventsEmit(TaskFinish, item)
+		}(task)
 	}
-	u.RawQuery = values.Encode()
-
-	if len(info.Data.Pages) == 0 {
-		return errors.New("no page data")
-	}
-
-	res, err := info.Data.Pages[0].selectResolution(u)
-	if err != nil {
-		return err
-	}
-
-	item := DownloadTaskUIItem{
-		TaskName: task.TaskName,
-		Time:     time.Now().Format("2006-01-02 15:04:05"),
-		Status:   "初始化...",
-		Url:      task.Url,
-	}
-
-	a.eventsEmit(TaskNotifyCreate, item)
-
-	go func() {
-		wg := &sync.WaitGroup{}
-		wg.Add(int(info.Data.Videos))
-
-		for _, page := range info.Data.Pages {
-			go func(p *videoPageData) {
-				tmp, e := u.Parse(u.String())
-				if e != nil {
-					return
-				}
-				vars := tmp.Query()
-				vars.Add("qn", res)
-				tmp.RawQuery = vars.Encode()
-				err = p.download(tmp, wg, task)
-				if err != nil {
-					a.logInfof("B站任务下载失败：%v", err)
-				}
-			}(page)
-		}
-		wg.Wait()
-	}()
-
-	return
+	return nil
 }
 
 func (a *App) handleM3UTask(result *ParseResult) (err error) {
@@ -271,14 +282,18 @@ func (a *App) addTaskNotifyItem(task *ParserTask) *DownloadTaskUIItem {
 	return item
 }
 
-func (a *App) RemoveTaskNotifyItem(item *DownloadTaskUIItem) error {
+func (a *App) RemoveTaskNotifyItem(item *DownloadTaskUIItem) (err error) {
 	if !item.IsDone {
 		task, ok := a.queues[item.Url]
 		if ok {
 			task.Stop()
 		}
 	}
-	err := os.Remove(item.VideoPath)
+	if item.IsDone {
+		err = os.Remove(item.VideoPath)
+	} else {
+		err = os.RemoveAll(item.VideoPath)
+	}
 	delete(a.tasks, item.Url)
 	return err
 }
