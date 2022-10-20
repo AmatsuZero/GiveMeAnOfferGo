@@ -22,6 +22,8 @@ const (
 	OnVariantSelected      = "variant-selected"
 	TaskNotifyCreate       = "task-notify-create"
 	StopLiveStreamDownload = "stop-live-stream-download"
+	TaskStatusUpdate       = "task-notify-update"
+	TaskFinish             = "task-notify-end"
 )
 
 type ParserTask struct {

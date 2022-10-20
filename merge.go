@@ -60,11 +60,11 @@ func Cmd(commandName string, params []string) (string, error) {
 	return out.String(), err
 }
 
-func (c *MergeFilesConfig) Merge() error {
+func (c *MergeFilesConfig) Merge() (string, error) {
 	fileName := c.TsName // 处理非法文件名
 	fileName, err := filenamify.Filenamify(fileName, filenamify.Options{})
 	if err != nil {
-		return err
+		return "", err
 	}
 	fileName = strings.ReplaceAll(fileName, " ", "") // 移除空格
 
@@ -76,19 +76,19 @@ func (c *MergeFilesConfig) Merge() error {
 
 	f, err := os.CreateTemp("", name)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	for _, file := range c.Files {
 		_, err = f.WriteString(fmt.Sprintf("file '%v'\n", file))
 		if err != nil {
-			return err
+			return "", err
 		}
 	}
 
 	err = f.Close()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	audioCodec, videoCodec := "", ""
@@ -125,5 +125,5 @@ func (c *MergeFilesConfig) Merge() error {
 			SharedApp.logErrorf("删除合并文件临时列表失败：%v", err.Error())
 		}
 	}(f.Name())
-	return err
+	return output, err
 }

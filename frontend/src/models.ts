@@ -12,6 +12,7 @@ export class DownloadTask {
     status = "";
     videoPath = "";
     isDone = false;
+    TaskID = 0;
 }
 
 export enum MergeFileType {

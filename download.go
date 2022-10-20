@@ -14,8 +14,13 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 )
+
+type StoppableTask interface {
+	Stop()
+}
 
 type DownloadTask struct {
 	ProgressTracker
@@ -153,6 +158,7 @@ type M3U8DownloadQueue struct {
 	keys          map[string][]byte
 	tasksSet      map[uint64]bool
 	concurrentCnt int
+	NotifyItem    *DownloadTaskUIItem
 }
 
 func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.MediaPlaylist) error {
@@ -220,8 +226,10 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 	}
 
 	wg := &sync.WaitGroup{}
-
+	cnt := len(q.tasks)
+	var ops uint64
 	var err error
+
 	ch := make(chan struct{}, q.concurrentCnt)
 	for _, task := range q.tasks {
 		ch <- struct{}{}
@@ -231,6 +239,10 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 			if err != nil { // 出现了错误，直接停掉其他任务，结束
 				SharedApp.logError(err.Error())
 				q.Stop()
+			} else {
+				atomic.AddUint64(&ops, 1)
+				q.NotifyItem.Status = fmt.Sprintf("下载中... %v/%v", ops, cnt)
+				SharedApp.eventsEmit(TaskStatusUpdate, q.NotifyItem)
 			}
 			<-ch
 		}(task)
@@ -309,7 +321,7 @@ func (q *M3U8DownloadQueue) preDownload(config *ParserTask) (err error) {
 		return err
 	}
 	q.DownloadDir = filepath.Join(SharedApp.config.PathDownloader, output)
-
+	q.NotifyItem.VideoPath = q.DownloadDir
 	if _, err = os.Stat(q.DownloadDir); errors.Is(err, os.ErrNotExist) {
 		err = os.Mkdir(q.DownloadDir, os.ModePerm)
 	}
@@ -345,11 +357,13 @@ type CommonDownloader struct {
 }
 
 type DownloadTaskUIItem struct {
-	TaskName string `json:"taskName"`
-	Time     string `json:"time"`
-	Status   string `json:"status"`
-	Url      string `json:"url"`
-	IsDone   bool   `json:"isDone"`
+	TaskName  string `json:"taskName"`
+	Time      string `json:"time"`
+	Status    string `json:"status"`
+	Url       string `json:"url"`
+	IsDone    bool   `json:"isDone"`
+	TaskID    int    `json:"taskID"`
+	VideoPath string `json:"videoPath"`
 }
 
 func (c *CommonDownloader) StartDownload(config *ParserTask, urls []string) error {
@@ -386,6 +400,9 @@ func (c *CommonDownloader) StartDownload(config *ParserTask, urls []string) erro
 
 	wg := &sync.WaitGroup{}
 	ch := make(chan struct{}, c.concurrentCnt)
+	var ops uint64
+	cnt := len(c.tasks)
+
 	for _, task := range c.tasks {
 		wg.Add(1)
 		go func(t *DownloadTask) {
@@ -394,6 +411,8 @@ func (c *CommonDownloader) StartDownload(config *ParserTask, urls []string) erro
 			if err != nil {
 				SharedApp.logError(err.Error())
 			}
+			atomic.AddUint64(&ops, 1)
+			c.NotifyItem.Status = fmt.Sprintf("下载中... %v/%v", ops, cnt)
 			<-ch
 		}(task)
 	}

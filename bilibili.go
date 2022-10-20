@@ -165,7 +165,7 @@ func (r *playUrlResp) download(t *ParserTask, title string) error {
 		MergeType: MergeTypeSpeed,
 	}
 
-	err = merger.Merge()
+	_, err = merger.Merge()
 	if err != nil {
 		return err
 	}

@@ -52,7 +52,7 @@ export default {
 <script lang="ts" setup>
 import { Link, CirclePlusFilled, RemoveFilled, Download } from "@element-plus/icons";
 import {DownloadTask, MergeFileType, PlaylistItem} from "../models";
-import {OpenSelectTsDir, TaskAdd, Play } from "../../wailsjs/go/main/App";
+import { OpenSelectTsDir, TaskAdd, Play, RemoveTaskNotifyItem } from "../../wailsjs/go/main/App";
 import {ElMessage, ElIcon} from "element-plus";
 import { ref, reactive } from 'vue';
 import {main} from "../../wailsjs/go/models";
@@ -100,8 +100,8 @@ function clickNewTaskOK() {
   if (playlistUri.value.length > 0) {
     EventsEmit('variant-selected', playlistUri.value);
   } else {
-    TaskAdd(parserTask).catch(err => {
-      console.error(err)
+    TaskAdd(parserTask).catch(() => {
+      addTaskMessage.value = "资源解析失败";
     });
 
     addTaskMessage.value = "正在检查链接...";
@@ -119,6 +119,21 @@ EventsOn("task-notify-create", data => {
   dlg_newTask_visible.value = false;
 });
 
+EventsOn("task-notify-update", data => updateTaskItem(data));
+
+EventsOn("task-notify-end", data => updateTaskItem(data));
+
+function updateTaskItem(data: any) {
+  const item = data as DownloadTask;
+  const idx = allVideos.value.findIndex(video => video.url === item.url);
+  if (idx === -1) {
+    return
+  }
+  allVideos.value[idx].isDone = item.isDone;
+  allVideos.value[idx].status = item.status;
+  allVideos.value[idx].videoPath = item.videoPath;
+}
+
 function clickPlayMergeMp4() {
 
 }
@@ -128,7 +143,8 @@ function stopItem(task: DownloadTask) {
 }
 
 function deleteTask(task: DownloadTask) {
-
+  allVideos.value = allVideos.value.filter(video => video.url !== task.url);
+  RemoveTaskNotifyItem(task);
 }
 
 function playTask(task: DownloadTask) {

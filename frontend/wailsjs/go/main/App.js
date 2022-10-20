@@ -37,3 +37,7 @@ export function TaskAdd(arg1) {
 export function TaskAddMuti(arg1) {
   return window['go']['main']['App']['TaskAddMuti'](arg1);
 }
+
+export function RemoveTaskNotifyItem(arg) {
+  return window['go']['main']['App']['RemoveTaskNotifyItem'](arg)
+}

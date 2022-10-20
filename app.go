@@ -46,6 +46,9 @@ type App struct {
 	stopTasks      context.CancelFunc
 	sniffer        *Sniffer
 	concurrentLock chan struct{}
+
+	tasks  map[string]*DownloadTaskUIItem
+	queues map[string]StoppableTask
 }
 
 // NewApp creates a new App application struct
@@ -88,6 +91,8 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.config = config
 	a.concurrentLock = make(chan struct{}, config.ConCurrentCnt)
+	a.tasks = map[string]*DownloadTaskUIItem{}
+	a.queues = map[string]StoppableTask{}
 }
 
 func (a *App) shutdown(ctx context.Context) {
@@ -134,7 +139,8 @@ func (a *App) OpenSelectTsDir(dir string) ([]string, error) {
 }
 
 func (a *App) StartMergeTs(config MergeFilesConfig) error {
-	return config.Merge()
+	_, e := config.Merge()
+	return e
 }
 
 func (a *App) OpenConfigDir() (string, error) {
@@ -246,9 +252,42 @@ func (a *App) handleM3UTask(result *ParseResult) (err error) {
 	return
 }
 
+func (a *App) addTaskNotifyItem(task *ParserTask) *DownloadTaskUIItem {
+	// 先从记录里面查找
+	item, ok := a.tasks[task.Url]
+	if ok {
+		return item
+	}
+
+	// 通知前端任务列表添加任务
+	item = &DownloadTaskUIItem{
+		TaskName: task.TaskName,
+		Time:     time.Now().Format("2006-01-02 15:04:05"),
+		Status:   "初始化...",
+		Url:      task.Url,
+		TaskID:   len(a.tasks) + 1,
+	}
+	a.eventsEmit(TaskNotifyCreate, item)
+	return item
+}
+
+func (a *App) RemoveTaskNotifyItem(item *DownloadTaskUIItem) error {
+	if !item.IsDone {
+		task, ok := a.queues[item.Url]
+		if ok {
+			task.Stop()
+		}
+	}
+	err := os.Remove(item.VideoPath)
+	delete(a.tasks, item.Url)
+	return err
+}
+
 func (a *App) handleM3U8Task(task *ParserTask, result *ParseResult) (err error) {
 	mpl := result.Data.(*m3u8.MediaPlaylist)
 	queue := &M3U8DownloadQueue{}
+	a.queues[task.Url] = queue
+
 	info, cnt := "", 0
 	if mpl.Closed {
 		d := time.Unix(int64(queue.TotalDuration), 0).Format("15:07:51")
@@ -263,36 +302,45 @@ func (a *App) handleM3U8Task(task *ParserTask, result *ParseResult) (err error) 
 	})
 
 	// 任务列表添加任务
-	item := DownloadTaskUIItem{
-		TaskName: task.TaskName,
-		Time:     time.Now().Format("2006-01-02 15:04:05"),
-		Status:   "初始化...",
-		Url:      task.Url,
-	}
-
-	a.eventsEmit(TaskNotifyCreate, item)
+	item := a.addTaskNotifyItem(task)
+	queue.NotifyItem = item
 
 	go func() {
+		defer delete(a.queues, task.Url)
+
 		// 开始下载
 		a.concurrentLock <- struct{}{}
 		err = queue.StartDownload(task, mpl)
 		// 下载完毕，释放资源
 		<-a.concurrentLock
 		if err != nil {
+			item.Status = "下载失败，请检查链接有效性"
+			a.eventsEmit(TaskFinish, item)
 			return
 		}
+
+		item.Status = "已完成，合并中..."
+		a.eventsEmit(TaskFinish, item)
 		a.logInfof("切片下载完成，一共%v个", len(queue.tasks))
 
 		merger := NewMergeConfigFromDownloadQueue(queue, task.TaskName)
-		err = merger.Merge()
+		output, err := merger.Merge()
 		if err != nil {
+			item.Status = "合并出错，请尝试手动合并"
+			a.eventsEmit(TaskFinish, item)
 			return
 		}
+
 		a.logInfo("切片合并完成")
 		if task.DelOnComplete {
 			err = os.RemoveAll(queue.DownloadDir)
 			a.logInfo("切片删除完成")
 		}
+
+		item.Status = "已完成"
+		item.IsDone = true
+		item.VideoPath = output
+		a.eventsEmit(TaskFinish, item)
 	}()
 	return
 }
@@ -309,17 +357,13 @@ func (a *App) handleAACCTask(result *ParseResult) error {
 }
 
 func (a *App) handleCommonTask(task *ParserTask, result *ParseResult) (err error) {
-	item := DownloadTaskUIItem{
-		TaskName: task.TaskName,
-		Time:     time.Now().Format("2006-01-02 15:04:05"),
-		Status:   "初始化...",
-		Url:      task.Url,
-	}
-	a.eventsEmit(TaskNotifyCreate, item)
+	item := a.addTaskNotifyItem(task)
 
 	go func() {
 		a.concurrentLock <- struct{}{}
 		q := &CommonDownloader{}
+		a.queues[task.Url] = q
+		q.NotifyItem = item
 		err = q.StartDownload(task, result.Data.([]string))
 		<-a.concurrentLock
 	}()
