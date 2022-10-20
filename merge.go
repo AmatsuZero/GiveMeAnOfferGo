@@ -117,12 +117,12 @@ func (c *MergeFilesConfig) Merge() error {
 	args = append(args, output)
 	msg, err := Cmd(args[0], args[1:])
 	if err != nil {
-		SharedApp.LogErrorf("video merge failed, %v, output: %v\n", err, msg)
+		SharedApp.logErrorf("video merge failed, %v, output: %v\n", err, msg)
 	}
 	defer func(name string) {
 		err = os.Remove(name)
 		if err != nil {
-			SharedApp.LogErrorf("删除合并文件临时列表失败：%v", err.Error())
+			SharedApp.logErrorf("删除合并文件临时列表失败：%v", err.Error())
 		}
 	}(f.Name())
 	return err

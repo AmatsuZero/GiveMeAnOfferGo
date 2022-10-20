@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/grafov/m3u8"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -72,16 +74,16 @@ func (a *App) startup(ctx context.Context) {
 
 	config, err := NewConfig(configFilePath)
 	if err != nil {
-		a.LogError(err.Error())
+		a.logError(err.Error())
 	} else if config.ConfigProxy != nil {
 		// 写入代理配置
 		err = os.Setenv("HTTP_PROXY", config.ConfigProxy.http)
 		if err != nil {
-			a.LogError(err.Error())
+			a.logError(err.Error())
 		}
 		err = os.Setenv("HTTPS_PROXY", config.ConfigProxy.https)
 		if err != nil {
-			a.LogError(err.Error())
+			a.logError(err.Error())
 		}
 	}
 	a.config = config
@@ -157,23 +159,185 @@ func (a *App) OpenConfigDir() (string, error) {
 }
 
 func (a *App) TaskAdd(task *ParserTask) error {
-	err := task.Parse()
+	ret, err := task.Parse()
+	if err != nil {
+		return err
+	}
+	switch ret.Type {
+	case TaskTypeCommon:
+		err = a.handleCommonTask(task, ret)
+	case TaskTypeChinaAACC:
+		err = a.handleAACCTask(ret)
+	case TaskTypeM3U8:
+		err = a.handleM3U8Task(task, ret)
+	case TaskTypeM3U:
+		err = a.handleM3UTask(ret)
+	case TaskTypeBilibili:
+		err = a.handleBilibiliTask(task, ret)
+	}
 	return err
+}
+
+func (a *App) handleBilibiliTask(task *ParserTask, result *ParseResult) (err error) {
+	info := result.Data.(*videoInfoResp)
+
+	task.TaskName = info.Data.Title
+
+	u := baseURl.JoinPath(videoStream)
+	values := u.Query()
+	if len(info.Data.Bvid) > 0 {
+		values.Add("bvid", info.Data.Bvid)
+	} else {
+		values.Add("aid", strconv.Itoa(int(info.Data.aid)))
+	}
+	u.RawQuery = values.Encode()
+
+	if len(info.Data.Pages) == 0 {
+		return errors.New("no page data")
+	}
+
+	res, err := info.Data.Pages[0].selectResolution(u)
+	if err != nil {
+		return err
+	}
+
+	item := DownloadTaskUIItem{
+		TaskName: task.TaskName,
+		Time:     time.Now().Format("2006-01-02 15:04:05"),
+		Status:   "初始化...",
+		Url:      task.Url,
+	}
+
+	a.eventsEmit(TaskNotifyCreate, item)
+
+	go func() {
+		wg := &sync.WaitGroup{}
+		wg.Add(int(info.Data.Videos))
+
+		for _, page := range info.Data.Pages {
+			go func(p *videoPageData) {
+				tmp, e := u.Parse(u.String())
+				if e != nil {
+					return
+				}
+				vars := tmp.Query()
+				vars.Add("qn", res)
+				tmp.RawQuery = vars.Encode()
+				err = p.download(tmp, wg, task)
+				if err != nil {
+					a.logInfof("B站任务下载失败：%v", err)
+				}
+			}(page)
+		}
+		wg.Wait()
+	}()
+
+	return
+}
+
+func (a *App) handleM3UTask(result *ParseResult) (err error) {
+	tasks := result.Data.([]*ParserTask)
+	for _, task := range tasks {
+		err = a.TaskAdd(task)
+		if err != nil {
+			a.logErrorf("m3u 列表任务下载失败，链接：%v", task.Url)
+		}
+	}
+	return
+}
+
+func (a *App) handleM3U8Task(task *ParserTask, result *ParseResult) (err error) {
+	mpl := result.Data.(*m3u8.MediaPlaylist)
+	queue := &M3U8DownloadQueue{}
+	info, cnt := "", 0
+	if mpl.Closed {
+		d := time.Unix(int64(queue.TotalDuration), 0).Format("15:07:51")
+		info = fmt.Sprintf("点播资源解析成功，有%v个片段，时长：%v，，即将开始缓存...", cnt, d)
+	} else {
+		info = "直播资源解析成功，即将开始缓存..."
+	}
+	// 通知前端任务即将开始
+	a.eventsEmit(TaskAddEvent, EventMessage{
+		Code:    0,
+		Message: info,
+	})
+
+	// 任务列表添加任务
+	item := DownloadTaskUIItem{
+		TaskName: task.TaskName,
+		Time:     time.Now().Format("2006-01-02 15:04:05"),
+		Status:   "初始化...",
+		Url:      task.Url,
+	}
+
+	a.eventsEmit(TaskNotifyCreate, item)
+
+	go func() {
+		// 开始下载
+		a.concurrentLock <- struct{}{}
+		err = queue.StartDownload(task, mpl)
+		// 下载完毕，释放资源
+		<-a.concurrentLock
+		if err != nil {
+			return
+		}
+		a.logInfof("切片下载完成，一共%v个", len(queue.tasks))
+
+		merger := NewMergeConfigFromDownloadQueue(queue, task.TaskName)
+		err = merger.Merge()
+		if err != nil {
+			return
+		}
+		a.logInfo("切片合并完成")
+		if task.DelOnComplete {
+			err = os.RemoveAll(queue.DownloadDir)
+			a.logInfo("切片删除完成")
+		}
+	}()
+	return
+}
+
+func (a *App) handleAACCTask(result *ParseResult) error {
+	ch := result.Data.(chan *ParserTask)
+	for parserTask := range ch {
+		err := a.TaskAdd(parserTask)
+		if err != nil {
+			a.logErrorf("正保网校课程下载失败，任务名：%v，链接：%v", parserTask.TaskName, parserTask.Url)
+		}
+	}
+	return nil
+}
+
+func (a *App) handleCommonTask(task *ParserTask, result *ParseResult) (err error) {
+	item := DownloadTaskUIItem{
+		TaskName: task.TaskName,
+		Time:     time.Now().Format("2006-01-02 15:04:05"),
+		Status:   "初始化...",
+		Url:      task.Url,
+	}
+	a.eventsEmit(TaskNotifyCreate, item)
+
+	go func() {
+		a.concurrentLock <- struct{}{}
+		q := &CommonDownloader{}
+		err = q.StartDownload(task, result.Data.([]string))
+		<-a.concurrentLock
+	}()
+
+	return
 }
 
 func (a *App) TaskAddMuti(tasks []*ParserTask) error {
 	var wg sync.WaitGroup
 	for _, task := range tasks {
-		a.concurrentLock <- struct{}{}
 		wg.Add(1)
-
 		go func(t *ParserTask) {
 			defer wg.Done()
-			e := t.Parse()
+			e := a.TaskAdd(t)
 			if e != nil {
-				a.LogErrorf("下载任务失败:%v, 原因：%v", t.Url, e.Error())
+				a.logErrorf("下载任务失败:%v, 原因：%v", t.Url, e.Error())
 			}
-			<-a.concurrentLock
+
 		}(task)
 	}
 	wg.Wait()
@@ -198,7 +362,7 @@ func (a *App) Open(link string) error {
 func (a *App) Play(file string) error {
 	msg, err := Cmd("ffplay", []string{file})
 	if err == nil {
-		a.LogInfof("播放文件 %v \n %v", file, msg)
+		a.logInfof("播放文件 %v \n %v", file, msg)
 	}
 	return err
 }
@@ -211,7 +375,7 @@ func (a *App) getCli() *Cli {
 	return val.(*Cli)
 }
 
-func (a *App) EventsEmit(eventName string, optionalData ...interface{}) {
+func (a *App) eventsEmit(eventName string, optionalData ...interface{}) {
 	cli := a.getCli()
 	if cli != nil {
 		return
@@ -219,7 +383,7 @@ func (a *App) EventsEmit(eventName string, optionalData ...interface{}) {
 	runtime.EventsEmit(a.ctx, eventName, optionalData...)
 }
 
-func (a *App) EventsOnce(eventName string, callback func(optionalData ...interface{})) {
+func (a *App) eventsOnce(eventName string, callback func(optionalData ...interface{})) {
 	cli := a.getCli()
 	if cli != nil {
 		return
@@ -227,7 +391,7 @@ func (a *App) EventsOnce(eventName string, callback func(optionalData ...interfa
 	runtime.EventsOnce(a.ctx, eventName, callback)
 }
 
-func (a *App) MessageDialog(dialogOptions runtime.MessageDialogOptions) (string, error) {
+func (a *App) messageDialog(dialogOptions runtime.MessageDialogOptions) (string, error) {
 	cli := a.ctx.Value(CliKey).(*Cli)
 	if cli != nil {
 		return "", nil
@@ -235,7 +399,7 @@ func (a *App) MessageDialog(dialogOptions runtime.MessageDialogOptions) (string,
 	return runtime.MessageDialog(a.ctx, dialogOptions)
 }
 
-func (a *App) EventsOn(eventName string, callback func(optionalData ...interface{})) {
+func (a *App) eventsOn(eventName string, callback func(optionalData ...interface{})) {
 	cli := a.getCli()
 	if cli != nil {
 		return
@@ -243,7 +407,7 @@ func (a *App) EventsOn(eventName string, callback func(optionalData ...interface
 	runtime.EventsOn(a.ctx, eventName, callback)
 }
 
-func (a *App) LogInfof(format string, args ...interface{}) {
+func (a *App) logInfof(format string, args ...interface{}) {
 	cli := a.getCli()
 	if cli != nil {
 		if *cli.verbose {
@@ -254,7 +418,7 @@ func (a *App) LogInfof(format string, args ...interface{}) {
 	}
 }
 
-func (a *App) LogInfo(message string) {
+func (a *App) logInfo(message string) {
 	cli := a.getCli()
 	if cli != nil {
 		if *cli.verbose {
@@ -265,7 +429,7 @@ func (a *App) LogInfo(message string) {
 	}
 }
 
-func (a *App) LogError(message string) {
+func (a *App) logError(message string) {
 	cli := a.getCli()
 	if cli != nil {
 		fmt.Println("ERR | " + message)
@@ -274,7 +438,7 @@ func (a *App) LogError(message string) {
 	}
 }
 
-func (a *App) LogErrorf(format string, args ...interface{}) {
+func (a *App) logErrorf(format string, args ...interface{}) {
 	cli := a.getCli()
 	if cli != nil {
 		fmt.Printf("ERR | "+format+"\n", args...)

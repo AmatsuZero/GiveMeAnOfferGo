@@ -46,9 +46,9 @@ func (t *DownloadTask) Read(p []byte) (n int, err error) {
 	n, err = t.Reader.Read(p)
 	t.Current += int64(n)
 	//runtime.LogPrint(SharedApp.ctx, fmt.Sprintf("开始下载: %v", t.Req.URL.String()))
-	//runtime.LogInfof(SharedApp.ctx, "\r正在下载，下载进度：%.2f%%", float64(t.Current*10000/t.Total)/100)
+	//runtime.logInfof(SharedApp.ctx, "\r正在下载，下载进度：%.2f%%", float64(t.Current*10000/t.Total)/100)
 	if t.Current == t.Total {
-		//runtime.LogInfof(SharedApp.ctx, "\r下载完成，下载进度：%.2f%%", float64(t.Current*10000/t.Total)/100)
+		//runtime.logInfof(SharedApp.ctx, "\r下载完成，下载进度：%.2f%%", float64(t.Current*10000/t.Total)/100)
 	}
 	return
 }
@@ -63,20 +63,20 @@ func (t *DownloadTask) download() error {
 		t.decrypt.Ctx = t.Req.Context()
 		err := t.decrypt.Generate()
 		if err != nil {
-			SharedApp.LogError(fmt.Sprintf("创建解密信息失败：%v", err))
+			SharedApp.logError(fmt.Sprintf("创建解密信息失败：%v", err))
 			return err
 		}
 	}
 
 	out, err := os.Create(t.Dst)
 	if err != nil {
-		SharedApp.LogError(err.Error())
+		SharedApp.logError(err.Error())
 		return err
 	}
 	defer func(out *os.File) {
 		err = out.Close()
 		if err != nil {
-			SharedApp.LogError(err.Error())
+			SharedApp.logError(err.Error())
 		}
 	}(out)
 
@@ -87,7 +87,7 @@ func (t *DownloadTask) download() error {
 	defer func(Body io.ReadCloser) {
 		err = Body.Close()
 		if err != nil {
-			SharedApp.LogError(err.Error())
+			SharedApp.logError(err.Error())
 		}
 	}(resp.Body)
 
@@ -111,7 +111,7 @@ func (t *DownloadTask) download() error {
 		t.Total = resp.ContentLength
 		_, err = io.Copy(out, t)
 	}
-	SharedApp.LogInfof("下载完成: %v", t.Req.URL.String())
+	SharedApp.logInfof("下载完成: %v", t.Req.URL.String())
 	return err
 }
 
@@ -179,7 +179,7 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 			q.TotalDuration += seg.Duration
 			req, err := config.BuildReq(seg.URI)
 			if err != nil {
-				SharedApp.LogErrorf("生成 Segments 请求出粗：%v", err)
+				SharedApp.logErrorf("生成 Segments 请求出粗：%v", err)
 				continue
 			}
 
@@ -210,7 +210,7 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 	if cipher != nil {
 		err := cipher.Generate()
 		if err != nil {
-			SharedApp.LogErrorf("生成解密结构体出错：%v", err)
+			SharedApp.logErrorf("生成解密结构体出错：%v", err)
 			return err
 		}
 	}
@@ -229,7 +229,7 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 		go func(t *DownloadTask) {
 			err = t.Start(wg)
 			if err != nil { // 出现了错误，直接停掉其他任务，结束
-				SharedApp.LogError(err.Error())
+				SharedApp.logError(err.Error())
 				q.Stop()
 			}
 			<-ch
@@ -237,7 +237,7 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 	}
 
 	wg.Wait()
-	SharedApp.LogInfof("完成了%v个切片任务的下载", len(q.tasks))
+	SharedApp.logInfof("完成了%v个切片任务的下载", len(q.tasks))
 	return err
 }
 
@@ -256,7 +256,7 @@ func (q *M3U8DownloadQueue) startDownloadLive(config *ParserTask, list *m3u8.Med
 	shouldStop := false
 	var tasks []*DownloadTask
 
-	SharedApp.EventsOn(StopLiveStreamDownload, func(optionalData ...interface{}) { // 收到停止直播下载的通知
+	SharedApp.eventsOn(StopLiveStreamDownload, func(optionalData ...interface{}) { // 收到停止直播下载的通知
 		u := optionalData[0].(string)
 		if u != config.Url { // 只停止自己的任务
 			return
@@ -284,10 +284,10 @@ func (q *M3U8DownloadQueue) startDownloadLive(config *ParserTask, list *m3u8.Med
 		}
 		playlist, _, err := config.retrieveM3U8List()
 		if err != nil {
-			SharedApp.LogError("获取直播 m3u8 列表失败")
+			SharedApp.logError("获取直播 m3u8 列表失败")
 		} else {
 			list = playlist.(*m3u8.MediaPlaylist)
-			SharedApp.LogInfo("刷新了直播 m3u8 链接")
+			SharedApp.logInfo("刷新了直播 m3u8 链接")
 		}
 	}
 	// 将所有任务传过去, 后面文件合并用
@@ -323,15 +323,6 @@ func (q *M3U8DownloadQueue) preDownload(config *ParserTask) (err error) {
 			task.Stop()
 		}
 	}
-
-	item := DownloadTaskUIItem{
-		TaskName: config.TaskName,
-		Time:     time.Now().Format("2006-01-02 15:04:05"),
-		Status:   "初始化...",
-		Url:      config.Url,
-	}
-
-	SharedApp.EventsEmit(TaskNotifyCreate, item)
 
 	return
 }
@@ -401,7 +392,7 @@ func (c *CommonDownloader) StartDownload(config *ParserTask, urls []string) erro
 			defer wg.Done()
 			err = t.Start(wg)
 			if err != nil {
-				SharedApp.LogError(err.Error())
+				SharedApp.logError(err.Error())
 			}
 			<-ch
 		}(task)

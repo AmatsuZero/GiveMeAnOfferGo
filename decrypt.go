@@ -56,7 +56,7 @@ func NewCipherFromKey(config *ParserTask, key *m3u8.Key, queryKey func(u string)
 	req, err := http.NewRequest("GET", key.URI, nil)
 	req = req.WithContext(SharedApp.ctx)
 	if err != nil {
-		SharedApp.LogError(fmt.Sprintf("生成 密钥 Key 请求出粗：%v", err))
+		SharedApp.logError(fmt.Sprintf("生成 密钥 Key 请求出粗：%v", err))
 		return nil, err
 	}
 	decrypt.KeyReq = req
@@ -104,13 +104,13 @@ func (c *Cipher) Generate() error {
 		// 下载 Key
 		resp, err := SharedApp.client.Do(req)
 		if err != nil {
-			SharedApp.LogErrorf("下载密钥失败：%v", err)
+			SharedApp.logErrorf("下载密钥失败：%v", err)
 			return err
 		}
 		defer func(Body io.ReadCloser) {
 			err = Body.Close()
 			if err != nil {
-				SharedApp.LogError(err.Error())
+				SharedApp.logError(err.Error())
 			}
 		}(resp.Body)
 

@@ -46,52 +46,54 @@ func createChromeContext() (context.Context, context.CancelFunc) {
 
 	// create context
 	chromeCtx, _ := chromedp.NewContext(c, chromedp.WithLogf(func(s string, i ...interface{}) {
-		SharedApp.LogInfof(s, i)
+		SharedApp.logInfof(s, i)
 	}))
 
 	//创建一个上下文，超时时间为40s
 	return context.WithTimeout(chromeCtx, 40*time.Second)
 }
 
-func (t *ChinaAACCParserTask) Parse() error {
+func (t *ChinaAACCParserTask) Parse() (*ParseResult, error) {
 	// 获取cookie
 	err := t.getCookies()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	content, err := t.getHttpHtmlContent()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	tasks, err := t.scrapeLinks(content)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	ch := make(chan *ParserTask)
 	// 资源链接有效时间很短，每个页面单独提取，然后立刻下载
-	for _, task := range tasks {
-		timeoutCtx, cancel := createChromeContext()
-		// 提取 m3u8 链接
-		chromedp.ListenTarget(timeoutCtx, t.interceptResource(task))
-		e := chromedp.Run(timeoutCtx,
-			t.setCookies(),
-			network.Enable(),
-			chromedp.Navigate(task.Url),
-			chromedp.WaitVisible("#catalog", chromedp.ByID),
-		)
-		if e != nil {
-			SharedApp.LogErrorf("❌获取链接失败：%v", e)
+	go func() {
+		for _, task := range tasks {
+			timeoutCtx, cancel := createChromeContext()
+			// 提取 m3u8 链接
+			chromedp.ListenTarget(timeoutCtx, t.interceptResource(task))
+			e := chromedp.Run(timeoutCtx,
+				t.setCookies(),
+				network.Enable(),
+				chromedp.Navigate(task.Url),
+				chromedp.WaitVisible("#catalog", chromedp.ByID),
+			)
+			if e != nil {
+				SharedApp.logErrorf("❌获取链接失败：%v", e)
+			}
+			cancel()
+			// 下载
+			ch <- task
 		}
-		cancel()
-		// 下载
-		e = task.Parse()
-		if e != nil {
-			SharedApp.LogErrorf("❌下载课程失败：%v", task.TaskName)
-		}
-	}
-	return err
+		close(ch)
+	}()
+
+	return &ParseResult{Type: TaskTypeChinaAACC, Data: ch}, nil
 }
 
 func (t *ChinaAACCParserTask) interceptResource(task *ParserTask) func(interface{}) {
@@ -102,7 +104,7 @@ func (t *ChinaAACCParserTask) interceptResource(task *ParserTask) func(interface
 		case *network.EventRequestWillBeSent:
 			if strings.Contains(ev.Request.URL, ".m3u8") {
 				task.Url = ev.Request.URL
-				SharedApp.LogInfof("提取到网校 m3u8 资源链接：%v")
+				SharedApp.logInfof("提取到网校 m3u8 资源链接：%v")
 			} else if strings.Contains(ev.Request.URL, "getKeyForHls") { // 获取密钥的链接
 				keyRequestID = ev.RequestID
 			}
@@ -110,7 +112,7 @@ func (t *ChinaAACCParserTask) interceptResource(task *ParserTask) func(interface
 			if len(keyRequestID) > 0 && ev.RequestID == keyRequestID {
 				b, err := network.GetResponseBody(keyRequestID).MarshalJSON()
 				if err != nil {
-					SharedApp.LogError(err.Error())
+					SharedApp.logError(err.Error())
 				} else {
 					task.KeyIV = string(b)
 				}

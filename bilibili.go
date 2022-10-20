@@ -100,7 +100,7 @@ func (v *videoInfoResp) download(t *ParserTask) error {
 		go func(p *videoPageData) {
 			err = p.download(u, wg, t)
 			if err != nil {
-				SharedApp.LogInfof("B站任务下载失败：%v", err)
+				SharedApp.logInfof("B站任务下载失败：%v", err)
 			}
 		}(page)
 	}
@@ -172,7 +172,7 @@ func (r *playUrlResp) download(t *ParserTask, title string) error {
 
 	if t.DelOnComplete {
 		err = os.RemoveAll(downloader.DownloadDir)
-		SharedApp.LogInfo("临时文件删除完成")
+		SharedApp.logInfo("临时文件删除完成")
 	}
 
 	return err
@@ -224,8 +224,8 @@ func (d *videoPageData) selectResolution(u *url.URL) (string, error) {
 	}
 
 	ch := make(chan string)
-	SharedApp.EventsEmit(SelectVariant, msg)
-	SharedApp.EventsOnce(OnVariantSelected, func(optionalData ...interface{}) {
+	SharedApp.eventsEmit(SelectVariant, msg)
+	SharedApp.eventsOnce(OnVariantSelected, func(optionalData ...interface{}) {
 		ch <- optionalData[0].(string)
 	})
 
@@ -270,7 +270,7 @@ type BilibiliParserTask struct {
 	taskType bilibiliTaskType
 }
 
-func (t *BilibiliParserTask) Parse() error {
+func (t *BilibiliParserTask) Parse() (*ParseResult, error) {
 	// 获取视频信息
 	infoURL := baseURl.JoinPath(videoInfo)
 	values := infoURL.Query()
@@ -283,20 +283,14 @@ func (t *BilibiliParserTask) Parse() error {
 
 	resp, err := SharedApp.client.Get(infoURL.String())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	var info videoInfoResp
-	err = json.NewDecoder(resp.Body).Decode(&info)
+	var info *videoInfoResp
+	err = json.NewDecoder(resp.Body).Decode(info)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = info.download(t.ParserTask)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return &ParseResult{Type: TaskTypeBilibili, Data: info}, nil
 }

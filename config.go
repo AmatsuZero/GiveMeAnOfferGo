@@ -39,7 +39,7 @@ func NewConfig(path string) (*UserConfig, error) {
 	defer func(file *os.File) {
 		err = file.Close()
 		if err != nil {
-			SharedApp.LogError(err.Error())
+			SharedApp.logError(err.Error())
 		}
 	}(file)
 	var tmp UserConfig
@@ -60,7 +60,7 @@ func (c *UserConfig) Save() error {
 	defer func(f *os.File) {
 		err = f.Close()
 		if err != nil {
-			SharedApp.LogError(err.Error())
+			SharedApp.logError(err.Error())
 		}
 	}(f)
 	_, err = f.Write(data)

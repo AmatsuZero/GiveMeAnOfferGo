@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
 	"github.com/grafov/m3u8"
 	"github.com/jamesnetherton/m3u"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -15,7 +14,6 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"time"
 )
 
 const (
@@ -46,13 +44,28 @@ type EventMessage struct {
 	Info    []*playListInfo
 }
 
-func (t *ParserTask) Parse() error {
+type TaskType int
+
+const (
+	TaskTypeM3U TaskType = iota + 1
+	TaskTypeM3U8
+	TaskTypeChinaAACC
+	TaskTypeBilibili
+	TaskTypeCommon
+)
+
+type ParseResult struct {
+	Type TaskType
+	Data interface{}
+}
+
+func (t *ParserTask) Parse() (*ParseResult, error) {
 	if t.Headers == nil {
 		t.Headers = make(map[string]string)
 	}
 	u, err := url.Parse(t.Url)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if u.Host == "www.bilibili.com" {
@@ -75,19 +88,18 @@ func (t *ParserTask) Parse() error {
 			return t.getPlayerList()
 		}
 	default:
-		q := &CommonDownloader{}
-		return q.StartDownload(t, []string{t.Url})
+		return &ParseResult{Type: TaskTypeCommon, Data: []string{t.Url}}, nil
 	}
 }
 
-func (t *ParserTask) handleM3UList() error {
+func (t *ParserTask) handleM3UList() (*ParseResult, error) {
 	playlist, err := m3u.Parse(t.Url)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	tasks := make([]*ParserTask, 0, len(playlist.Tracks))
@@ -102,7 +114,7 @@ func (t *ParserTask) handleM3UList() error {
 		})
 	}
 
-	return SharedApp.TaskAddMuti(tasks)
+	return &ParseResult{Type: TaskTypeM3U, Data: tasks}, nil
 }
 
 func (t *ParserTask) NewChinaAACCTask() *ChinaAACCParserTask {
@@ -133,10 +145,10 @@ func (t *ParserTask) NewBilibiliTask(u *url.URL) *BilibiliParserTask {
 	return ret
 }
 
-func (t *ParserTask) parseLocalFile(path string) error {
+func (t *ParserTask) parseLocalFile(path string) (*ParseResult, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	p, listType, err := m3u8.DecodeFrom(bufio.NewReader(f), true)
 	if err != nil {
@@ -144,11 +156,11 @@ func (t *ParserTask) parseLocalFile(path string) error {
 	}
 	switch listType {
 	case m3u8.MEDIA:
-		return t.handleMediaPlayList(p.(*m3u8.MediaPlaylist))
+		return &ParseResult{Type: TaskTypeM3U8, Data: p}, nil
 	case m3u8.MASTER:
 		return t.selectVariant(p.(*m3u8.MasterPlaylist))
 	}
-	return nil
+	return nil, nil
 }
 
 func (t *ParserTask) buildSegmentsURL(u string) (string, error) {
@@ -204,7 +216,7 @@ func (t *ParserTask) BuildReq(u string) (*http.Request, error) {
 	return req, nil
 }
 
-func (t *ParserTask) selectVariant(l *m3u8.MasterPlaylist) error {
+func (t *ParserTask) selectVariant(l *m3u8.MasterPlaylist) (*ParseResult, error) {
 	// 等待前端选择
 	msg := EventMessage{
 		Code:    1,
@@ -219,8 +231,8 @@ func (t *ParserTask) selectVariant(l *m3u8.MasterPlaylist) error {
 	}
 
 	ch := make(chan int)
-	SharedApp.EventsEmit(SelectVariant, msg)
-	SharedApp.EventsOnce(OnVariantSelected, func(optionalData ...interface{}) {
+	SharedApp.eventsEmit(SelectVariant, msg)
+	SharedApp.eventsOnce(OnVariantSelected, func(optionalData ...interface{}) {
 		res := optionalData[0].(string)
 		i, _ := strconv.Atoi(res)
 		ch <- i
@@ -230,64 +242,17 @@ func (t *ParserTask) selectVariant(l *m3u8.MasterPlaylist) error {
 	return t.handleVariant(l.Variants[idx])
 }
 
-func (t *ParserTask) handleVariant(v *m3u8.Variant) error {
+func (t *ParserTask) handleVariant(v *m3u8.Variant) (*ParseResult, error) {
 	if v.Chunklist != nil {
-		return t.handleMediaPlayList(v.Chunklist)
+		return &ParseResult{Type: TaskTypeM3U8, Data: v.Chunklist}, nil
 	}
 	req, err := t.BuildReq(v.URI)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	t.Url = req.URL.String()
-	err = t.Parse()
-	return err
-}
-
-func (t *ParserTask) handleMediaPlayList(mpl *m3u8.MediaPlaylist) error {
-	cnt := 0
-	info := ""
-
-	queue := &M3U8DownloadQueue{}
-
-	ch := make(chan bool)
-	if mpl.Closed {
-		d := time.Unix(int64(queue.TotalDuration), 0).Format("15:07:51")
-		info = fmt.Sprintf("点播资源解析成功，有%v个片段，时长：%v，，即将开始缓存...", cnt, d)
-	} else {
-		info = "直播资源解析成功，即将开始缓存..."
-	}
-
-	var err error
-	go func(c chan bool) {
-		err = queue.StartDownload(t, mpl)
-		c <- true
-	}(ch)
-
-	SharedApp.EventsEmit(TaskAddEvent, EventMessage{
-		Code:    0,
-		Message: info,
-	})
-
-	<-ch
-	if err != nil {
-		return err
-	}
-
-	SharedApp.LogInfof("切片下载完成，一共%v个", len(queue.tasks))
-
-	merger := NewMergeConfigFromDownloadQueue(queue, t.TaskName)
-	err = merger.Merge()
-	if err != nil {
-		return err
-	}
-	SharedApp.LogInfo("切片合并完成")
-
-	if t.DelOnComplete {
-		err = os.RemoveAll(queue.DownloadDir)
-		SharedApp.LogInfo("切片删除完成")
-	}
-	return err
+	return t.Parse()
 }
 
 func (t *ParserTask) retrieveM3U8List() (m3u8.Playlist, m3u8.ListType, error) {
@@ -303,7 +268,7 @@ func (t *ParserTask) retrieveM3U8List() (m3u8.Playlist, m3u8.ListType, error) {
 	defer func(Body io.ReadCloser) {
 		err = Body.Close()
 		if err != nil {
-			SharedApp.LogError(err.Error())
+			SharedApp.logError(err.Error())
 		}
 	}(resp.Body)
 
@@ -318,7 +283,7 @@ func (t *ParserTask) handleFor509Error(err error) (m3u8.Playlist, m3u8.ListType,
 	if _, ok = e.Err.(x509.CertificateInvalidError); !ok {
 		return nil, 0, err
 	}
-	result, err := SharedApp.MessageDialog(runtime.MessageDialogOptions{
+	result, err := SharedApp.messageDialog(runtime.MessageDialogOptions{
 		Type:          runtime.QuestionDialog,
 		Title:         "遇到证书错误",
 		Message:       "是否忽略?",
@@ -332,17 +297,17 @@ func (t *ParserTask) handleFor509Error(err error) (m3u8.Playlist, m3u8.ListType,
 	return t.retrieveM3U8List()
 }
 
-func (t *ParserTask) getPlayerList() error {
+func (t *ParserTask) getPlayerList() (*ParseResult, error) {
 	playlist, listType, err := t.retrieveM3U8List()
 	if err != nil {
 		playlist, listType, err = t.handleFor509Error(err)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 	if listType == m3u8.MASTER {
 		return t.selectVariant(playlist.(*m3u8.MasterPlaylist))
 	} else {
-		return t.handleMediaPlayList(playlist.(*m3u8.MediaPlaylist))
+		return &ParseResult{Type: TaskTypeM3U8, Data: playlist}, nil
 	}
 }

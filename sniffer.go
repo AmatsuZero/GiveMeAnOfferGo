@@ -32,7 +32,7 @@ func (s *Sniffer) GetLinks() ([]string, error) {
 	defer cancel()
 
 	taskCtx, cancel := chromedp.NewContext(allocCtx, chromedp.WithLogf(func(s string, i ...interface{}) {
-		SharedApp.LogInfof(s, i)
+		SharedApp.logInfof(s, i)
 	}))
 
 	defer cancel()
@@ -49,7 +49,7 @@ func (s *Sniffer) GetLinks() ([]string, error) {
 
 	chromedp.ListenTarget(taskCtx, s.interceptResource(taskCtx))
 
-	SharedApp.LogInfof("开始嗅探 URL：", s.Link)
+	SharedApp.logInfof("开始嗅探 URL：", s.Link)
 
 	err := chromedp.Run(taskCtx,
 		network.Enable(),
@@ -75,7 +75,7 @@ func (s *Sniffer) interceptResource(ctx context.Context) func(interface{}) {
 	return func(event interface{}) {
 		switch ev := event.(type) {
 		case *network.EventResponseReceived:
-			SharedApp.EventsEmit("intercept-url", ev.Response)
+			SharedApp.eventsEmit("intercept-url", ev.Response)
 			for _, suffix := range suffixes {
 				if strings.Contains(ev.Response.URL, suffix) {
 					s.resourceLinks[ev.Response.URL] = true
