@@ -27,9 +27,8 @@ func init() {
 }
 
 type baseResp struct {
-	Code    int
-	Message string
-	Ttl     int
+	Code, Ttl int
+	Message   string
 }
 
 type dimension struct {
@@ -54,18 +53,18 @@ type videoInfoResp struct {
 	baseResp
 	Data struct {
 		Bvid      string
-		aid       int64
+		Aid       int64
 		Videos    int64  // 分区数量
 		Tid       int64  // 分区tid
 		Pic       string // 稿件封面
 		Title     string // 稿件标题
-		Cid       int64  // 稿件1P 分辨率
-		Dimension dimension
+		Cid       int64  // 稿件1P cid
+		Dimension *dimension
 		Pages     []*videoPageData // 视频分P列表
 	}
 }
 
-func (v *videoInfoResp) download(t *ParserTask) error {
+func (v *videoInfoResp) parse(t *ParserTask) (*ParseResult, error) {
 	t.TaskName = v.Data.Title
 
 	u := baseURl.JoinPath(videoStream)
@@ -73,18 +72,34 @@ func (v *videoInfoResp) download(t *ParserTask) error {
 	if len(v.Data.Bvid) > 0 {
 		values.Add("bvid", v.Data.Bvid)
 	} else {
-		values.Add("aid", strconv.Itoa(int(v.Data.aid)))
+		values.Add("aid", strconv.Itoa(int(v.Data.Aid)))
 	}
 	u.RawQuery = values.Encode()
 
 	if len(v.Data.Pages) == 0 {
-		return errors.New("no page data")
+		return nil, errors.New("no page data")
 	}
 
-	res, err := v.Data.Pages[0].selectResolution(u)
+	resolution, err := v.Data.Pages[0].selectResolution(u)
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	for _, page := range v.Data.Pages {
+		tmp, _ := u.Parse(u.String()) // 拷贝一份原来的 URL
+		vars := tmp.Query()
+		vars.Add("qn", resolution)
+		tmp.RawQuery = vars.Encode()
+		go func(p *videoPageData) {
+			err = p.download(u, wg, t)
+			if err != nil {
+				SharedApp.logInfof("B站任务下载失败：%v", err)
+			}
+		}(page)
+	}
+}
+
+func (v *videoInfoResp) download(t *ParserTask) error {
 
 	wg := &sync.WaitGroup{}
 	wg.Add(int(v.Data.Videos))
@@ -187,11 +202,12 @@ type supportFormat struct {
 }
 
 type videoPageData struct {
-	Cid, Page int64
-	From      string
-	Part      string // 分P标题
-	Duration  int64  // 分P时长（单位为秒）
-	Dimension dimension
+	Cid, Page  int64
+	From       string
+	Part       string // 分P标题
+	Duration   int64  // 分P时长（单位为秒）
+	Dimension  dimension
+	FirstFrame string `json:"first_frame"`
 }
 
 func (d *videoPageData) selectResolution(u *url.URL) (string, error) {
@@ -234,6 +250,27 @@ func (d *videoPageData) selectResolution(u *url.URL) (string, error) {
 	return res, nil
 }
 
+func (d *videoPageData) parse(u *url.URL, t *ParserTask) (*ParseResult, error) {
+	values := u.Query()
+	values.Add("cid", strconv.Itoa(int(d.Cid)))
+	u.RawQuery = values.Encode()
+
+	// 获取指定清晰度的 url 列表
+	resp, err := SharedApp.client.Get(u.String())
+	if err != nil {
+		return nil, err
+	}
+
+	info := new(playUrlResp)
+	err = json.NewDecoder(resp.Body).Decode(&info)
+	if err != nil {
+		return nil, err
+	}
+	t.Headers["Referer"] = "https://www.bilibili.com"
+	t.Headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36"
+
+}
+
 func (d *videoPageData) download(u *url.URL, g *sync.WaitGroup, t *ParserTask) error {
 	defer g.Done()
 
@@ -270,7 +307,7 @@ type BilibiliParserTask struct {
 	taskType bilibiliTaskType
 }
 
-func (t *BilibiliParserTask) Parse() (*ParseResult, error) {
+func (t *BilibiliParserTask) parse() (*ParseResult, error) {
 	// 获取视频信息
 	infoURL := baseURl.JoinPath(videoInfo)
 	values := infoURL.Query()
@@ -286,11 +323,11 @@ func (t *BilibiliParserTask) Parse() (*ParseResult, error) {
 		return nil, err
 	}
 
-	var info *videoInfoResp
+	info := &videoInfoResp{}
 	err = json.NewDecoder(resp.Body).Decode(info)
 	if err != nil {
 		return nil, err
 	}
 
-	return &ParseResult{Type: TaskTypeBilibili, Data: info}, nil
+	return info.parse(t.ParserTask)
 }

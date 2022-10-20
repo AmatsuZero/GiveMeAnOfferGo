@@ -194,7 +194,7 @@ func (a *App) handleBilibiliTask(task *ParserTask, result *ParseResult) (err err
 	if len(info.Data.Bvid) > 0 {
 		values.Add("bvid", info.Data.Bvid)
 	} else {
-		values.Add("aid", strconv.Itoa(int(info.Data.aid)))
+		values.Add("aid", strconv.Itoa(int(info.Data.Aid)))
 	}
 	u.RawQuery = values.Encode()
 
