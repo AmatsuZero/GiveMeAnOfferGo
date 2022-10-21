@@ -302,23 +302,20 @@ func (a *App) handleM3U8Task(task *ParserTask, result *ParseResult) (err error) 
 	mpl := result.Data.(*m3u8.MediaPlaylist)
 	queue := &M3U8DownloadQueue{}
 	a.queues[task.Url] = queue
+	// 任务列表添加任务
+	item := a.addTaskNotifyItem(task)
+	queue.NotifyItem = item
 
-	info, cnt := "", 0
+	info, cnt := "", mpl.Count()
 	if mpl.Closed {
 		d := time.Unix(int64(queue.TotalDuration), 0).Format("15:07:51")
-		info = fmt.Sprintf("点播资源解析成功，有%v个片段，时长：%v，，即将开始缓存...", cnt, d)
+		info = fmt.Sprintf("点播资源解析成功，有%v个片段，时长：%v，即将开始缓存...", cnt, d)
 	} else {
 		info = "直播资源解析成功，即将开始缓存..."
 	}
 	// 通知前端任务即将开始
-	a.eventsEmit(TaskAddEvent, EventMessage{
-		Code:    0,
-		Message: info,
-	})
-
-	// 任务列表添加任务
-	item := a.addTaskNotifyItem(task)
-	queue.NotifyItem = item
+	item.Status = info
+	a.eventsEmit(TaskStatusUpdate, item)
 
 	go func() {
 		defer delete(a.queues, task.Url)

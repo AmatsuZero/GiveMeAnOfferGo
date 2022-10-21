@@ -1,3 +1,5 @@
+import {MergeFileType} from "../../src/models";
+
 export namespace main {
 	
 	export class MergeFilesConfig {
@@ -11,8 +13,8 @@ export namespace main {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.files = source["files"];
-	        this.mergeType = source["mergeType"];
+	        this.files = source["files"] ?? [];
+	        this.mergeType = source["mergeType"] ?? MergeFileType.Speed;
 	        this.taskName = source["taskName"];
 	    }
 	}

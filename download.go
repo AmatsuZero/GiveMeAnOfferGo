@@ -231,8 +231,10 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 	var err error
 
 	ch := make(chan struct{}, q.concurrentCnt)
-	q.NotifyItem.Status = fmt.Sprintf("下载中... %v/%v", ops, cnt)
-	SharedApp.eventsEmit(TaskStatusUpdate, q.NotifyItem)
+	if list.Closed {
+		q.NotifyItem.Status = fmt.Sprintf("下载中... %v/%v", ops, cnt)
+		SharedApp.eventsEmit(TaskStatusUpdate, q.NotifyItem)
+	}
 
 	for _, task := range q.tasks {
 		ch <- struct{}{}
@@ -243,8 +245,10 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 				SharedApp.logError(err.Error())
 				q.Stop()
 			} else {
-				atomic.AddUint64(&ops, 1)
-				q.NotifyItem.Status = fmt.Sprintf("下载中... %v/%v", ops, cnt)
+				if list.Closed { // 仅 vod 更新下载切片进度
+					atomic.AddUint64(&ops, 1)
+					q.NotifyItem.Status = fmt.Sprintf("下载中... %v/%v", ops, cnt)
+				}
 				SharedApp.eventsEmit(TaskStatusUpdate, q.NotifyItem)
 			}
 			<-ch
@@ -268,6 +272,9 @@ func (q *M3U8DownloadQueue) Stop() {
 }
 
 func (q *M3U8DownloadQueue) startDownloadLive(config *ParserTask, list *m3u8.MediaPlaylist) error {
+	q.NotifyItem.Status = "直播中..."
+	SharedApp.eventsEmit(TaskStatusUpdate, q.NotifyItem)
+
 	shouldStop := false
 	var tasks []*DownloadTask
 
@@ -291,6 +298,8 @@ func (q *M3U8DownloadQueue) startDownloadLive(config *ParserTask, list *m3u8.Med
 		}
 		needWait := len(q.tasks) == 0
 		tasks = append(tasks, q.tasks...)
+		q.NotifyItem.Status = fmt.Sprintf("直播中... [%v]", len(tasks))
+		SharedApp.eventsEmit(TaskStatusUpdate, q.NotifyItem)
 		if needWait { // 如果本次没有新增任务，睡一小会儿
 			time.Sleep(interval * time.Second)
 			interval += 2
