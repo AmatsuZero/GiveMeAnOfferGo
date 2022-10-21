@@ -6,7 +6,7 @@ export default {
 <script lang="ts" setup>
 import { Link, CirclePlusFilled, RemoveFilled, Download } from "@element-plus/icons";
 import {EventsEmit, EventsOn} from "../../wailsjs/runtime";
-import {DownloadTask, PlaylistItem} from "../models";
+import {DownloadTask, DownloadTaskState, PlaylistItem} from "../models";
 import {computed, reactive, ref} from "vue";
 import {Open, Play, RemoveTaskNotifyItem, TaskAdd} from "../../wailsjs/go/main/App";
 import {main} from "../../wailsjs/go/models";
@@ -36,20 +36,20 @@ const tableRowClassName = ({
   row: DownloadTask
   rowIndex: number
 }) => {
-  if (rowIndex === 1) {
-    return 'warning-row'
-  } else if (rowIndex === 3) {
-    return 'success-row'
+  switch (row.state) {
+    case DownloadTaskState.Processing:
+      return 'warning-row';
+    case DownloadTaskState.Idle:
+      return 'primary-row';
+    case DownloadTaskState.Error:
+      return 'error-row'
+    case DownloadTaskState.Done:
+      return 'success-row'
   }
   return ''
 }
 
 EventsOn("task-notify-update", data => updateTaskItem(data));
-EventsOn("task-notify-create", data => {
-  const item = data as DownloadTask;
-  allVideos.value.push(item);
-});
-
 EventsOn("task-notify-end", data => updateTaskItem(data));
 
 function deleteTask(task: DownloadTask) {
@@ -118,6 +118,7 @@ function updateTaskItem(data: any) {
   allVideos.value[idx].isDone = item.isDone;
   allVideos.value[idx].status = item.status;
   allVideos.value[idx].videoPath = item.videoPath;
+  allVideos.value[idx].state = item.state;
 }
 
 function onHeadersChange(value: string | number) {
@@ -142,6 +143,14 @@ function openTask(link: string) {
   Open(link);
 }
 
+function dropM3U8File() {
+
+}
+
+function clickSelectM3U8() {
+
+}
+
 </script>
 
 <template>
@@ -162,7 +171,10 @@ function openTask(link: string) {
         {{downloadSpeed}}
       </el-col>
     </el-row>
-    <el-table :data="filterTableData" style="width: 100%">
+    <el-table
+        :data="filterTableData"
+        :row-class-name="tableRowClassName"
+        style="width: 100%">
       <el-table-column label="创建时间" prop="time"/>
       <el-table-column label="任务名" prop="taskName"/>
       <el-table-column label="状态" prop="status"/>
@@ -276,7 +288,17 @@ function openTask(link: string) {
 .el-table .warning-row {
   --el-table-tr-bg-color: var(--el-color-warning-light-9);
 }
+
 .el-table .success-row {
   --el-table-tr-bg-color: var(--el-color-success-light-9);
 }
+
+.el-table .error-row {
+  --el-table-tr-bg-color: var(--el-color-error-light-9);
+}
+
+.el-table .primary-row {
+  --el-table-tr-bg-color: var(--el-color-primary-light-9);
+}
+
 </style>

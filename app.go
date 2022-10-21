@@ -194,6 +194,7 @@ func (a *App) handleBilibiliTask(result *ParseResult) error {
 				Time:     time.Now().Format("2006-01-02 15:04:05"),
 				Status:   "初始化...",
 				Url:      t.Url,
+				State:    DownloadTaskProcessing,
 			}
 			a.eventsEmit(TaskNotifyCreate, item)
 
@@ -277,6 +278,7 @@ func (a *App) addTaskNotifyItem(task *ParserTask) *DownloadTaskUIItem {
 		Status:   "初始化...",
 		Url:      task.Url,
 		TaskID:   len(a.tasks) + 1,
+		State:    DownloadTaskIdle,
 	}
 	a.eventsEmit(TaskNotifyCreate, item)
 	return item
@@ -320,6 +322,8 @@ func (a *App) handleM3U8Task(task *ParserTask, result *ParseResult) (err error) 
 	go func() {
 		defer delete(a.queues, task.Url)
 
+		item.State = DownloadTaskProcessing
+		a.eventsEmit(TaskStatusUpdate, item)
 		// 开始下载
 		a.concurrentLock <- struct{}{}
 		err = queue.StartDownload(task, mpl)
@@ -327,6 +331,7 @@ func (a *App) handleM3U8Task(task *ParserTask, result *ParseResult) (err error) 
 		<-a.concurrentLock
 		if err != nil {
 			item.Status = "下载失败，请检查链接有效性"
+			item.State = DownloadTaskError
 			a.eventsEmit(TaskFinish, item)
 			return
 		}
@@ -339,6 +344,7 @@ func (a *App) handleM3U8Task(task *ParserTask, result *ParseResult) (err error) 
 		output, err := merger.Merge()
 		if err != nil {
 			item.Status = "合并出错，请尝试手动合并"
+			item.State = DownloadTaskError
 			a.eventsEmit(TaskFinish, item)
 			return
 		}
@@ -351,6 +357,7 @@ func (a *App) handleM3U8Task(task *ParserTask, result *ParseResult) (err error) 
 
 		item.Status = "已完成"
 		item.IsDone = true
+		item.State = DownloadTaskDone
 		item.VideoPath = output
 		a.eventsEmit(TaskFinish, item)
 	}()
@@ -372,6 +379,7 @@ func (a *App) handleCommonTask(task *ParserTask, result *ParseResult) (err error
 	item := a.addTaskNotifyItem(task)
 
 	go func() {
+		item.State = DownloadTaskProcessing
 		a.concurrentLock <- struct{}{}
 		q := &CommonDownloader{}
 		a.queues[task.Url] = q

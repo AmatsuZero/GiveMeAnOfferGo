@@ -4,6 +4,13 @@ export class VideoItem {
     headers: string = "";
 }
 
+export enum DownloadTaskState {
+    Done = "finish",
+    Error = "error",
+    Processing = "processing",
+    Idle = "idle"
+}
+
 export class DownloadTask {
     id = "";
     url = "";
@@ -12,7 +19,8 @@ export class DownloadTask {
     status = "";
     videoPath = "";
     isDone = false;
-    TaskID = 0;
+    taskID = 0;
+    state = DownloadTaskState.Idle;
 }
 
 export enum MergeFileType {

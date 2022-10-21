@@ -368,14 +368,24 @@ type CommonDownloader struct {
 	M3U8DownloadQueue
 }
 
+type DownloadTaskState string
+
+const (
+	DownloadTaskProcessing DownloadTaskState = "processing"
+	DownloadTaskError                        = "error"
+	DownloadTaskDone                         = "finish"
+	DownloadTaskIdle                         = "idle"
+)
+
 type DownloadTaskUIItem struct {
-	TaskName  string `json:"taskName"`
-	Time      string `json:"time"`
-	Status    string `json:"status"`
-	Url       string `json:"url"`
-	IsDone    bool   `json:"isDone"`
-	TaskID    int    `json:"taskID"`
-	VideoPath string `json:"videoPath"`
+	TaskName  string            `json:"taskName"`
+	Time      string            `json:"time"`
+	Status    string            `json:"status"`
+	Url       string            `json:"url"`
+	IsDone    bool              `json:"isDone"`
+	TaskID    int               `json:"taskID"`
+	VideoPath string            `json:"videoPath"`
+	State     DownloadTaskState `json:"state"`
 }
 
 func (c *CommonDownloader) StartDownload(config *ParserTask, urls []string) error {

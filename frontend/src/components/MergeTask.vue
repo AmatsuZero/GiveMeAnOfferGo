@@ -114,15 +114,7 @@ function clickPlayMergeMp4() {
 
 }
 
-function clickSelectM3U8() {
-
-}
-
 function clickClearMergeTS() {
-
-}
-
-function dropM3U8File() {
 
 }
 
