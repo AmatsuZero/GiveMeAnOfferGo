@@ -93,7 +93,6 @@ func (c *Cli) parse(cmd *cobra.Command, args []string) error {
 			Prefix:        c.parserTask.Prefix,
 			DelOnComplete: *c.delOnComplete,
 			KeyIV:         c.parserTask.KeyIV,
-			Headers:       nil,
 		})
 	}
 	defer fmt.Println("解析结束")

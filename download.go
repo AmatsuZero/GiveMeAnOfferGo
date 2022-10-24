@@ -385,7 +385,7 @@ func (c *CommonDownloader) StartDownload(config *ParserTask, urls []string) erro
 
 	for idx, u := range urls {
 		req, e := http.NewRequest("GET", u, nil)
-		for k, v := range config.Headers {
+		for k, v := range config.headers {
 			req.Header.Add(k, v)
 		}
 

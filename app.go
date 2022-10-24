@@ -49,10 +49,9 @@ type App struct {
 	sniffer        *Sniffer
 	concurrentLock chan struct{}
 
-	db       *gorm.DB
-	tasks    []*DownloadTaskUIItem
-	tasksIdx map[string]int
-	queues   map[string]StoppableTask
+	db     *gorm.DB
+	tasks  []*DownloadTaskUIItem
+	queues map[string]StoppableTask
 }
 
 // NewApp creates a new App application struct
@@ -193,10 +192,9 @@ func (a *App) handleBilibiliTask(result *ParseResult) error {
 	for _, task := range tasks {
 		go func(t *BilibiliParserTask) {
 			item := &DownloadTaskUIItem{
-				TaskName: t.TaskName,
-				Status:   "初始化...",
-				Url:      t.Url,
-				State:    DownloadTaskProcessing,
+				ParserTask: t.ParserTask,
+				Status:     "初始化...",
+				State:      DownloadTaskProcessing,
 			}
 			a.eventsEmit(TaskNotifyCreate, item)
 

@@ -24,7 +24,7 @@ export namespace main {
 	    prefix: string;
 	    delOnComplete: boolean;
 	    keyIV: string;
-	    headers: {[key: string]: string};
+	    headers: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ParserTask(source);

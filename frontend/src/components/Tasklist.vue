@@ -4,13 +4,14 @@ export default {
 }
 </script>
 <script lang="ts" setup>
-import { Link, CirclePlusFilled, RemoveFilled, Download } from "@element-plus/icons";
+import { Link, CirclePlusFilled, RemoveFilled, Download, ArrowDown, VideoPlay, Stopwatch, FolderOpened, Refresh } from "@element-plus/icons";
 import {EventsEmit, EventsOn} from "../../wailsjs/runtime";
 import {DownloadTask, DownloadTaskState, PlaylistItem} from "../models";
 import {computed, reactive, ref} from "vue";
-import {Open, Play, RemoveTaskNotifyItem, TaskAdd} from "../../wailsjs/go/main/App";
+import {ClearTasks, Open, Play, RemoveTaskNotifyItem, TaskAdd} from "../../wailsjs/go/main/App";
 import {main} from "../../wailsjs/go/models";
 
+let headers = ref('');
 let playlists = ref(Array<PlaylistItem>());
 let playlistUri = ref('');
 let toolTipVisible = ref(false);
@@ -53,7 +54,11 @@ EventsOn("task-notify-update", data => updateTaskItem(data));
 EventsOn("task-notify-end", data => updateTaskItem(data));
 
 function deleteTask(task: DownloadTask) {
-  allVideos.value = allVideos.value.filter(video => video.url !== task.url);
+  const idx = allVideos.value.findIndex(video => video.url === task.url);
+  if (idx === -1) {
+    return;
+  }
+  allVideos.value.splice(idx, 1);
   RemoveTaskNotifyItem(task);
 }
 
@@ -99,7 +104,7 @@ EventsOn("select-variant", (data) => {
   addTaskMessage.value = data["Message"];
 });
 
-EventsOn("task-notify-create", (data, isBatchUpdate: boolean) => {
+EventsOn("task-notify-create", (data) => {
   const item = data as DownloadTask;
   allVideos.value.push(item);
   dlg_newTask_visible.value = false;
@@ -121,22 +126,9 @@ function updateTaskItem(data: any) {
   allVideos.value[idx].state = item.state;
 }
 
-function onHeadersChange(value: string | number) {
-  if (value === undefined || typeof value !== "string") {
-    return;
-  }
-
-  const headers = value.split("\n");
-  const obj = new Map<string, string>();
-  for (const header of headers) {
-    const arr = header.split(":")
-    obj.set(arr[0].trim(), arr[1].trim())
-  }
-  parserTask.headers = Object.fromEntries(obj);
-}
-
 function clickClearTask() {
-  allVideos.value.forEach(video => deleteTask(video))
+  allVideos.value.forEach(video => deleteTask(video));
+  ClearTasks();
 }
 
 function openTask(link: string) {
@@ -149,6 +141,22 @@ function dropM3U8File() {
 
 function clickSelectM3U8() {
 
+}
+
+function handleDownloadTask(ev: any) {
+  if (ev['play'] !== undefined) {
+    playTask(ev['play'] as DownloadTask)
+  } else if (ev['open'] !== undefined) {
+    const item = ev['open'] as DownloadTask;
+    openTask(item.videoPath);
+  } else if (ev['remove'] !== undefined) {
+    deleteTask(ev['remove'] as DownloadTask);
+  } else if (ev['stop'] !== undefined) {
+    stopItem(ev['stop'] as DownloadTask);
+  }
+  // else if (ev['retry'] !== undefined) {
+  //   deleteTask(ev['retry'] as DownloadTask);
+  // }
 }
 
 </script>
@@ -183,16 +191,23 @@ function clickSelectM3U8() {
           <el-input v-model="search" size="small" placeholder="搜索任务" />
         </template>
         <template #default="scope">
-          <el-button size="small"
-                     @click="playTask(scope.row)">
-            播放
-          </el-button>
-          <el-button
-              size="small"
-              type="danger"
-              @click="deleteTask(scope.row)">
-            删除
-          </el-button>
+          <el-dropdown size="small" type="primary" @command="handleDownloadTask">
+          <span class="el-dropdown-link">
+            更多
+            <el-icon class="el-icon--right">
+              <ArrowDown />
+            </el-icon>
+          </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item :icon="FolderOpened" :command="{open: scope.row}">打开</el-dropdown-item>
+                <el-dropdown-item :icon="VideoPlay" :command="{play: scope.row}">播放</el-dropdown-item>
+                <el-dropdown-item :icon="RemoveFilled" :command="{remove: scope.row}">删除</el-dropdown-item>
+                <el-dropdown-item :icon="Stopwatch" :command="{stop: scope.row}">停止</el-dropdown-item>
+                <el-dropdown-item :icon="Refresh" :command="{retry:scope.row}">重试</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </template>
       </el-table-column>
     </el-table>
@@ -243,7 +258,6 @@ function clickSelectM3U8() {
                     placeholder="[可空] 请输入一行一个Header，例如:
                         Origin: http://www.host.com
                         Referer: http://www.host.com"
-                    @change="onHeadersChange"
           />
         </el-form-item>
         <el-form-item label="私有KEY">
@@ -301,4 +315,10 @@ function clickSelectM3U8() {
   --el-table-tr-bg-color: var(--el-color-primary-light-9);
 }
 
+.el-dropdown-link {
+  cursor: pointer;
+  color: var(--el-color-primary);
+  display: flex;
+  align-items: center;
+}
 </style>

@@ -22,3 +22,5 @@ export function TaskAdd(arg1:main.ParserTask):Promise<Error>;
 export function TaskAddMuti(arg1:Array<main.ParserTask>):Promise<Error>;
 
 export function RemoveTaskNotifyItem(arg: DownloadTask): Promise<void>;
+
+export function ClearTasks(): void;

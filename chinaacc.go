@@ -19,7 +19,7 @@ type ChinaAACCParserTask struct {
 }
 
 func (t *ChinaAACCParserTask) getCookies() error {
-	rawCookies, ok := t.Headers["Cookie"]
+	rawCookies, ok := t.headers["Cookie"]
 	if !ok {
 		return errors.New("需要设置Cookie")
 	}

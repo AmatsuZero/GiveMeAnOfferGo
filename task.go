@@ -27,12 +27,13 @@ const (
 )
 
 type ParserTask struct {
-	Url           string            `json:"url"`
+	Url           string            `gorm:"primaryKey json:"url"`
 	TaskName      string            `json:"taskName"`
 	Prefix        string            `json:"prefix"`
 	DelOnComplete bool              `json:"delOnComplete"`
 	KeyIV         string            `json:"keyIV"`
-	Headers       map[string]string `json:"headers"`
+	Headers       string            `json:"headers"`
+	headers       map[string]string `gorm:"-"`
 }
 
 type playListInfo struct {
@@ -62,9 +63,21 @@ type ParseResult struct {
 }
 
 func (t *ParserTask) Parse() (*ParseResult, error) {
-	if t.Headers == nil {
-		t.Headers = make(map[string]string)
+	if t.headers == nil {
+		t.headers = make(map[string]string)
 	}
+
+	if len(t.Headers) > 0 {
+		headers := strings.Split(t.Headers, "\n")
+		for _, header := range headers {
+			arr := strings.Split(header, ":")
+			if len(arr) != 2 {
+				continue
+			}
+			t.headers[strings.TrimSpace(arr[0])] = strings.TrimSpace(arr[1])
+		}
+	}
+
 	u, err := url.Parse(t.Url)
 	if err != nil {
 		return nil, err
@@ -196,18 +209,18 @@ func (t *ParserTask) BuildReq(u string) (*http.Request, error) {
 		return nil, err
 	}
 
-	origin := t.Headers["Origin"]
+	origin := t.headers["Origin"]
 	if len(origin) == 0 {
-		origin = t.Headers["origin"]
+		origin = t.headers["origin"]
 	}
 	if len(origin) == 0 {
 		origin = playlistUrl.Host
 	}
 	req.Header.Set("Origin", origin)
 
-	refer := t.Headers["Referer"]
+	refer := t.headers["Referer"]
 	if len(refer) == 0 {
-		refer = t.Headers["referer"]
+		refer = t.headers["referer"]
 	}
 	if len(refer) == 0 {
 		refer = playlistUrl.Host

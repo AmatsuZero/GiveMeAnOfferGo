@@ -314,7 +314,7 @@ func (r *playUrlResp) parse(t *BilibiliParserTask, title string) (*BilibiliParse
 		OrderDict:  dict,
 	}
 	ret.TaskName = title
-	ret.Headers["Referer"] = "https://www.bilibili.com"
-	ret.Headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36"
+	ret.headers["Referer"] = "https://www.bilibili.com"
+	ret.headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36"
 	return ret, nil
 }

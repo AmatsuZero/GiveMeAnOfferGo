@@ -1,3 +1,6 @@
+import {main} from "../wailsjs/go/models";
+import ParserTask = main.ParserTask;
+
 export class VideoItem {
     url: string = "";
     key: string = "";
@@ -11,9 +14,7 @@ export enum DownloadTaskState {
     Idle = "idle"
 }
 
-export class DownloadTask {
-    url = "";
-    taskName = "";
+export class DownloadTask extends ParserTask {
     time = "";
     status = "";
     videoPath = "";
