@@ -12,14 +12,12 @@ export enum DownloadTaskState {
 }
 
 export class DownloadTask {
-    id = "";
     url = "";
     taskName = "";
     time = "";
     status = "";
     videoPath = "";
     isDone = false;
-    taskID = 0;
     state = DownloadTaskState.Idle;
 }
 

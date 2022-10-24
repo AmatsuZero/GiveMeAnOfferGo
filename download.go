@@ -377,17 +377,6 @@ const (
 	DownloadTaskIdle                         = "idle"
 )
 
-type DownloadTaskUIItem struct {
-	TaskName  string            `json:"taskName"`
-	Time      string            `json:"time"`
-	Status    string            `json:"status"`
-	Url       string            `json:"url"`
-	IsDone    bool              `json:"isDone"`
-	TaskID    int               `json:"taskID"`
-	VideoPath string            `json:"videoPath"`
-	State     DownloadTaskState `json:"state"`
-}
-
 func (c *CommonDownloader) StartDownload(config *ParserTask, urls []string) error {
 	err := c.preDownload(config)
 	if err != nil {

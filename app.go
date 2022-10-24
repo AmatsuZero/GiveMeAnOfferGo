@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/grafov/m3u8"
+	"gorm.io/gorm"
 	"net"
 	"net/http"
 	"os"
@@ -19,24 +20,24 @@ import (
 )
 
 var configFilePath string
+var appFolder string
 
 type AppCtxKey string
 
 func init() {
-	configFilePath, _ = os.UserConfigDir()
-	if len(configFilePath) == 0 {
-		configFilePath = os.Getenv("APPDATA")
+	appFolder, _ = os.UserConfigDir()
+	if len(appFolder) == 0 {
+		appFolder = os.Getenv("APPDATA")
 	}
-	configFilePath = filepath.Join(configFilePath, "M3U8-Downloader-GO")
-
-	if _, err := os.Stat(configFilePath); errors.Is(err, os.ErrNotExist) {
-		err = os.Mkdir(configFilePath, os.ModePerm)
+	appFolder = filepath.Join(appFolder, "M3U8-Downloader-GO")
+	if _, err := os.Stat(appFolder); errors.Is(err, os.ErrNotExist) {
+		err = os.Mkdir(appFolder, os.ModePerm)
 		if err != nil {
 			return
 		}
 	}
 
-	configFilePath = filepath.Join(configFilePath, "config.json")
+	configFilePath = filepath.Join(appFolder, "config.json")
 }
 
 // App struct
@@ -48,8 +49,10 @@ type App struct {
 	sniffer        *Sniffer
 	concurrentLock chan struct{}
 
-	tasks  map[string]*DownloadTaskUIItem
-	queues map[string]StoppableTask
+	db       *gorm.DB
+	tasks    []*DownloadTaskUIItem
+	tasksIdx map[string]int
+	queues   map[string]StoppableTask
 }
 
 // NewApp creates a new App application struct
@@ -92,8 +95,7 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.config = config
 	a.concurrentLock = make(chan struct{}, config.ConCurrentCnt)
-	a.tasks = map[string]*DownloadTaskUIItem{}
-	a.queues = map[string]StoppableTask{}
+	a.initDB()
 }
 
 func (a *App) shutdown(ctx context.Context) {
@@ -102,6 +104,7 @@ func (a *App) shutdown(ctx context.Context) {
 		runtime.LogError(ctx, err.Error())
 	}
 	a.stopTasks()
+	a.saveTracks()
 }
 
 func (a *App) OpenSelectM3U8() (string, error) {
@@ -191,7 +194,6 @@ func (a *App) handleBilibiliTask(result *ParseResult) error {
 		go func(t *BilibiliParserTask) {
 			item := &DownloadTaskUIItem{
 				TaskName: t.TaskName,
-				Time:     time.Now().Format("2006-01-02 15:04:05"),
 				Status:   "初始化...",
 				Url:      t.Url,
 				State:    DownloadTaskProcessing,
@@ -262,42 +264,6 @@ func (a *App) handleM3UTask(result *ParseResult) (err error) {
 		}
 	}
 	return
-}
-
-func (a *App) addTaskNotifyItem(task *ParserTask) *DownloadTaskUIItem {
-	// 先从记录里面查找
-	item, ok := a.tasks[task.Url]
-	if ok {
-		return item
-	}
-
-	// 通知前端任务列表添加任务
-	item = &DownloadTaskUIItem{
-		TaskName: task.TaskName,
-		Time:     time.Now().Format("2006-01-02 15:04:05"),
-		Status:   "初始化...",
-		Url:      task.Url,
-		TaskID:   len(a.tasks) + 1,
-		State:    DownloadTaskIdle,
-	}
-	a.eventsEmit(TaskNotifyCreate, item)
-	return item
-}
-
-func (a *App) RemoveTaskNotifyItem(item *DownloadTaskUIItem) (err error) {
-	if !item.IsDone {
-		task, ok := a.queues[item.Url]
-		if ok {
-			task.Stop()
-		}
-	}
-	if item.IsDone {
-		err = os.Remove(item.VideoPath)
-	} else {
-		err = os.RemoveAll(item.VideoPath)
-	}
-	delete(a.tasks, item.Url)
-	return err
 }
 
 func (a *App) handleM3U8Task(task *ParserTask, result *ParseResult) (err error) {

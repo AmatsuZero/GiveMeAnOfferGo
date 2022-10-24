@@ -99,7 +99,7 @@ EventsOn("select-variant", (data) => {
   addTaskMessage.value = data["Message"];
 });
 
-EventsOn("task-notify-create", data => {
+EventsOn("task-notify-create", (data, isBatchUpdate: boolean) => {
   const item = data as DownloadTask;
   allVideos.value.push(item);
   dlg_newTask_visible.value = false;
@@ -136,7 +136,7 @@ function onHeadersChange(value: string | number) {
 }
 
 function clickClearTask() {
-
+  allVideos.value.forEach(video => deleteTask(video))
 }
 
 function openTask(link: string) {
