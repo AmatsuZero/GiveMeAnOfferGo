@@ -58,6 +58,10 @@ func (a *App) RemoveTaskNotifyItem(item *DownloadTaskUIItem) (err error) {
 }
 
 func (a *App) removeLocalNotifyItem(item *DownloadTaskUIItem) (err error) {
+	// 先看看是否已经下载过是否存在
+	if _, err = os.Stat(item.VideoPath); os.IsNotExist(err) {
+		return nil
+	}
 	if !item.IsDone {
 		task, ok := a.queues[item.Url]
 		if ok {

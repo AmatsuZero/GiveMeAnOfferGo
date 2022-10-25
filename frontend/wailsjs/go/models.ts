@@ -1,4 +1,4 @@
-import {MergeFileType} from "../../src/models";
+import {DownloadTask, MergeFileType} from "../../src/models";
 
 export namespace main {
 	
@@ -39,6 +39,11 @@ export namespace main {
 	        this.keyIV = source["keyIV"];
 	        this.headers = source["headers"];
 	    }
+
+		copy(task: DownloadTask) {
+			this.url = task.url;
+			this.taskName = task.taskName;
+		}
 	}
 
 }

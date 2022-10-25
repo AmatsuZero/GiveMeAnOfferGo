@@ -153,10 +153,11 @@ function handleDownloadTask(ev: any) {
     deleteTask(ev['remove'] as DownloadTask);
   } else if (ev['stop'] !== undefined) {
     stopItem(ev['stop'] as DownloadTask);
+  } else if (ev['retry'] !== undefined) {
+    const item = ev['retry'] as DownloadTask;
+    deleteTask(item);
+    TaskAdd(item);
   }
-  // else if (ev['retry'] !== undefined) {
-  //   deleteTask(ev['retry'] as DownloadTask);
-  // }
 }
 
 </script>
