@@ -101,7 +101,9 @@ func (c *Cli) parse(cmd *cobra.Command, args []string) (err error) {
 		SharedApp.logInfof(item.Status)
 	})
 
-	_ = c.eventBus.Subscribe(SelectVariant, c.selectVariant)
+	_ = c.eventBus.Subscribe(SelectVariant, func(msg *EventMessage) {
+		c.selectVariant(msg)
+	})
 
 	SharedApp.concurrentLock = make(chan struct{}, *c.concurrentCnt)
 	adders := strings.Split(c.parserTask.Url, ",")
@@ -168,7 +170,7 @@ func (c *Cli) MessageDialog(ops runtime.MessageDialogOptions) (string, error) {
 	return result, err
 }
 
-func (c *Cli) selectVariant(msg EventMessage) {
+func (c *Cli) selectVariant(msg *EventMessage) {
 	var labels []string
 
 	for _, info := range msg.Info {
