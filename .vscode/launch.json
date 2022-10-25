@@ -13,15 +13,55 @@
                 "frontenddevserverurl": "http://localhost:3000", 
             },
             "windows": {
-                "program": "${workspaceFolder}/build/bin/m3u8-downloader.exe"
+                "program": "${workspaceFolder}/build/bin/m3u8-downloader.exe",
+                "name": "Launch",
+                "type": "go",
+                "request": "launch"
             },
             "osx": {
                 "program": "${workspaceFolder}/build/bin/m3u8-downloader.app",
                 "env": {
                     "CGO_CFLAGS": "-mmacosx-version-min=10.13",
                     "CGO_LDFLAGS": "-framework UniformTypeIdentifiers -mmacosx-version-min=10.13"
-                }
+                },
+                "name": "Launch",
+                "type": "go",
+                "request": "launch"
             }
-        }
+        },
+        {
+            "name": "Wails: Debug - headless",
+            "type": "go",
+            "request": "launch",
+            "mode": "exec",
+            "preLaunchTask": "build-headless",
+            "cwd": "${workspaceFolder}",
+            "windows": {
+                "program": "${workspaceFolder}/build/bin/m3u8-downloader.exe",
+                "name": "Launch",
+                "type": "go",
+                "request": "launch"
+            },
+            "osx": {
+                "program": "${workspaceFolder}/build/bin/m3u8-downloader.app",
+                "env": {
+                    "CGO_CFLAGS": "-mmacosx-version-min=10.13",
+                    "CGO_LDFLAGS": "-framework UniformTypeIdentifiers -mmacosx-version-min=10.13"
+                },
+                "name": "Launch",
+                "type": "go",
+                "request": "launch",
+            },
+            "linux": {
+                "program": "${workspaceFolder}/build/bin/m3u8-downloader",
+                "name": "Launch",
+                "type": "go",
+                "request": "launch"
+            },
+            "args": [
+                "--headless",
+                "version"
+            ]
+        },
     ]
 }

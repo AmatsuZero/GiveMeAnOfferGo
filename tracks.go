@@ -106,7 +106,9 @@ func (a *App) domReady(ctx context.Context) {
 }
 
 func (a *App) saveTracks() {
-	a.db.Save(a.tasks)
+	if len(a.tasks) > 0 {
+		a.db.Save(a.tasks)
+	}
 }
 
 func (a *App) ClearTasks() {

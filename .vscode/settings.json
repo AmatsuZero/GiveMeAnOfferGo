@@ -1,0 +1,7 @@
+{
+    "go.inferGopath": false,
+    "gopls": {
+        "ui.semanticTokens": true,
+        "formatting.gofumpt": true
+    }
+}

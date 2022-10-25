@@ -58,9 +58,64 @@
                 "build/bin/m3u8-downloader.app"
             ],
             },
+            "linux":{
+                "args": [
+                    "build",
+                    "-tags",
+                    "dev",
+                    "-gcflags",
+                    "all=-N -l",
+                    "-o",
+                    "build/bin/m3u8-downloader"
+                ]
+            },
             "dependsOn": [
                 "npm install",
                 "npm run build"
+            ]
+        },
+        {
+            "label": "build-headless",
+            "type": "shell",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "command": "go",
+            "windows": {
+                "args": [
+                    "build",
+                    "-tags",
+                    "dev",
+                    "-gcflags",
+                    "all=-N -l",
+                    "-o",
+                    "build/bin/m3u8-downloader.exe"
+                ],
+            },
+            "osx": {
+                "args": [
+                    "build",
+                    "-tags",
+                    "dev",
+                    "-gcflags",
+                    "all=-N -l",
+                    "-o",
+                    "build/bin/m3u8-downloader.app"
+                ],
+            },
+            "linux": {
+                "args": [
+                    "build",
+                    "-tags",
+                    "dev",
+                    "-gcflags",
+                    "all=-N -l",
+                    "-o",
+                    "build/bin/m3u8-downloader"
+                ]
+            },
+            "args": [
+                "--headless",
             ]
         }
     ]
