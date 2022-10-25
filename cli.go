@@ -1,16 +1,18 @@
 package main
 
 import (
-	"GiveMeAnOffer/eventbus"
 	"context"
 	"fmt"
-	"github.com/manifoldco/promptui"
-	"github.com/spf13/cobra"
 	"os"
-	"os/signal"
+	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
+	"time"
+
+	"GiveMeAnOffer/eventbus"
+
+	"github.com/manifoldco/promptui"
+	"github.com/spf13/cobra"
 )
 
 type Cli struct {
@@ -44,8 +46,13 @@ func NewCli() *Cli {
 		},
 	}
 
-	base, _ := os.UserHomeDir()
-	rootCmd.PersistentFlags().StringVar(&SharedApp.config.PathDownloader, "downloadDir", filepath.Join(base, "Downloads"), "设置下载文件夹")
+	downloadDir := SharedApp.config.PathDownloader
+	if len(downloadDir) == 0 {
+		base, _ := os.UserHomeDir()
+		downloadDir = filepath.Join(base, "Downloads")
+	}
+
+	rootCmd.PersistentFlags().StringVar(&SharedApp.config.PathDownloader, "downloadDir", downloadDir, "设置下载文件夹")
 	rootCmd.PersistentFlags().Bool("headless", true, "无 UI 启动")
 	cli.concurrentCnt = rootCmd.PersistentFlags().IntP("concurrent", "n", 3, "并发任务下载数量")
 	cli.verbose = rootCmd.PersistentFlags().BoolP("verbose", "v", false, "是否打印日志信息")
@@ -59,7 +66,7 @@ func NewCli() *Cli {
 
 	parseCmd := &cobra.Command{
 		Use:   "parse",
-		Short: "解析并下载 m3u8 文件",
+		Short: "解析并下载 m3u8 文件，按 q 终止",
 		RunE:  cli.parse,
 	}
 
@@ -80,6 +87,7 @@ func NewCli() *Cli {
 }
 
 func (c *Cli) parse(cmd *cobra.Command, args []string) (err error) {
+	SharedApp.logInfof("🐱 下载地址: %v", SharedApp.config.PathDownloader)
 	_ = c.eventBus.Subscribe(TaskStatusUpdate, func(item *DownloadTaskUIItem) {
 		SharedApp.logInfof(item.Status)
 	})
@@ -123,23 +131,13 @@ func (c *Cli) parse(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	s := make(chan os.Signal, 2)
-	signal.Notify(s, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-s
-		fmt.Println("\r- Ctrl+C pressed in Terminal")
-		for _, task := range tasks {
-			c.eventBus.Publish(TaskStop, task.Url)
-		}
-		os.Exit(0)
-	}()
-
+	go c.quitKeyListening(tasks)
 	done := make(chan bool)
 	_ = c.eventBus.Subscribe(TaskFinish, func(item *DownloadTaskUIItem) {
 		if item.State == DownloadTaskError {
 			SharedApp.logError(item.Status)
 		}
-		if item.IsDone {
+		if item.IsDone || item.State == DownloadTaskError {
 			done <- true
 		}
 	})
@@ -162,4 +160,30 @@ func (c *Cli) MessageDialog() (string, error) {
 		Label: "",
 	}
 	return prompt.Run()
+}
+
+func (c *Cli) quitKeyListening(tasks []*ParserTask) {
+	ch := make(chan string)
+	go func(ch chan string) {
+		// disable input buffering
+		exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
+		// do not display entered characters on the screen
+		exec.Command("stty", "-F", "/dev/tty", "-echo").Run()
+		var b []byte = make([]byte, 1)
+		for {
+			os.Stdin.Read(b)
+			ch <- string(b)
+		}
+	}(ch)
+
+	for {
+		stdin := <-ch
+		if stdin == "q" {
+			for _, task := range tasks {
+				c.eventBus.Publish(TaskStop, task.Url)
+			}
+			break
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
 }
