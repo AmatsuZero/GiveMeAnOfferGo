@@ -4,9 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/avast/retry-go"
-	"github.com/flytam/filenamify"
-	"github.com/grafov/m3u8"
 	"io"
 	"net/http"
 	"os"
@@ -16,6 +13,10 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/avast/retry-go"
+	"github.com/flytam/filenamify"
+	"github.com/grafov/m3u8"
 )
 
 type StoppableTask interface {
@@ -52,9 +53,9 @@ func (t *DownloadTask) Read(p []byte) (n int, err error) {
 	t.Current += int64(n)
 	//runtime.LogPrint(SharedApp.ctx, fmt.Sprintf("开始下载: %v", t.Req.URL.String()))
 	//runtime.logInfof(SharedApp.ctx, "\r正在下载，下载进度：%.2f%%", float64(t.Current*10000/t.Total)/100)
-	if t.Current == t.Total {
-		//runtime.logInfof(SharedApp.ctx, "\r下载完成，下载进度：%.2f%%", float64(t.Current*10000/t.Total)/100)
-	}
+	// if t.Current == t.Total {
+	//runtime.logInfof(SharedApp.ctx, "\r下载完成，下载进度：%.2f%%", float64(t.Current*10000/t.Total)/100)
+	// }
 	return
 }
 
@@ -153,9 +154,7 @@ func (t *DownloadTask) Stop() {
 type M3U8DownloadQueue struct {
 	tasks         []*DownloadTask
 	TotalDuration float64
-	ctx           context.Context
 	DownloadDir   string
-	keys          map[string][]byte
 	tasksSet      map[uint64]bool
 	concurrentCnt int
 	NotifyItem    *DownloadTaskUIItem
@@ -199,6 +198,10 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 			}
 
 			decrypt, err := NewCipherFromKey(config, seg.Key, queryKey, setKey)
+			if err != nil {
+				SharedApp.logErrorf("生成解密结构体出错：%v", err)
+				continue
+			}
 			if decrypt != nil {
 				task.decrypt = decrypt
 				if cipher == nil {
@@ -372,9 +375,9 @@ type DownloadTaskState string
 
 const (
 	DownloadTaskProcessing DownloadTaskState = "processing"
-	DownloadTaskError                        = "error"
-	DownloadTaskDone                         = "finish"
-	DownloadTaskIdle                         = "idle"
+	DownloadTaskError      DownloadTaskState = "error"
+	DownloadTaskDone       DownloadTaskState = "finish"
+	DownloadTaskIdle       DownloadTaskState = "idle"
 )
 
 func (c *CommonDownloader) StartDownload(config *ParserTask, urls []string) error {

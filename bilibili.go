@@ -4,10 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/url"
-	"os"
 	"path"
-	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -80,57 +77,6 @@ type playUrlResp struct {
 			BackupUrl    []string `json:"backup_url"`
 		}
 	}
-}
-
-func (r *playUrlResp) download(t *ParserTask, title string) error {
-
-	downloader := &CommonDownloader{}
-	dict := map[string]int64{}
-	var list []string
-
-	for _, item := range r.Data.Durl {
-		list = append(list, item.Url)
-		dict[path.Base(item.Url)] = item.Order
-	}
-
-	err := downloader.StartDownload(t, list)
-	if err != nil {
-		return err
-	}
-
-	// 遍历下载文件夹，调整顺序
-	files, err := os.ReadDir(downloader.DownloadDir)
-	var fileList []string
-	if err != nil {
-		return err
-	}
-
-	for _, f := range files {
-		fileList = append(fileList, filepath.Join(downloader.DownloadDir, f.Name()))
-	}
-
-	sort.Slice(fileList, func(i, j int) bool {
-		lhs, rhs := path.Base(fileList[i]), path.Base(fileList[j])
-		return dict[lhs] < dict[rhs]
-	})
-
-	merger := &MergeFilesConfig{
-		Files:     fileList,
-		TsName:    title,
-		MergeType: MergeTypeSpeed,
-	}
-
-	_, err = merger.Merge()
-	if err != nil {
-		return err
-	}
-
-	if t.DelOnComplete {
-		err = os.RemoveAll(downloader.DownloadDir)
-		SharedApp.logInfo("临时文件删除完成")
-	}
-
-	return err
 }
 
 type supportFormat struct {

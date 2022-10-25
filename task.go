@@ -4,9 +4,6 @@ import (
 	"bufio"
 	"crypto/tls"
 	"crypto/x509"
-	"github.com/grafov/m3u8"
-	"github.com/jamesnetherton/m3u"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"io"
 	"net/http"
 	"net/url"
@@ -14,6 +11,10 @@ import (
 	"path"
 	"strconv"
 	"strings"
+
+	"github.com/grafov/m3u8"
+	"github.com/jamesnetherton/m3u"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 const (
@@ -27,7 +28,7 @@ const (
 )
 
 type ParserTask struct {
-	Url           string            `gorm:"primaryKey json:"url"`
+	Url           string            `gorm:"primaryKey" json:"url"`
 	TaskName      string            `json:"taskName"`
 	Prefix        string            `json:"prefix"`
 	DelOnComplete bool              `json:"delOnComplete"`

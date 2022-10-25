@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
-	"golang.org/x/exp/slices"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 	"os"
 	"path/filepath"
 	"time"
+
+	"golang.org/x/exp/slices"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 type DownloadTaskUIItem struct {
@@ -46,7 +47,7 @@ func (a *App) RemoveTaskNotifyItem(item *DownloadTaskUIItem) (err error) {
 	if err != nil {
 		return err
 	}
-	idx := slices.IndexFunc[*DownloadTaskUIItem](a.tasks, func(ele *DownloadTaskUIItem) bool {
+	idx := slices.IndexFunc(a.tasks, func(ele *DownloadTaskUIItem) bool {
 		return ele.Url == item.Url
 	})
 	if idx == -1 {

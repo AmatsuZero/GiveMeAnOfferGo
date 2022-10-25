@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/grafov/m3u8"
-	"gorm.io/gorm"
 	"net"
 	"net/http"
 	"os"
@@ -14,6 +12,9 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/grafov/m3u8"
+	"gorm.io/gorm"
 
 	"github.com/skratchdot/open-golang/open"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -241,7 +242,11 @@ func (a *App) handleBilibiliTask(result *ParseResult) error {
 
 			if t.DelOnComplete {
 				err = os.RemoveAll(downloader.DownloadDir)
-				SharedApp.logInfo("临时文件删除完成")
+				if err != nil {
+					SharedApp.logErrorf("临时文件删除失败：%v", err)
+				} else {
+					SharedApp.logInfo("临时文件删除完成")
+				}
 			}
 
 			item.Status = "已完成"
@@ -275,7 +280,7 @@ func (a *App) handleM3U8Task(task *ParserTask, result *ParseResult) (err error) 
 	info, cnt := "", mpl.Count()
 	if mpl.Closed {
 		d := time.Unix(int64(queue.TotalDuration), 0).Format("15:07:51")
-		info = fmt.Sprintf("点播资源解析成功，有%v个片段，时长：%v，即将开始缓存...", cnt, d)
+		info = fmt.Sprintf("点播资源解析成功，有%v个片段, 时长：%v, 即将开始缓存...", cnt, d)
 	} else {
 		info = "直播资源解析成功，即将开始缓存..."
 	}
@@ -316,7 +321,11 @@ func (a *App) handleM3U8Task(task *ParserTask, result *ParseResult) (err error) 
 		a.logInfo("切片合并完成")
 		if task.DelOnComplete {
 			err = os.RemoveAll(queue.DownloadDir)
-			a.logInfo("切片删除完成")
+			if err != nil {
+				a.logErrorf("切片删除失败: %v", err)
+			} else {
+				a.logInfo("切片删除完成")
+			}
 		}
 
 		item.Status = "已完成"
