@@ -12,6 +12,7 @@ import {ClearTasks, Open, Play, RemoveTaskNotifyItem, TaskAdd} from "../../wails
 import {main} from "../../wailsjs/go/models";
 
 let headers = ref('');
+let promptMsg = ref('* 画质');
 let playlists = ref(Array<PlaylistItem>());
 let playlistUri = ref('');
 let toolTipVisible = ref(false);
@@ -101,8 +102,12 @@ function clickNewTaskOK() {
 }
 
 EventsOn("select-variant", (data) => {
-  playlists.value = data["Info"];
-  addTaskMessage.value = data["Message"];
+  playlists.value = data["info"];
+  addTaskMessage.value = data["message"];
+  const title = data['title'];
+  if (title !== undefined && title.length > 0) {
+    promptMsg.value = title;
+  }
 });
 
 EventsOn("task-notify-create", (data) => {
@@ -237,7 +242,7 @@ function handleDownloadTask(ev: any) {
             </el-input>
           </div>
         </el-form-item>
-        <el-form-item v-if="playlists.length > 0" label="* 画质">
+        <el-form-item v-if="playlists.length > 0" :label="promptMsg">
           <el-select v-model="playlistUri"
                      placeholder="选择视频源"
                      style="width: 100%;"

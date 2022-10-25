@@ -46,6 +46,7 @@ type EventMessage struct {
 	Code    int             `json:"code"`
 	Message string          `json:"message"`
 	Info    []*playListInfo `json:"info"`
+	Title   string          `json:"title"`
 }
 
 type TaskType int
@@ -234,9 +235,10 @@ func (t *ParserTask) BuildReq(u string) (*http.Request, error) {
 
 func (t *ParserTask) selectVariant(l *m3u8.MasterPlaylist) (*ParseResult, error) {
 	// 等待前端选择
-	msg := EventMessage{
+	msg := &EventMessage{
 		Code:    1,
-		Message: "",
+		Message: "请选择一种画质",
+		Title:   "* 画质",
 	}
 
 	for i, variant := range l.Variants {
@@ -304,6 +306,7 @@ func (t *ParserTask) handleFor509Error(err error) (m3u8.Playlist, m3u8.ListType,
 		Title:         "遇到证书错误",
 		Message:       "是否忽略?",
 		DefaultButton: "No",
+		Buttons:       []string{"Yes", "No"},
 	})
 	if err != nil || result == "No" {
 		return nil, 0, err

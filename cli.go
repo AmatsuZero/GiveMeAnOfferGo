@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -100,6 +101,8 @@ func (c *Cli) parse(cmd *cobra.Command, args []string) (err error) {
 		SharedApp.logInfof(item.Status)
 	})
 
+	_ = c.eventBus.Subscribe(SelectVariant, c.selectVariant)
+
 	SharedApp.concurrentLock = make(chan struct{}, *c.concurrentCnt)
 	adders := strings.Split(c.parserTask.Url, ",")
 	if len(adders) == 0 {
@@ -155,11 +158,35 @@ func (c *Cli) Execute() error {
 	return c.rootCmd.Execute()
 }
 
-func (c *Cli) MessageDialog() (string, error) {
-	prompt := promptui.Prompt{
-		Label: "",
+func (c *Cli) MessageDialog(ops runtime.MessageDialogOptions) (string, error) {
+	prompt := promptui.Select{
+		Label: ops.Title,
+		Items: ops.Buttons,
 	}
-	return prompt.Run()
+
+	_, result, err := prompt.Run()
+	return result, err
+}
+
+func (c *Cli) selectVariant(msg EventMessage) {
+	var labels []string
+
+	for _, info := range msg.Info {
+		labels = append(labels, info.Desc)
+	}
+
+	prompt := promptui.Select{
+		Label: "请选择",
+		Items: labels,
+	}
+
+	i, _, err := prompt.Run()
+	if err != nil {
+		SharedApp.logError(err.Error())
+		return
+	}
+
+	c.eventBus.Publish(OnVariantSelected, msg.Info[i].Uri)
 }
 
 func (c *Cli) quitKeyListening(tasks []*ParserTask) {

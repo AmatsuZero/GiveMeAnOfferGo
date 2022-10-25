@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -264,13 +265,30 @@ func (a *App) handleBilibiliTask(result *ParseResult) error {
 
 func (a *App) handleM3UTask(result *ParseResult) (err error) {
 	tasks := result.Data.([]*ParserTask)
-	for _, task := range tasks {
-		err = a.TaskAdd(task)
-		if err != nil {
-			a.logErrorf("m3u 列表任务下载失败，链接：%v", task.Url)
-		}
+	ch := make(chan int)
+
+	msg := &EventMessage{
+		Code:    1,
+		Message: "请选择要下载的链接",
+		Title:   "* 片源",
 	}
-	return
+
+	for i, task := range tasks {
+		msg.Info = append(msg.Info, &playListInfo{
+			Desc: task.TaskName,
+			Uri:  strconv.Itoa(i),
+		})
+	}
+
+	SharedApp.eventsEmit(SelectVariant, msg)
+	SharedApp.eventsOnce(OnVariantSelected, func(optionalData ...interface{}) {
+		res := optionalData[0].(string)
+		i, _ := strconv.Atoi(res)
+		ch <- i
+	})
+
+	idx := <-ch
+	return a.TaskAdd(tasks[idx])
 }
 
 func (a *App) handleM3U8Task(task *ParserTask, result *ParseResult) (err error) {
