@@ -433,7 +433,7 @@ func (a *App) eventsEmit(eventName string, optionalData ...interface{}) {
 func (a *App) eventsOnce(eventName string, callback func(optionalData ...interface{})) {
 	cli := a.getCli()
 	if cli != nil {
-		cli.eventBus.Subscribe(eventName, callback)
+		_ = cli.eventBus.Subscribe(eventName, callback)
 	} else {
 		runtime.EventsOnce(a.ctx, eventName, callback)
 	}
@@ -449,7 +449,7 @@ func (a *App) messageDialog(dialogOptions runtime.MessageDialogOptions) (string,
 func (a *App) eventsOn(eventName string, callback func(optionalData ...interface{})) {
 	cli := a.getCli()
 	if cli != nil {
-		cli.eventBus.Subscribe(eventName, callback)
+		_ = cli.eventBus.Subscribe(eventName, callback)
 	} else {
 		runtime.EventsOn(a.ctx, eventName, callback)
 	}

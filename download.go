@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -160,6 +161,30 @@ type M3U8DownloadQueue struct {
 	NotifyItem    *DownloadTaskUIItem
 }
 
+func isContextCancelError(e error) bool {
+	_, ok := e.(retry.Error)
+	if !ok {
+		return false
+	}
+
+	retryError := e.(retry.Error)
+	if len(retryError) == 0 {
+		return false
+	}
+
+	e = retryError[0]
+
+	if errors.Is(e, context.Canceled) {
+		return true
+	}
+
+	err, ok := e.(*url.Error)
+	if !ok {
+		return false
+	}
+	return errors.Is(err, context.Canceled)
+}
+
 func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.MediaPlaylist) error {
 	q.tasks = nil
 
@@ -245,8 +270,11 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 		go func(t *DownloadTask) {
 			err = t.Start(wg)
 			if err != nil { // 出现了错误，直接停掉其他任务，结束
-				SharedApp.logError(err.Error())
-				q.Stop()
+				e, ok := err.(retry.Error)
+				if !ok || !isContextCancelError(e) {
+					SharedApp.logError(err.Error())
+					q.Stop()
+				}
 			} else {
 				if list.Closed { // 仅 vod 更新下载切片进度
 					atomic.AddUint64(&ops, 1)
@@ -296,7 +324,7 @@ func (q *M3U8DownloadQueue) startDownloadLive(config *ParserTask, list *m3u8.Med
 	// 直播链接就是不停的分段下载
 	for !(shouldStop || list.Closed) {
 		err := q.startDownloadVOD(config, list)
-		if err != nil {
+		if err != nil && !isContextCancelError(err) {
 			return err
 		}
 		needWait := len(q.tasks) == 0

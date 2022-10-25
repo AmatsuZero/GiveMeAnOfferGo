@@ -3,7 +3,6 @@ package main
 import (
 	"GiveMeAnOffer/eventbus"
 	"context"
-	"errors"
 	"fmt"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
@@ -81,15 +80,15 @@ func NewCli() *Cli {
 }
 
 func (c *Cli) parse(cmd *cobra.Command, args []string) (err error) {
-	c.eventBus.Subscribe(TaskStatusUpdate, func(item *DownloadTaskUIItem) {
+	_ = c.eventBus.Subscribe(TaskStatusUpdate, func(item *DownloadTaskUIItem) {
 		SharedApp.logInfof(item.Status)
 	})
 
-	c.eventBus.Subscribe(TaskNotifyCreate, func(item *DownloadTaskUIItem) {
+	_ = c.eventBus.Subscribe(TaskNotifyCreate, func(item *DownloadTaskUIItem) {
 		SharedApp.logInfof(item.Status)
 	})
 
-	c.eventBus.Subscribe(TaskAddEvent, func(item *DownloadTaskUIItem) {
+	_ = c.eventBus.Subscribe(TaskAddEvent, func(item *DownloadTaskUIItem) {
 		SharedApp.logInfof(item.Status)
 	})
 
@@ -136,11 +135,13 @@ func (c *Cli) parse(cmd *cobra.Command, args []string) (err error) {
 	}()
 
 	done := make(chan bool)
-	c.eventBus.Subscribe(TaskFinish, func(item *DownloadTaskUIItem) {
+	_ = c.eventBus.Subscribe(TaskFinish, func(item *DownloadTaskUIItem) {
 		if item.State == DownloadTaskError {
-			err = errors.New(item.Status)
+			SharedApp.logError(item.Status)
 		}
-		done <- true
+		if item.IsDone {
+			done <- true
+		}
 	})
 
 	<-done
