@@ -1,15 +1,17 @@
 package main
 
 import (
+	"GiveMeAnOffer/eventbus"
 	"context"
+	"errors"
 	"fmt"
+	"github.com/manifoldco/promptui"
+	"github.com/spf13/cobra"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
-
-	"github.com/manifoldco/promptui"
-
-	"github.com/spf13/cobra"
+	"syscall"
 )
 
 type Cli struct {
@@ -19,13 +21,17 @@ type Cli struct {
 	verbose       *bool
 	concurrentCnt *int
 	ctx           context.Context
+	eventBus      *eventbus.AsyncEventBus
 }
 
 const CliKey AppCtxKey = "cli"
 
 func NewCli() *Cli {
 	ctx := context.Background()
-	cli := &Cli{ctx: ctx}
+	cli := &Cli{
+		ctx:      ctx,
+		eventBus: eventbus.NewAsyncEventBus(),
+	}
 
 	ctx = context.WithValue(ctx, CliKey, cli)
 	SharedApp.startup(ctx)
@@ -74,7 +80,19 @@ func NewCli() *Cli {
 	return cli
 }
 
-func (c *Cli) parse(cmd *cobra.Command, args []string) error {
+func (c *Cli) parse(cmd *cobra.Command, args []string) (err error) {
+	c.eventBus.Subscribe(TaskStatusUpdate, func(item *DownloadTaskUIItem) {
+		SharedApp.logInfof(item.Status)
+	})
+
+	c.eventBus.Subscribe(TaskNotifyCreate, func(item *DownloadTaskUIItem) {
+		SharedApp.logInfof(item.Status)
+	})
+
+	c.eventBus.Subscribe(TaskAddEvent, func(item *DownloadTaskUIItem) {
+		SharedApp.logInfof(item.Status)
+	})
+
 	SharedApp.concurrentLock = make(chan struct{}, *c.concurrentCnt)
 	adders := strings.Split(c.parserTask.Url, ",")
 	if len(adders) == 0 {
@@ -97,9 +115,36 @@ func (c *Cli) parse(cmd *cobra.Command, args []string) error {
 	}
 	defer fmt.Println("解析结束")
 	if len(tasks) == 1 {
-		return SharedApp.TaskAdd(tasks[0])
+		err = SharedApp.TaskAdd(tasks[0])
+	} else {
+		err = SharedApp.TaskAddMuti(tasks)
 	}
-	return SharedApp.TaskAddMuti(tasks)
+
+	if err != nil {
+		return err
+	}
+
+	s := make(chan os.Signal, 2)
+	signal.Notify(s, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-s
+		fmt.Println("\r- Ctrl+C pressed in Terminal")
+		for _, task := range tasks {
+			c.eventBus.Publish(TaskStop, task.Url)
+		}
+		os.Exit(0)
+	}()
+
+	done := make(chan bool)
+	c.eventBus.Subscribe(TaskFinish, func(item *DownloadTaskUIItem) {
+		if item.State == DownloadTaskError {
+			err = errors.New(item.Status)
+		}
+		done <- true
+	})
+
+	<-done
+	return
 }
 
 func (c *Cli) printVersion(cmd *cobra.Command, args []string) {
@@ -115,6 +160,5 @@ func (c *Cli) MessageDialog() (string, error) {
 	prompt := promptui.Prompt{
 		Label: "",
 	}
-
 	return prompt.Run()
 }

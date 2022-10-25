@@ -26,6 +26,10 @@ func (a *App) addTaskNotifyItem(task *ParserTask) *DownloadTaskUIItem {
 	// 先从记录里面查找
 	for _, t := range a.tasks {
 		if t.Url == task.Url {
+			a.eventsEmit(TaskAddEvent, EventMessage{
+				Code:    -1,
+				Message: "任务已经存在",
+			})
 			return t
 		}
 	}

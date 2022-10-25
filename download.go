@@ -281,7 +281,7 @@ func (q *M3U8DownloadQueue) startDownloadLive(config *ParserTask, list *m3u8.Med
 	shouldStop := false
 	var tasks []*DownloadTask
 
-	SharedApp.eventsOn(StopLiveStreamDownload, func(optionalData ...interface{}) { // 收到停止直播下载的通知
+	SharedApp.eventsOn(TaskStop, func(optionalData ...interface{}) { // 收到停止直播下载的通知
 		u := optionalData[0].(string)
 		if u != config.Url { // 只停止自己的任务
 			return

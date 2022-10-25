@@ -54,6 +54,7 @@ EventsOn("task-notify-update", data => updateTaskItem(data));
 EventsOn("task-notify-end", data => updateTaskItem(data));
 
 function deleteTask(task: DownloadTask) {
+  stopItem(task);
   const idx = allVideos.value.findIndex(video => video.url === task.url);
   if (idx === -1) {
     return;
@@ -68,7 +69,7 @@ function playTask(task: DownloadTask) {
 }
 
 function stopItem(task: DownloadTask) {
-  EventsEmit('stop-live-stream-download', task.url);
+  EventsEmit('task-stop', task.url);
 }
 
 function m3u8UrlChange() {
@@ -108,6 +109,13 @@ EventsOn("task-notify-create", (data) => {
   const item = data as DownloadTask;
   allVideos.value.push(item);
   dlg_newTask_visible.value = false;
+});
+
+EventsOn('task-add-reply', (message) => {
+  const code = message['code'];
+  if (code === -1) {
+    addTaskMessage.value = message['message'];
+  }
 });
 
 EventsOn("task-notify-update", data => updateTaskItem(data));

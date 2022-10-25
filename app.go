@@ -205,6 +205,7 @@ func (a *App) handleBilibiliTask(result *ParseResult) error {
 
 			if err != nil {
 				item.Status = "下载失败，请检查链接有效性"
+				item.State = DownloadTaskError
 				a.eventsEmit(TaskFinish, item)
 				return
 			}
@@ -214,6 +215,7 @@ func (a *App) handleBilibiliTask(result *ParseResult) error {
 			var fileList []string
 			if err != nil {
 				item.Status = "读取文件夹失败"
+				item.State = DownloadTaskError
 				a.eventsEmit(TaskFinish, item)
 				return
 			}
@@ -236,6 +238,7 @@ func (a *App) handleBilibiliTask(result *ParseResult) error {
 			output, err := merger.Merge()
 			if err != nil {
 				item.Status = "合并出错，请尝试手动合并"
+				item.State = DownloadTaskError
 				a.eventsEmit(TaskFinish, item)
 				return
 			}
@@ -252,6 +255,7 @@ func (a *App) handleBilibiliTask(result *ParseResult) error {
 			item.Status = "已完成"
 			item.IsDone = true
 			item.VideoPath = output
+			item.State = DownloadTaskDone
 			a.eventsEmit(TaskFinish, item)
 		}(task)
 	}
@@ -404,6 +408,11 @@ func (a *App) Play(file string) error {
 	return err
 }
 
+func (a *App) isCliMode() bool {
+	cli := a.getCli()
+	return cli != nil
+}
+
 func (a *App) getCli() *Cli {
 	val := a.ctx.Value(CliKey)
 	if val == nil {
@@ -415,22 +424,23 @@ func (a *App) getCli() *Cli {
 func (a *App) eventsEmit(eventName string, optionalData ...interface{}) {
 	cli := a.getCli()
 	if cli != nil {
-		return
+		cli.eventBus.Publish(eventName, optionalData...)
+	} else {
+		runtime.EventsEmit(a.ctx, eventName, optionalData...)
 	}
-	runtime.EventsEmit(a.ctx, eventName, optionalData...)
 }
 
 func (a *App) eventsOnce(eventName string, callback func(optionalData ...interface{})) {
 	cli := a.getCli()
 	if cli != nil {
-		return
+		cli.eventBus.Subscribe(eventName, callback)
+	} else {
+		runtime.EventsOnce(a.ctx, eventName, callback)
 	}
-	runtime.EventsOnce(a.ctx, eventName, callback)
 }
 
 func (a *App) messageDialog(dialogOptions runtime.MessageDialogOptions) (string, error) {
-	cli := a.ctx.Value(CliKey).(*Cli)
-	if cli != nil {
+	if a.isCliMode() {
 		return "", nil
 	}
 	return runtime.MessageDialog(a.ctx, dialogOptions)
@@ -439,9 +449,10 @@ func (a *App) messageDialog(dialogOptions runtime.MessageDialogOptions) (string,
 func (a *App) eventsOn(eventName string, callback func(optionalData ...interface{})) {
 	cli := a.getCli()
 	if cli != nil {
-		return
+		cli.eventBus.Subscribe(eventName, callback)
+	} else {
+		runtime.EventsOn(a.ctx, eventName, callback)
 	}
-	runtime.EventsOn(a.ctx, eventName, callback)
 }
 
 func (a *App) logInfof(format string, args ...interface{}) {
@@ -467,8 +478,7 @@ func (a *App) logInfo(message string) {
 }
 
 func (a *App) logError(message string) {
-	cli := a.getCli()
-	if cli != nil {
+	if a.isCliMode() {
 		fmt.Println("ERR | " + message)
 	} else {
 		runtime.LogError(a.ctx, message)
@@ -476,8 +486,7 @@ func (a *App) logError(message string) {
 }
 
 func (a *App) logErrorf(format string, args ...interface{}) {
-	cli := a.getCli()
-	if cli != nil {
+	if a.isCliMode() {
 		fmt.Printf("ERR | "+format+"\n", args...)
 	} else {
 		runtime.LogErrorf(a.ctx, format, args...)

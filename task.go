@@ -18,13 +18,13 @@ import (
 )
 
 const (
-	TaskAddEvent           = "task-add-reply"
-	SelectVariant          = "select-variant"
-	OnVariantSelected      = "variant-selected"
-	TaskNotifyCreate       = "task-notify-create"
-	StopLiveStreamDownload = "stop-live-stream-download"
-	TaskStatusUpdate       = "task-notify-update"
-	TaskFinish             = "task-notify-end"
+	TaskAddEvent      = "task-add-reply"
+	SelectVariant     = "select-variant"
+	OnVariantSelected = "variant-selected"
+	TaskNotifyCreate  = "task-notify-create"
+	TaskStop          = "task-stop"
+	TaskStatusUpdate  = "task-notify-update"
+	TaskFinish        = "task-notify-end"
 )
 
 type ParserTask struct {
@@ -43,9 +43,9 @@ type playListInfo struct {
 }
 
 type EventMessage struct {
-	Code    int
-	Message string
-	Info    []*playListInfo
+	Code    int             `json:"code"`
+	Message string          `json:"message"`
+	Info    []*playListInfo `json:"info"`
 }
 
 type TaskType int
