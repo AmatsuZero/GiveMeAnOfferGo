@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/flytam/filenamify"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,8 +11,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	"github.com/flytam/filenamify"
 )
 
 type MergeType string
@@ -25,6 +24,7 @@ type MergeFilesConfig struct {
 	Files     []string  `json:"files"`
 	MergeType MergeType `json:"mergeType"` // speed: 快速合并 / transcoding：修复合并(慢|转码)
 	TsName    string    `json:"taskName"`
+	Output    string    `json:"output"`
 }
 
 func NewMergeConfigFromDownloadQueue(q *M3U8DownloadQueue, fileName string) *MergeFilesConfig {
@@ -103,12 +103,16 @@ func (c *MergeFilesConfig) Merge() (string, error) {
 		break
 	}
 
-	output := fileName
+	output := c.Output
 	if len(output) == 0 {
-		output = fmt.Sprintf("%v", time.Now().Unix())
+		if len(fileName) > 0 {
+			output = fileName
+		} else {
+			output = fmt.Sprintf("%v", time.Now().Unix())
+		}
+		output = filepath.Join(SharedApp.config.PathDownloader, output+".mp4")
 	}
 
-	output = filepath.Join(SharedApp.config.PathDownloader, output+".mp4")
 	cmdStr := fmt.Sprintf("ffmpeg -loglevel quiet -f concat -safe 0 -i %v -vcodec %v -acodec %v", f.Name(), videoCodec, audioCodec)
 	args := strings.Split(cmdStr, " ")
 	if runtime.GOOS == "linux" { // FIX：linux 主机合并失败

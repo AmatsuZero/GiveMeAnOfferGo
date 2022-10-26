@@ -143,7 +143,7 @@ func (a *App) OpenSelectTsDir(dir string) ([]string, error) {
 	})
 }
 
-func (a *App) StartMergeTs(config MergeFilesConfig) error {
+func (a *App) StartMergeTs(config *MergeFilesConfig) error {
 	_, e := config.Merge()
 	return e
 }
