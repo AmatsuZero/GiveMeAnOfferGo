@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"os"
@@ -81,10 +80,15 @@ func (c *Cli) addParseCmd() *Cli {
 	parseCmd := &cobra.Command{
 		Use:   "parse",
 		Short: "解析并下载 m3u8 文件，按 q 终止",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Run: func(cmd *cobra.Command, args []string) {
 			SharedApp.concurrentLock = make(chan struct{}, *concurrentCnt)
 			parserTask.DelOnComplete = *delOnComplete
-			return c.parse(parserTask)
+			e := c.parse(parserTask)
+			if e != nil {
+				SharedApp.logErrorf("解析失败: %v", e)
+			} else {
+				fmt.Println("解析结束")
+			}
 		},
 	}
 
@@ -109,13 +113,14 @@ func (c *Cli) addMergeFileCmd() *Cli {
 	mergeFileCmd := &cobra.Command{
 		Use:   "merge",
 		Short: "合并 ts 文件",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Run: func(cmd *cobra.Command, args []string) {
 			if len(files) > 0 {
 				config.Files = strings.Split(files, ",")
 			} else if len(dir) > 0 {
 				tsFiles, err := os.ReadDir(dir)
 				if err != nil {
-					return err
+					SharedApp.logErrorf("读取文件夹失败: %v", err)
+					return
 				}
 				fileList := make([]string, 0, len(tsFiles))
 				// 文件名排序
@@ -127,14 +132,15 @@ func (c *Cli) addMergeFileCmd() *Cli {
 				}
 				config.Files = fileList
 			} else {
-				return errors.New("必须指定要合并的文件或文件夹")
+				SharedApp.logError("必须指定要合并的文件或文件夹")
+				return
 			}
 			e := SharedApp.StartMergeTs(config)
 			if e != nil {
-				return e
+				SharedApp.logErrorf("合并失败：%v", e)
+			} else {
+				fmt.Println("合并结束")
 			}
-			fmt.Println("合并结束")
-			return nil
 		},
 	}
 
@@ -186,7 +192,7 @@ func (c *Cli) parse(task *ParserTask) (err error) {
 			KeyIV:         task.KeyIV,
 		})
 	}
-	defer fmt.Println("解析结束")
+
 	if len(tasks) == 1 {
 		err = SharedApp.TaskAdd(tasks[0])
 	} else {
