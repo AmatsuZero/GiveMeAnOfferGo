@@ -96,9 +96,9 @@ func (c *Cli) addParseCmd() *Cli {
 	_ = parseCmd.MarkFlagRequired("url")
 
 	delOnComplete = parseCmd.Flags().BoolP("delOnComplete", "d", true, "合并完成后是否删除 ts 文件")
-	parseCmd.PersistentFlags().StringVar(&parserTask.KeyIV, "keyIV", "", "设置自定义密钥")
-	parseCmd.PersistentFlags().StringVar(&parserTask.Prefix, "prefix", "", "设置前缀")
-	parseCmd.PersistentFlags().StringVar(&parserTask.TaskName, "name", "", "输入文件名")
+	parseCmd.PersistentFlags().StringVarP(&parserTask.KeyIV, "keyIV", "k", "", "设置自定义密钥")
+	parseCmd.PersistentFlags().StringVarP(&parserTask.Prefix, "prefix", "p", "", "设置前缀")
+	parseCmd.PersistentFlags().StringVarP(&parserTask.TaskName, "name", "n", "", "输入文件名")
 	concurrentCnt = parseCmd.PersistentFlags().IntP("concurrent", "n", 3, "并发任务下载数量")
 
 	c.rootCmd.AddCommand(parseCmd)
