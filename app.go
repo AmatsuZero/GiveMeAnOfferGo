@@ -310,6 +310,18 @@ func (a *App) handleM3U8Task(task *ParserTask, result *ParseResult) (err error) 
 	item.Status = info
 	a.eventsEmit(TaskStatusUpdate, item)
 
+	shouldStop := false
+	a.eventsOn(TaskStop, func(optionalData ...interface{}) {
+		u := optionalData[0].(string)
+		if u != task.Url { // 只停止自己的任务
+			return
+		}
+		queue.Stop()
+		shouldStop = true
+		item.Status = "任务停止中..."
+		a.eventsEmit(TaskFinish, item)
+	})
+
 	go func() {
 		defer delete(a.queues, task.Url)
 
@@ -320,7 +332,12 @@ func (a *App) handleM3U8Task(task *ParserTask, result *ParseResult) (err error) 
 		err = queue.StartDownload(task, mpl)
 		// 下载完毕，释放资源
 		<-a.concurrentLock
-		if err != nil {
+		if shouldStop {
+			item.Status = "任务已经停止"
+			item.State = DownloadTaskError
+			a.eventsEmit(TaskFinish, item)
+			return
+		} else if err != nil {
 			item.Status = "下载失败，请检查链接有效性"
 			item.State = DownloadTaskError
 			a.eventsEmit(TaskFinish, item)

@@ -14,13 +14,12 @@ import (
 )
 
 type Cipher struct {
-	KeyReq *http.Request
-	IV     string
-	Method string
-	Ctx    context.Context
+	KeyReq  *http.Request
+	Key, IV []byte
+	Method  string
+	Ctx     context.Context
 
 	MyKeyIV  string
-	block    cipher.Block
 	queryKey func(u string) ([]byte, bool)
 	setKey   func(u string, key []byte)
 }
@@ -50,7 +49,7 @@ func NewCipherFromKey(config *ParserTask, key *m3u8.Key, queryKey func(u string)
 
 	decrypt := &Cipher{
 		Method:  key.Method,
-		IV:      key.IV,
+		IV:      []byte(key.IV),
 		MyKeyIV: config.KeyIV,
 	}
 	req, err := http.NewRequest("GET", key.URI, nil)
@@ -65,37 +64,49 @@ func NewCipherFromKey(config *ParserTask, key *m3u8.Key, queryKey func(u string)
 	return decrypt, err
 }
 
-func (c *Cipher) Decrypt(body io.Reader) (*bytes.Buffer, error) {
-	// cbc解密模式
-	src, err := io.ReadAll(body)
-	blockSize := c.block.BlockSize()
-
-	if len(src)%blockSize != 0 {
-		return nil, NotFullBlocksError
+// cbc解密模式
+func (c *Cipher) aES128Decrypt(crypted []byte) ([]byte, error) {
+	block, err := aes.NewCipher(c.Key)
+	if err != nil {
+		return nil, err
 	}
-
-	key, _ := c.queryKey(c.KeyReq.RequestURI)
-	var iv []byte
+	blockSize := block.BlockSize()
 	if len(c.IV) == 0 {
-		iv = key[:blockSize]
-	} else {
-		iv = []byte(c.IV)
+		c.IV = c.Key
 	}
-	blockMode := cipher.NewCBCDecrypter(c.block, iv)
-	dst := make([]byte, len(src))
-	blockMode.CryptBlocks(dst, src)
+	blockMode := cipher.NewCBCDecrypter(block, c.IV[:blockSize])
+	origData := make([]byte, len(crypted))
+	blockMode.CryptBlocks(origData, crypted)
+	origData = pkcs5UnPadding(origData)
+	return origData, nil
+}
+
+func pkcs5UnPadding(origData []byte) []byte {
+	length := len(origData)
+	unPadding := int(origData[length-1])
+	return origData[:(length - unPadding)]
+}
+
+func (c *Cipher) Decrypt(body io.Reader) (*bytes.Buffer, error) {
+	src, err := io.ReadAll(body)
+	if err != nil {
+		return nil, err
+	}
+	dst, err := c.aES128Decrypt(src)
+	if err != nil {
+		return nil, err
+	}
 	buffer := bytes.NewBuffer(dst)
 	return buffer, err
 }
 
 func (c *Cipher) Generate() error {
-	if c.block != nil {
-		return nil
-	}
 	var b []byte
+	key := c.KeyReq.URL.String()
+
 	if len(c.MyKeyIV) > 0 {
 		b = []byte(c.MyKeyIV)
-	} else if _, ok := c.queryKey(c.KeyReq.RequestURI); !ok {
+	} else if _, ok := c.queryKey(key); !ok {
 		req := c.KeyReq
 		if c.Ctx != nil {
 			req = req.WithContext(c.Ctx)
@@ -126,14 +137,10 @@ func (c *Cipher) Generate() error {
 			return err
 		}
 
-		c.setKey(c.KeyReq.RequestURI, b)
+		c.setKey(key, b)
 	} else {
-		b, _ = c.queryKey(c.KeyReq.RequestURI)
+		b, _ = c.queryKey(key)
 	}
-	block, err := aes.NewCipher(b)
-	if err != nil {
-		return err
-	}
-	c.block = block
+	c.Key = b
 	return nil
 }

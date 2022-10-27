@@ -61,6 +61,10 @@ func (t *DownloadTask) Read(p []byte) (n int, err error) {
 }
 
 func (t *DownloadTask) download() error {
+	if t.Done { // 任务已经取消
+		return nil
+	}
+
 	defer func() {
 		t.Done = true
 	}()
@@ -122,11 +126,12 @@ func (t *DownloadTask) download() error {
 	return err
 }
 
-func (t *DownloadTask) Start(g *sync.WaitGroup) error {
+func (t *DownloadTask) Start() error {
 	ctx, cancel := context.WithCancel(SharedApp.ctx)
 	t.Req = t.Req.WithContext(ctx)
 	t.cancel = cancel
-	err := retry.Do(t.download,
+	err := retry.Do(
+		t.download,
 		retry.Context(ctx),
 		retry.RetryIf(func(err error) bool {
 			_, ok := err.(NetworkError)
@@ -141,7 +146,6 @@ func (t *DownloadTask) Start(g *sync.WaitGroup) error {
 			return 3 * time.Second
 		}))
 
-	g.Done()
 	return err
 }
 
@@ -195,11 +199,13 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 	queryKey := func(u string) ([]byte, bool) {
 		mutex.RLock()
 		b, ok := keys[u]
+		fmt.Printf("🐉 get req: %v, key %v\n", u, string(b))
 		mutex.RUnlock()
 		return b, ok
 	}
 	setKey := func(u string, key []byte) {
 		mutex.Lock()
+		fmt.Printf("🐉 set req: %v, key %v\n", u, string(key))
 		keys[u] = key
 		mutex.Unlock()
 	}
@@ -229,10 +235,15 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 			}
 			if decrypt != nil {
 				task.decrypt = decrypt
-				if cipher == nil {
+				if cipher == nil || cipher.KeyReq.URL.String() != decrypt.KeyReq.URL.String() {
+					if cipher != nil {
+						fmt.Printf("🐱 pre req: %v\n", cipher.KeyReq.URL.String())
+					}
+					fmt.Printf("🐕 new req: %v\n", decrypt.KeyReq.URL.String())
 					cipher = decrypt
 				}
 			} else if cipher != nil {
+				fmt.Printf("set req: %v\n", cipher.KeyReq.URL.String())
 				task.decrypt = cipher
 			}
 			q.tasks = append(q.tasks, task)
@@ -268,7 +279,8 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 		ch <- struct{}{}
 		wg.Add(1)
 		go func(t *DownloadTask) {
-			err = t.Start(wg)
+			defer wg.Done()
+			err = t.Start()
 			if err != nil { // 出现了错误，直接停掉其他任务，结束
 				e, ok := err.(retry.Error)
 				if !ok || !isContextCancelError(e) {
@@ -453,7 +465,7 @@ func (c *CommonDownloader) StartDownload(config *ParserTask, urls []string) erro
 		wg.Add(1)
 		go func(t *DownloadTask) {
 			defer wg.Done()
-			err = t.Start(wg)
+			err = t.Start()
 			if err != nil {
 				SharedApp.logError(err.Error())
 			}

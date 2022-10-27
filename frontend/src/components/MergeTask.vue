@@ -27,7 +27,7 @@
       <el-col :span="7" :offset="3">
         <div>
           <el-radio style="line-height: 40px;" v-model="mergeConfig.mergeType"
-                    label="">快速合并
+                    label="speed">快速合并
           </el-radio>
           <el-radio style="line-height: 40px;" v-model="mergeConfig.mergeType"
                     label="transcoding">
