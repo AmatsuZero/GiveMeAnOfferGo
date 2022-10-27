@@ -73,8 +73,8 @@ func (c *Cli) addVersionCmd() *Cli {
 }
 
 func (c *Cli) addParseCmd() *Cli {
-	delOnComplete := new(bool)
-	concurrentCnt := new(int)
+	var delOnComplete *bool
+	var concurrentCnt *int
 	parserTask := new(ParserTask)
 
 	parseCmd := &cobra.Command{
@@ -92,14 +92,14 @@ func (c *Cli) addParseCmd() *Cli {
 		},
 	}
 
-	parseCmd.PersistentFlags().StringVarP(&parserTask.Url, "url", "u", "", "设置 m3u8 地址, 多个地址用分号分割")
+	parseCmd.Flags().StringVarP(&parserTask.Url, "url", "u", "", "设置 m3u8 地址, 多个地址用分号分割")
 	_ = parseCmd.MarkFlagRequired("url")
 
 	delOnComplete = parseCmd.Flags().BoolP("delOnComplete", "d", true, "合并完成后是否删除 ts 文件")
-	parseCmd.PersistentFlags().StringVarP(&parserTask.KeyIV, "keyIV", "k", "", "设置自定义密钥")
-	parseCmd.PersistentFlags().StringVarP(&parserTask.Prefix, "prefix", "p", "", "设置前缀")
-	parseCmd.PersistentFlags().StringVarP(&parserTask.TaskName, "name", "n", "", "输入文件名")
-	concurrentCnt = parseCmd.PersistentFlags().IntP("concurrent", "n", 3, "并发任务下载数量")
+	parseCmd.Flags().StringVarP(&parserTask.KeyIV, "keyIV", "k", "", "设置自定义密钥")
+	parseCmd.Flags().StringVarP(&parserTask.Prefix, "prefix", "p", "", "设置前缀")
+	parseCmd.Flags().StringVarP(&parserTask.TaskName, "name", "n", "", "输入文件名")
+	concurrentCnt = parseCmd.Flags().IntP("concurrent", "c", 3, "并发任务下载数量")
 
 	c.rootCmd.AddCommand(parseCmd)
 
@@ -145,11 +145,11 @@ func (c *Cli) addMergeFileCmd() *Cli {
 	}
 
 	c.rootCmd.AddCommand(mergeFileCmd)
-	mergeFileCmd.PersistentFlags().StringVarP(&config.TsName, "name", "n", "", "输入文件名")
-	mergeFileCmd.PersistentFlags().StringVarP((*string)(&config.MergeType), "type", "t", "speed", "转换类型")
-	mergeFileCmd.PersistentFlags().StringVarP(&files, "files", "f", "", "要合并的 ts 文件，用逗号隔开")
-	mergeFileCmd.PersistentFlags().StringVarP(&dir, "dir", "d", "", "要合并的 ts 文件夹")
-	mergeFileCmd.PersistentFlags().StringVarP(&config.Output, "output", "o", "", "输出路径")
+	mergeFileCmd.Flags().StringVarP(&config.TsName, "name", "n", "", "输入文件名")
+	mergeFileCmd.Flags().StringVarP((*string)(&config.MergeType), "type", "t", "speed", "转换类型")
+	mergeFileCmd.Flags().StringVarP(&files, "files", "f", "", "要合并的 ts 文件，用逗号隔开")
+	mergeFileCmd.Flags().StringVarP(&dir, "dir", "d", "", "要合并的 ts 文件夹")
+	mergeFileCmd.Flags().StringVarP(&config.Output, "output", "o", "", "输出路径")
 	mergeFileCmd.MarkFlagsMutuallyExclusive("files", "dir")
 
 	return c

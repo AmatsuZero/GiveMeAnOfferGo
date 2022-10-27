@@ -449,6 +449,7 @@ func (c *CommonDownloader) StartDownload(config *ParserTask, urls []string) erro
 	SharedApp.eventsEmit(TaskStatusUpdate, c.NotifyItem)
 
 	for _, task := range c.tasks {
+		ch <- struct{}{}
 		wg.Add(1)
 		go func(t *DownloadTask) {
 			defer wg.Done()
