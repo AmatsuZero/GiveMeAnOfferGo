@@ -199,13 +199,11 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 	queryKey := func(u string) ([]byte, bool) {
 		mutex.RLock()
 		b, ok := keys[u]
-		fmt.Printf("🐉 get req: %v, key %v\n", u, string(b))
 		mutex.RUnlock()
 		return b, ok
 	}
 	setKey := func(u string, key []byte) {
 		mutex.Lock()
-		fmt.Printf("🐉 set req: %v, key %v\n", u, string(key))
 		keys[u] = key
 		mutex.Unlock()
 	}
@@ -236,14 +234,9 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *ParserTask, list *m3u8.Medi
 			if decrypt != nil {
 				task.decrypt = decrypt
 				if cipher == nil || cipher.KeyReq.URL.String() != decrypt.KeyReq.URL.String() {
-					if cipher != nil {
-						fmt.Printf("🐱 pre req: %v\n", cipher.KeyReq.URL.String())
-					}
-					fmt.Printf("🐕 new req: %v\n", decrypt.KeyReq.URL.String())
 					cipher = decrypt
 				}
 			} else if cipher != nil {
-				fmt.Printf("set req: %v\n", cipher.KeyReq.URL.String())
 				task.decrypt = cipher
 			}
 			q.tasks = append(q.tasks, task)
