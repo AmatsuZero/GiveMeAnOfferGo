@@ -182,6 +182,10 @@ func (c *Cli) parse(task *ParserTask) (err error) {
 		c.selectVariant(msg)
 	})
 
+	_ = c.eventBus.Subscribe(TaskFinish, func(item *DownloadTaskUIItem) {
+		SharedApp.logInfof(item.Status)
+	})
+
 	adders := strings.Split(task.Url, ",")
 	if len(adders) == 0 {
 		return fmt.Errorf("输入 m3u8 地址")

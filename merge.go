@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/flytam/filenamify"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/flytam/filenamify"
 )
 
 type MergeType string
@@ -48,7 +49,7 @@ func NewMergeConfigFromDownloadQueue(q *M3U8DownloadQueue, fileName string) *Mer
 
 func Cmd(commandName string, params []string) (string, error) {
 	cmd := exec.Command(commandName, params...)
-	//fmt.Println("Cmd", cmd.Args)
+	// fmt.Println("Cmd", cmd.Args)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = os.Stderr
@@ -119,7 +120,7 @@ func (c *MergeFilesConfig) Merge() (string, error) {
 		args = append(args, "-bsf:a", "aac_adtstoasc")
 	}
 	// 处理进度
-	args = append(args, "-progress", "-nostats")
+	//	args = append(args, "-progress")
 	args = append(args, output)
 	msg, err := Cmd(args[0], args[1:])
 	if err != nil {
