@@ -8,8 +8,11 @@
         <div @drop="dropTSFiles" @dragover.prevent @dragenter.prevent>
           <el-input placeholder="选择一个包含TS流的目录或将所有TS文件拖拽至此" v-model="ts_dir"
                     clearable draggable="false">
-            <i slot="suffix" class="el-input__icon el-icon-folder-opened"
-               @click="clickSelectTSDir"></i>
+            <template #suffix>
+              <el-icon @click="clickOpenMergeTSDir">
+                <FolderOpened/>
+              </el-icon>
+            </template>
           </el-input>
         </div>
       </el-col>
@@ -58,8 +61,10 @@
               style="line-height: 40px;float: right;">查看文件</span>
       </el-col>
       <el-col :span="6" v-if="tsMergeStatus !=='success'">
-        <el-progress type="circle" :percentage="tsMergeProgress" status="success"
-                     :width="100"></el-progress>
+        <el-progress type="circle"
+                     :percentage="tsMergeProgress"
+                     status="success"
+                     :width="100"/>
       </el-col>
       <el-col :span="4" v-else>
         <el-button class="mybutton" type="success" @click="clickOpenMergeTSDir">
@@ -92,10 +97,11 @@ export default {
 </script>
 <script lang="ts" setup>
 
-import {MergeFileType} from "../models";
+import { FolderOpened } from '@element-plus/icons';
 import {reactive, ref} from "vue";
-import {OpenSelectTsDir} from "../../wailsjs/go/main/App";
+import { OpenSelectTsDir, StartMergeTs } from "../../wailsjs/go/main/App";
 import {main} from "../../wailsjs/go/models";
+import {MergeFileType} from "../models";
 
 let tsMergeMp4Path = '';
 let tsMergeStatus = '';
@@ -103,11 +109,12 @@ let ts_dir = '';
 let tsMergeProgress = 0;
 let headers = ref("");
 const mergeConfig = reactive(new main.MergeFilesConfig());
+mergeConfig.mergeType = MergeFileType.Speed;
 
 function clickOpenMergeTSDir () {
-  OpenSelectTsDir("").then(files => {
+  OpenSelectTsDir(ts_dir).then(files => {
     mergeConfig.files = files
-  })
+  });
 }
 
 function clickPlayMergeMp4() {
@@ -122,7 +129,13 @@ function clickSelectTSDir () {
 
 }
 
-function clickStartMergeTS() {}
+function clickStartMergeTS() {
+  mergeConfig.output = '';
+  StartMergeTs(mergeConfig).then(output => {
+      tsMergeStatus = 'success';
+      mergeConfig.output = output;
+  });
+}
 
 function dropTSFiles() {
 

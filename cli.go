@@ -135,11 +135,11 @@ func (c *Cli) addMergeFileCmd() *Cli {
 				SharedApp.logError("必须指定要合并的文件或文件夹")
 				return
 			}
-			e := SharedApp.StartMergeTs(config)
+			o, e := SharedApp.StartMergeTs(config)
 			if e != nil {
 				SharedApp.logErrorf("合并失败：%v", e)
 			} else {
-				fmt.Println("合并结束")
+				fmt.Printf("合并结束: %v", o)
 			}
 		},
 	}

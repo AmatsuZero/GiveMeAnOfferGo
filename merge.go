@@ -113,11 +113,13 @@ func (c *MergeFilesConfig) Merge() (string, error) {
 		output = filepath.Join(SharedApp.config.PathDownloader, output+".mp4")
 	}
 
-	cmdStr := fmt.Sprintf("ffmpeg -loglevel quiet -f concat -safe 0 -i %v -vcodec %v -acodec %v", f.Name(), videoCodec, audioCodec)
+	cmdStr := fmt.Sprintf("ffmpeg -loglevel 16 -f concat -safe 0 -i %v -vcodec %v -acodec %v", f.Name(), videoCodec, audioCodec)
 	args := strings.Split(cmdStr, " ")
 	if runtime.GOOS == "linux" { // FIX：linux 主机合并失败
 		args = append(args, "-bsf:a", "aac_adtstoasc")
 	}
+	// 处理进度
+	args = append(args, "-progress", "-nostats")
 	args = append(args, output)
 	msg, err := Cmd(args[0], args[1:])
 	if err != nil {

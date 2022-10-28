@@ -19,7 +19,7 @@ export function RemoveTaskNotifyItem(arg1:DownloadTask):Promise<Error>;
 
 export function SniffLinks(arg1:string):Promise<Array<string>>;
 
-export function StartMergeTs(arg1:main.MergeFilesConfig):Promise<Error>;
+export function StartMergeTs(arg1:main.MergeFilesConfig):Promise<string>;
 
 export function TaskAdd(arg1:main.ParserTask):Promise<Error>;
 

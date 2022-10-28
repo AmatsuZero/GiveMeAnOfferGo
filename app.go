@@ -125,12 +125,10 @@ func (a *App) OpenSelectTsDir(dir string) ([]string, error) {
 			return nil
 		})
 
-		if err != nil {
-			return nil, err
-		}
+		return files, err
 	}
 
-	return runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{
+	dir, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
 		Title: "请选择欲合并的TS文件",
 		Filters: []runtime.FileFilter{
 			{
@@ -141,11 +139,16 @@ func (a *App) OpenSelectTsDir(dir string) ([]string, error) {
 			},
 		},
 	})
+
+	if len(dir) == 0 {
+		return nil, err
+	}
+
+	return a.OpenSelectTsDir(dir)
 }
 
-func (a *App) StartMergeTs(config *MergeFilesConfig) error {
-	_, e := config.Merge()
-	return e
+func (a *App) StartMergeTs(config *MergeFilesConfig) (string, error) {
+	return config.Merge()
 }
 
 func (a *App) OpenConfigDir() (string, error) {

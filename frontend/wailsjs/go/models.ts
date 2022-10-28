@@ -3,6 +3,7 @@ export namespace main {
 	    files: string[];
 	    mergeType: string;
 	    taskName: string;
+		output: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new MergeFilesConfig(source);
@@ -13,6 +14,7 @@ export namespace main {
 	        this.files = source["files"] ?? [];
 	        this.mergeType = source["mergeType"];
 	        this.taskName = source["taskName"];
+			this.output = source["output"];
 	    }
 	}
 	export class ParserTask {
