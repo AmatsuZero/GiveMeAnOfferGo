@@ -139,7 +139,7 @@ func (c *Cli) addMergeFileCmd() *Cli {
 			if e != nil {
 				SharedApp.logErrorf("合并失败：%v", e)
 			} else {
-				fmt.Printf("合并结束: %v", o)
+				fmt.Fprintf(os.Stdout, "合并结束: %v", o)
 			}
 		},
 	}

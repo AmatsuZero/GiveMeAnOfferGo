@@ -497,7 +497,7 @@ func (a *App) logInfof(format string, args ...interface{}) {
 	cli := a.getCli()
 	if cli != nil {
 		if *cli.verbose {
-			fmt.Printf("INFO | "+format+"\n", args...)
+			fmt.Fprintf(os.Stdout, "INFO | "+format+"\n", args...)
 		}
 	} else {
 		runtime.LogInfof(a.ctx, format, args...)
@@ -508,7 +508,7 @@ func (a *App) logInfo(message string) {
 	cli := a.getCli()
 	if cli != nil {
 		if *cli.verbose {
-			fmt.Println("INFO | " + message)
+			fmt.Fprintln(os.Stdout, "INFO | "+message)
 		}
 	} else {
 		runtime.LogInfo(a.ctx, message)
@@ -517,7 +517,7 @@ func (a *App) logInfo(message string) {
 
 func (a *App) logError(message string) {
 	if a.isCliMode() {
-		fmt.Println("ERR | " + message)
+		fmt.Fprintln(os.Stderr, "ERR | "+message)
 	} else {
 		runtime.LogError(a.ctx, message)
 	}
@@ -525,7 +525,7 @@ func (a *App) logError(message string) {
 
 func (a *App) logErrorf(format string, args ...interface{}) {
 	if a.isCliMode() {
-		fmt.Printf("ERR | "+format+"\n", args...)
+		fmt.Fprintf(os.Stderr, "ERR | "+format+"\n", args...)
 	} else {
 		runtime.LogErrorf(a.ctx, format, args...)
 	}
