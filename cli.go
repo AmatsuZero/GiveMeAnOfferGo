@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"GiveMeAnOffer/eventbus"
 
@@ -84,11 +85,14 @@ func (c *Cli) addParseCmd() *Cli {
 			SharedApp.concurrentLock = make(chan struct{}, *concurrentCnt)
 			parserTask.DelOnComplete = *delOnComplete
 			e := c.parse(parserTask)
+			code := 0
 			if e != nil {
 				SharedApp.logErrorf("解析失败: %v", e)
+				code = 1
 			} else {
-				fmt.Println("解析结束")
+				fmt.Fprintln(os.Stdout, "解析结束")
 			}
+			os.Exit(code)
 		},
 	}
 
@@ -114,12 +118,15 @@ func (c *Cli) addMergeFileCmd() *Cli {
 		Use:   "merge",
 		Short: "合并 ts 文件",
 		Run: func(cmd *cobra.Command, args []string) {
+			code := 0
+			defer os.Exit(code)
 			if len(files) > 0 {
 				config.Files = strings.Split(files, ",")
 			} else if len(dir) > 0 {
 				tsFiles, err := os.ReadDir(dir)
 				if err != nil {
 					SharedApp.logErrorf("读取文件夹失败: %v", err)
+					code = 1
 					return
 				}
 				fileList := make([]string, 0, len(tsFiles))
@@ -133,11 +140,13 @@ func (c *Cli) addMergeFileCmd() *Cli {
 				config.Files = fileList
 			} else {
 				SharedApp.logError("必须指定要合并的文件或文件夹")
+				code = 1
 				return
 			}
 			o, e := SharedApp.StartMergeTs(config)
 			if e != nil {
 				SharedApp.logErrorf("合并失败：%v", e)
+				code = 1
 			} else {
 				fmt.Fprintf(os.Stdout, "合并结束: %v", o)
 			}
@@ -219,7 +228,7 @@ func (c *Cli) parse(task *ParserTask) (err error) {
 }
 
 func (c *Cli) printVersion(cmd *cobra.Command, args []string) {
-	fmt.Println("v1.0.0")
+	fmt.Fprintln(os.Stdout, "v1.0.0")
 }
 
 func (c *Cli) Execute() error {
