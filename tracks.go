@@ -23,6 +23,18 @@ type DownloadTaskUIItem struct {
 
 // 通知前端任务列表添加任务
 func (a *App) addTaskNotifyItem(task *ParserTask) *DownloadTaskUIItem {
+	item := &DownloadTaskUIItem{
+		ParserTask: task,
+		Status:     "初始化...",
+		State:      DownloadTaskIdle,
+	}
+
+	if a.isCliMode() {
+		a.tasks = append(a.tasks, item)
+		a.eventsEmit(TaskNotifyCreate, item)
+		return item
+	}
+
 	// 先从记录里面查找
 	for _, t := range a.tasks {
 		if t.Url == task.Url {
@@ -35,12 +47,7 @@ func (a *App) addTaskNotifyItem(task *ParserTask) *DownloadTaskUIItem {
 	}
 
 	// 通知前端任务列表添加任务
-	item := &DownloadTaskUIItem{}
-	a.db.FirstOrCreate(item, &DownloadTaskUIItem{
-		ParserTask: task,
-		Status:     "初始化...",
-		State:      DownloadTaskIdle,
-	})
+	a.db.Create(item)
 	a.tasks = append(a.tasks, item)
 	a.eventsEmit(TaskNotifyCreate, item)
 	return item
@@ -110,7 +117,7 @@ func (a *App) domReady(ctx context.Context) {
 }
 
 func (a *App) saveTracks() {
-	if len(a.tasks) > 0 {
+	if len(a.tasks) > 0 && !a.isCliMode() {
 		a.db.Save(a.tasks)
 	}
 }
