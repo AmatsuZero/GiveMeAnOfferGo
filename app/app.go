@@ -91,7 +91,7 @@ func NewApp() *App {
 func (a *App) Startup(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	a.ctx, a.stopTasks = ctx, cancel
-
+	a.initDB()
 	config, err := NewConfig(configFilePath)
 	if err != nil {
 		a.LogError(err.Error())
@@ -107,8 +107,9 @@ func (a *App) Startup(ctx context.Context) {
 		}
 	}
 	a.Config = config
+	a.Config.AriaConfig.StartUp(ctx, a.client, a)
 	a.concurrentLock = make(chan struct{}, config.ConCurrentCnt)
-	a.initDB()
+	a.tasks = make([]*downloader.DownloadTaskUIItem, 0)
 }
 
 func (a *App) Shutdown(ctx context.Context) {

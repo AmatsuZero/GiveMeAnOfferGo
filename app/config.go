@@ -1,6 +1,7 @@
 package app
 
 import (
+	"GiveMeAnOffer/downloader/aria"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -15,16 +16,23 @@ type UserConfig struct {
 	ConfigProxy    *ProxyConfig `json:"config_proxy"`
 	ConCurrentCnt  int          `json:"ConCurrentCnt"`
 	savePath       string
+	AriaConfig     *aria.Config
 }
 
 func defaultConfig(savePath string) *UserConfig {
 	base, _ := os.UserHomeDir()
-	return &UserConfig{
+	config := &UserConfig{
 		PathDownloader: filepath.Join(base, "Downloads"),
 		ConfigProxy:    nil,
 		savePath:       savePath,
-		ConCurrentCnt:  3,
+		ConCurrentCnt:  5,
 	}
+
+	config.AriaConfig = aria.DefaultConfig(filepath.Join(appFolder, "aria2"))
+	config.AriaConfig.MaxConCurrentDownload = config.ConCurrentCnt
+	config.AriaConfig.SaveDir = config.PathDownloader
+
+	return config
 }
 
 func NewConfig(path string) (*UserConfig, error) {

@@ -3,7 +3,6 @@ package downloader
 import (
 	"GiveMeAnOffer/custom_error"
 	"GiveMeAnOffer/eventbus"
-	"GiveMeAnOffer/logger"
 	"GiveMeAnOffer/parse"
 	"GiveMeAnOffer/utils"
 	"context"
@@ -37,11 +36,6 @@ type DownloadTask struct {
 	cancel  context.CancelFunc
 	decrypt *utils.Cipher
 	Done    bool
-
-	handler eventbus.RuntimeHandler
-	logger  logger.AppLogger
-	ctx     context.Context
-	client  *http.Client
 }
 
 type ProgressTracker struct {
@@ -75,31 +69,33 @@ func (t *DownloadTask) download(config *parse.ParserTask) error {
 		t.decrypt.Ctx = t.Req.Context()
 		err := t.decrypt.Generate(config)
 		if err != nil {
-			t.logger.LogError(fmt.Sprintf("创建解密信息失败：%v", err))
+			if config.Logger != nil {
+				config.Logger.LogError(fmt.Sprintf("创建解密信息失败：%v", err))
+			}
 			return err
 		}
 	}
 
 	out, err := os.Create(t.Dst)
 	if err != nil {
-		t.logger.LogError(err.Error())
+		config.Logger.LogError(err.Error())
 		return err
 	}
 	defer func(out *os.File) {
 		err = out.Close()
-		if err != nil {
-			t.logger.LogError(err.Error())
+		if err != nil && config.Logger != nil {
+			config.Logger.LogError(err.Error())
 		}
 	}(out)
 
-	resp, err := t.client.Do(t.Req)
+	resp, err := config.Client.Do(t.Req)
 	if err != nil {
 		return err
 	}
 	defer func(Body io.ReadCloser) {
 		err = Body.Close()
-		if err != nil {
-			t.logger.LogError(err.Error())
+		if err != nil && config.Logger != nil {
+			config.Logger.LogError(err.Error())
 		}
 	}(resp.Body)
 
@@ -123,12 +119,15 @@ func (t *DownloadTask) download(config *parse.ParserTask) error {
 		t.Total = resp.ContentLength
 		_, err = io.Copy(out, t)
 	}
-	t.logger.LogInfof("下载完成: %v", t.Req.URL.String())
+
+	if config.Logger != nil {
+		config.Logger.LogInfof("下载完成: %v", t.Req.URL.String())
+	}
 	return err
 }
 
 func (t *DownloadTask) Start(config *parse.ParserTask) error {
-	ctx, cancel := context.WithCancel(t.ctx)
+	ctx, cancel := context.WithCancel(config.Ctx)
 	t.Req = t.Req.WithContext(ctx)
 	t.cancel = cancel
 	err := retry.Do(
@@ -224,13 +223,9 @@ func (q *M3U8DownloadQueue) startDownloadVOD(config *parse.ParserTask, list *m3u
 			dst += path.Ext(req.URL.Path)
 			dst = filepath.Join(q.DownloadDir, dst)
 			task := &DownloadTask{
-				Req:     req,
-				Idx:     seg.SeqId,
-				Dst:     dst,
-				logger:  config.Logger,
-				handler: config.Handler,
-				ctx:     config.Ctx,
-				client:  config.Client,
+				Req: req,
+				Idx: seg.SeqId,
+				Dst: dst,
 			}
 
 			decrypt, err := utils.NewCipherFromKey(config, seg.Key, queryKey, setKey)
@@ -376,7 +371,9 @@ func (q *M3U8DownloadQueue) preDownload(config *parse.ParserTask) (err error) {
 		return err
 	}
 	q.DownloadDir = filepath.Join(config.DstPath, output)
-	q.NotifyItem.VideoPath = q.DownloadDir
+	if q.NotifyItem != nil {
+		q.NotifyItem.VideoPath = q.DownloadDir
+	}
 	if _, err = os.Stat(q.DownloadDir); errors.Is(err, os.ErrNotExist) {
 		err = os.Mkdir(q.DownloadDir, os.ModePerm)
 	}
@@ -420,7 +417,7 @@ const (
 	DownloadTaskIdle       DownloadTaskState = "idle"
 )
 
-func (c *CommonDownloader) StartDownload(config *parse.ParserTask, urls []string) error {
+func (c *CommonDownloader) StartDownload(config *parse.ParserTask, urls []string, dsts ...string) error {
 	err := c.preDownload(config)
 	if err != nil {
 		return err
@@ -436,7 +433,13 @@ func (c *CommonDownloader) StartDownload(config *parse.ParserTask, urls []string
 			return err
 		}
 
-		dst := path.Base(req.URL.Path)
+		dst := ""
+		if idx < len(dsts) && len(dsts[idx]) > 0 {
+			dst = dsts[idx]
+		} else {
+			dst = path.Base(req.URL.Path)
+		}
+
 		dst = filepath.Join(c.DownloadDir, dst)
 
 		task := &DownloadTask{
@@ -457,8 +460,10 @@ func (c *CommonDownloader) StartDownload(config *parse.ParserTask, urls []string
 	var ops uint64
 	cnt := len(c.Tasks)
 
-	c.NotifyItem.Status = fmt.Sprintf("下载中... %v/%v", ops, cnt)
-	config.Handler.EventsEmit(eventbus.TaskStatusUpdate, c.NotifyItem)
+	if c.NotifyItem != nil {
+		c.NotifyItem.Status = fmt.Sprintf("下载中... %v/%v", ops, cnt)
+		config.Handler.EventsEmit(eventbus.TaskStatusUpdate, c.NotifyItem)
+	}
 
 	for _, task := range c.Tasks {
 		ch <- struct{}{}
@@ -470,7 +475,10 @@ func (c *CommonDownloader) StartDownload(config *parse.ParserTask, urls []string
 				config.Logger.LogError(err.Error())
 			}
 			atomic.AddUint64(&ops, 1)
-			c.NotifyItem.Status = fmt.Sprintf("下载中... %v/%v", ops, cnt)
+			if c.NotifyItem != nil {
+				c.NotifyItem.Status = fmt.Sprintf("下载中... %v/%v", ops, cnt)
+				config.Handler.EventsEmit(eventbus.TaskStatusUpdate, c.NotifyItem)
+			}
 			<-ch
 		}(task)
 	}
