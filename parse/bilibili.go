@@ -1,6 +1,7 @@
-package main
+package parse
 
 import (
+	"GiveMeAnOffer/eventbus"
 	"encoding/json"
 	"errors"
 	"net/url"
@@ -96,13 +97,13 @@ type videoPageData struct {
 	FirstFrame string `json:"first_frame"`
 }
 
-func (d *videoPageData) selectResolution(u *url.URL) (string, error) {
+func (d *videoPageData) selectResolution(u *url.URL, t *BilibiliParserTask) (string, error) {
 	values := u.Query()
 	values.Add("cid", strconv.Itoa(int(d.Cid)))
 	u.RawQuery = values.Encode()
 
 	// 先获取信息
-	resp, err := SharedApp.client.Get(u.String())
+	resp, err := t.Client.Get(u.String())
 	if err != nil {
 		return "", err
 	}
@@ -119,15 +120,15 @@ func (d *videoPageData) selectResolution(u *url.URL) (string, error) {
 	}
 
 	for _, format := range info.Data.SupportFormats {
-		msg.Info = append(msg.Info, &playListInfo{
+		msg.Info = append(msg.Info, &PlayListInfo{
 			Desc: format.NewDescription,
 			Uri:  strconv.Itoa(format.Quality),
 		})
 	}
 
 	ch := make(chan string)
-	SharedApp.eventsEmit(SelectVariant, msg)
-	SharedApp.eventsOnce(OnVariantSelected, func(optionalData ...interface{}) {
+	t.Handler.EventsEmit(eventbus.SelectVariant, msg)
+	t.Handler.EventsOnce(eventbus.OnVariantSelected, func(optionalData ...interface{}) {
 		ch <- optionalData[0].(string)
 	})
 
@@ -150,7 +151,7 @@ type BilibiliParserTask struct {
 	OrderDict map[string]int64
 }
 
-func (t *BilibiliParserTask) Parse() (*ParseResult, error) {
+func (t *BilibiliParserTask) Parse() (*Result, error) {
 	// 获取视频信息
 	infoURL := baseURl.JoinPath(videoInfo)
 	values := infoURL.Query()
@@ -161,7 +162,7 @@ func (t *BilibiliParserTask) Parse() (*ParseResult, error) {
 	}
 	infoURL.RawQuery = values.Encode()
 
-	resp, err := SharedApp.client.Get(infoURL.String())
+	resp, err := t.Client.Get(infoURL.String())
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +176,7 @@ func (t *BilibiliParserTask) Parse() (*ParseResult, error) {
 	return info.parse(t)
 }
 
-func (v *videoInfoResp) parse(t *BilibiliParserTask) (*ParseResult, error) {
+func (v *videoInfoResp) parse(t *BilibiliParserTask) (*Result, error) {
 	t.TaskName = v.Data.Title
 
 	u := baseURl.JoinPath(videoStream)
@@ -192,7 +193,7 @@ func (v *videoInfoResp) parse(t *BilibiliParserTask) (*ParseResult, error) {
 		return nil, errors.New("no page data")
 	}
 
-	resolution, err := v.Data.Pages[0].selectResolution(u)
+	resolution, err := v.Data.Pages[0].selectResolution(u, t)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +211,7 @@ func (v *videoInfoResp) parse(t *BilibiliParserTask) (*ParseResult, error) {
 			defer wg.Done()
 			r, e := p.parse(u, t)
 			if e != nil {
-				SharedApp.logErrorf("B站分P解析失败: %v", e)
+				t.Logger.LogErrorf("B站分P解析失败: %v", e)
 				return
 			}
 			rs = append(rs, r)
@@ -218,7 +219,7 @@ func (v *videoInfoResp) parse(t *BilibiliParserTask) (*ParseResult, error) {
 	}
 	wg.Wait()
 
-	return &ParseResult{Type: TaskTypeBilibili, Data: rs}, nil
+	return &Result{Type: TaskTypeBilibili, Data: rs}, nil
 }
 
 func (d *videoPageData) parse(u *url.URL, t *BilibiliParserTask) (*BilibiliParserTask, error) {
@@ -227,7 +228,7 @@ func (d *videoPageData) parse(u *url.URL, t *BilibiliParserTask) (*BilibiliParse
 	u.RawQuery = values.Encode()
 
 	// 获取指定清晰度的 url 列表
-	resp, err := SharedApp.client.Get(u.String())
+	resp, err := t.Client.Get(u.String())
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +261,7 @@ func (r *playUrlResp) parse(t *BilibiliParserTask, title string) (*BilibiliParse
 		OrderDict:  dict,
 	}
 	ret.TaskName = title
-	ret.headers["Referer"] = "https://www.bilibili.com"
-	ret.headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36"
+	ret.HeadersMap["Referer"] = "https://www.bilibili.com"
+	ret.HeadersMap["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36"
 	return ret, nil
 }

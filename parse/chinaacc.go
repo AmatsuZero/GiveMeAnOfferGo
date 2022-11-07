@@ -1,4 +1,4 @@
-package main
+package parse
 
 import (
 	"context"
@@ -19,7 +19,7 @@ type ChinaAACCParserTask struct {
 }
 
 func (t *ChinaAACCParserTask) getCookies() error {
-	rawCookies, ok := t.headers["Cookie"]
+	rawCookies, ok := t.HeadersMap["Cookie"]
 	if !ok {
 		return errors.New("需要设置Cookie")
 	}
@@ -32,7 +32,7 @@ func (t *ChinaAACCParserTask) getCookies() error {
 	return nil
 }
 
-func createChromeContext() (context.Context, context.CancelFunc) {
+func (t *ChinaAACCParserTask) createChromeContext() (context.Context, context.CancelFunc) {
 	options := []chromedp.ExecAllocatorOption{
 		chromedp.Flag("headless", true), // debug使用
 		chromedp.Flag("blink-settings", "imagesEnabled=false"),
@@ -42,18 +42,18 @@ func createChromeContext() (context.Context, context.CancelFunc) {
 	//初始化参数，先传一个空的数据
 	options = append(chromedp.DefaultExecAllocatorOptions[:], options...)
 
-	c, _ := chromedp.NewExecAllocator(SharedApp.ctx, options...)
+	c, _ := chromedp.NewExecAllocator(t.Ctx, options...)
 
 	// create context
 	chromeCtx, _ := chromedp.NewContext(c, chromedp.WithLogf(func(s string, i ...interface{}) {
-		SharedApp.logInfof(s, i)
+		t.Logger.LogInfof(s, i)
 	}))
 
 	//创建一个上下文，超时时间为40s
 	return context.WithTimeout(chromeCtx, 40*time.Second)
 }
 
-func (t *ChinaAACCParserTask) Parse() (*ParseResult, error) {
+func (t *ChinaAACCParserTask) Parse() (*Result, error) {
 	// 获取cookie
 	err := t.getCookies()
 	if err != nil {
@@ -74,7 +74,7 @@ func (t *ChinaAACCParserTask) Parse() (*ParseResult, error) {
 	// 资源链接有效时间很短，每个页面单独提取，然后立刻下载
 	go func() {
 		for _, task := range tasks {
-			timeoutCtx, cancel := createChromeContext()
+			timeoutCtx, cancel := t.createChromeContext()
 			// 提取 m3u8 链接
 			chromedp.ListenTarget(timeoutCtx, t.interceptResource(task))
 			e := chromedp.Run(timeoutCtx,
@@ -84,7 +84,7 @@ func (t *ChinaAACCParserTask) Parse() (*ParseResult, error) {
 				chromedp.WaitVisible("#catalog", chromedp.ByID),
 			)
 			if e != nil {
-				SharedApp.logErrorf("❌获取链接失败：%v", e)
+				t.Logger.LogErrorf("❌获取链接失败：%v", e)
 			}
 			cancel()
 			// 下载
@@ -93,7 +93,7 @@ func (t *ChinaAACCParserTask) Parse() (*ParseResult, error) {
 		close(ch)
 	}()
 
-	return &ParseResult{Type: TaskTypeChinaAACC, Data: ch}, nil
+	return &Result{Type: TaskTypeChinaAACC, Data: ch}, nil
 }
 
 func (t *ChinaAACCParserTask) interceptResource(task *ParserTask) func(interface{}) {
@@ -104,7 +104,7 @@ func (t *ChinaAACCParserTask) interceptResource(task *ParserTask) func(interface
 		case *network.EventRequestWillBeSent:
 			if strings.Contains(ev.Request.URL, ".m3u8") {
 				task.Url = ev.Request.URL
-				SharedApp.logInfof("提取到网校 m3u8 资源链接：%v")
+				t.Logger.LogInfof("提取到网校 m3u8 资源链接：%v")
 			} else if strings.Contains(ev.Request.URL, "getKeyForHls") { // 获取密钥的链接
 				keyRequestID = ev.RequestID
 			}
@@ -112,7 +112,7 @@ func (t *ChinaAACCParserTask) interceptResource(task *ParserTask) func(interface
 			if len(keyRequestID) > 0 && ev.RequestID == keyRequestID {
 				b, err := network.GetResponseBody(keyRequestID).MarshalJSON()
 				if err != nil {
-					SharedApp.logError(err.Error())
+					t.Logger.LogError(err.Error())
 				} else {
 					task.KeyIV = string(b)
 				}
@@ -139,7 +139,7 @@ func (t *ChinaAACCParserTask) setCookies() chromedp.ActionFunc {
 // 获取网站上爬取的数据
 func (t *ChinaAACCParserTask) getHttpHtmlContent() (string, error) {
 	var htmlContent string
-	timeoutCtx, cancel := createChromeContext()
+	timeoutCtx, cancel := t.createChromeContext()
 	defer cancel()
 	err := chromedp.Run(timeoutCtx,
 		t.setCookies(),

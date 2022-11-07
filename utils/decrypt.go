@@ -1,6 +1,8 @@
-package main
+package utils
 
 import (
+	"GiveMeAnOffer/custom_error"
+	"GiveMeAnOffer/parse"
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
@@ -30,9 +32,7 @@ func (e DecryptError) Error() string {
 	return "crypto/cipher: input not full blocks"
 }
 
-var NotFullBlocksError = DecryptError{}
-
-func NewCipherFromKey(config *ParserTask, key *m3u8.Key, queryKey func(u string) ([]byte, bool), setKey func(u string, key []byte)) (*Cipher, error) {
+func NewCipherFromKey(config *parse.ParserTask, key *m3u8.Key, queryKey func(u string) ([]byte, bool), setKey func(u string, key []byte)) (*Cipher, error) {
 	if key == nil || key.Method == "NONE" {
 		return nil, nil
 	}
@@ -53,9 +53,9 @@ func NewCipherFromKey(config *ParserTask, key *m3u8.Key, queryKey func(u string)
 		MyKeyIV: config.KeyIV,
 	}
 	req, err := http.NewRequest("GET", key.URI, nil)
-	req = req.WithContext(SharedApp.ctx)
+	req = req.WithContext(config.Ctx)
 	if err != nil {
-		SharedApp.logError(fmt.Sprintf("生成 密钥 Key 请求出粗：%v", err))
+		config.Logger.LogError(fmt.Sprintf("生成 密钥 Key 请求出粗：%v", err))
 		return nil, err
 	}
 	decrypt.KeyReq = req
@@ -100,7 +100,7 @@ func (c *Cipher) Decrypt(body io.Reader) (*bytes.Buffer, error) {
 	return buffer, err
 }
 
-func (c *Cipher) Generate() error {
+func (c *Cipher) Generate(config *parse.ParserTask) error {
 	var b []byte
 	key := c.KeyReq.URL.String()
 
@@ -113,20 +113,20 @@ func (c *Cipher) Generate() error {
 		}
 
 		// 下载 Key
-		resp, err := SharedApp.client.Do(req)
+		resp, err := config.Client.Do(req)
 		if err != nil {
-			SharedApp.logErrorf("下载密钥失败：%v", err)
+			config.Logger.LogErrorf("下载密钥失败：%v", err)
 			return err
 		}
 		defer func(Body io.ReadCloser) {
 			err = Body.Close()
 			if err != nil {
-				SharedApp.logError(err.Error())
+				config.Logger.LogError(err.Error())
 			}
 		}(resp.Body)
 
 		if resp.StatusCode != 200 {
-			return NetworkError{
+			return custom_error.NetworkError{
 				Code: resp.StatusCode,
 				URL:  c.KeyReq.URL.String(),
 			}

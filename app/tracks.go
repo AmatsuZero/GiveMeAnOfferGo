@@ -1,44 +1,35 @@
-package main
+package app
 
 import (
+	"GiveMeAnOffer/downloader"
+	"GiveMeAnOffer/eventbus"
+	"GiveMeAnOffer/parse"
 	"context"
-	"os"
-	"path/filepath"
-	"time"
-
 	"golang.org/x/exp/slices"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"os"
+	"path/filepath"
 )
 
-type DownloadTaskUIItem struct {
-	*ParserTask
-	CreatedAt time.Time `json:"time"`
-	UpdatedAt time.Time
-	Status    string            `json:"status"`
-	IsDone    bool              `json:"isDone"`
-	VideoPath string            `json:"videoPath"`
-	State     DownloadTaskState `json:"state"`
-}
-
 // 通知前端任务列表添加任务
-func (a *App) addTaskNotifyItem(task *ParserTask) *DownloadTaskUIItem {
-	item := &DownloadTaskUIItem{
+func (a *App) addTaskNotifyItem(task *parse.ParserTask) *downloader.DownloadTaskUIItem {
+	item := &downloader.DownloadTaskUIItem{
 		ParserTask: task,
 		Status:     "初始化...",
-		State:      DownloadTaskIdle,
+		State:      downloader.DownloadTaskIdle,
 	}
 
 	if a.isCliMode() {
 		a.tasks = append(a.tasks, item)
-		a.eventsEmit(TaskNotifyCreate, item)
+		a.EventsEmit(eventbus.TaskNotifyCreate, item)
 		return item
 	}
 
 	// 先从记录里面查找
 	for _, t := range a.tasks {
 		if t.Url == task.Url {
-			a.eventsEmit(TaskAddEvent, EventMessage{
+			a.EventsEmit(eventbus.TaskAddEvent, parse.EventMessage{
 				Code:    -1,
 				Message: "任务已经存在",
 			})
@@ -49,16 +40,16 @@ func (a *App) addTaskNotifyItem(task *ParserTask) *DownloadTaskUIItem {
 	// 通知前端任务列表添加任务
 	a.db.Create(item)
 	a.tasks = append(a.tasks, item)
-	a.eventsEmit(TaskNotifyCreate, item)
+	a.EventsEmit(eventbus.TaskNotifyCreate, item)
 	return item
 }
 
-func (a *App) RemoveTaskNotifyItem(item *DownloadTaskUIItem) (err error) {
+func (a *App) RemoveTaskNotifyItem(item *downloader.DownloadTaskUIItem) (err error) {
 	err = a.removeLocalNotifyItem(item)
 	if err != nil {
 		return err
 	}
-	idx := slices.IndexFunc(a.tasks, func(ele *DownloadTaskUIItem) bool {
+	idx := slices.IndexFunc(a.tasks, func(ele *downloader.DownloadTaskUIItem) bool {
 		return ele.Url == item.Url
 	})
 	if idx == -1 {
@@ -69,7 +60,7 @@ func (a *App) RemoveTaskNotifyItem(item *DownloadTaskUIItem) (err error) {
 	return err
 }
 
-func (a *App) removeLocalNotifyItem(item *DownloadTaskUIItem) (err error) {
+func (a *App) removeLocalNotifyItem(item *downloader.DownloadTaskUIItem) (err error) {
 	// 先看看是否已经下载过是否存在
 	if _, err = os.Stat(item.VideoPath); os.IsNotExist(err) {
 		return nil
@@ -94,25 +85,25 @@ func (a *App) initDB() {
 		QueryFields: true,
 	})
 	if err != nil {
-		a.logErrorf("初始化数据库失败: %v", err)
+		a.LogErrorf("初始化数据库失败: %v", err)
 		return
 	}
 
 	a.db = db
-	err = a.db.AutoMigrate(&DownloadTaskUIItem{})
+	err = a.db.AutoMigrate(&downloader.DownloadTaskUIItem{})
 	if err != nil {
-		a.logErrorf("数据库自动迁移失败：%v", err)
+		a.LogErrorf("数据库自动迁移失败：%v", err)
 	}
-	a.tasks = make([]*DownloadTaskUIItem, 0)
-	a.queues = map[string]StoppableTask{}
+	a.tasks = make([]*downloader.DownloadTaskUIItem, 0)
+	a.queues = map[string]downloader.StoppableTask{}
 }
 
-func (a *App) domReady(ctx context.Context) {
+func (a *App) DomReady(_ context.Context) {
 	result := a.db.Find(&a.tasks)
-	a.logInfof("读取数据 %v 条", result.RowsAffected)
+	a.LogInfof("读取数据 %v 条", result.RowsAffected)
 
 	for _, task := range a.tasks {
-		a.eventsEmit(TaskNotifyCreate, task)
+		a.EventsEmit(eventbus.TaskNotifyCreate, task)
 	}
 }
 
@@ -124,6 +115,8 @@ func (a *App) saveTracks() {
 
 func (a *App) ClearTasks() {
 	for _, task := range a.tasks {
-		a.RemoveTaskNotifyItem(task)
+		if e := a.RemoveTaskNotifyItem(task); e != nil {
+			a.LogErrorf("移除任务失败: %v", e)
+		}
 	}
 }

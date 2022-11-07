@@ -1,7 +1,10 @@
-package main
+package parse
 
 import (
+	"GiveMeAnOffer/eventbus"
+	"GiveMeAnOffer/logger"
 	"bufio"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"io"
@@ -17,27 +20,23 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-const (
-	TaskAddEvent      = "task-add-reply"
-	SelectVariant     = "select-variant"
-	OnVariantSelected = "variant-selected"
-	TaskNotifyCreate  = "task-notify-create"
-	TaskStop          = "task-stop"
-	TaskStatusUpdate  = "task-notify-update"
-	TaskFinish        = "task-notify-end"
-)
-
 type ParserTask struct {
 	Url           string            `gorm:"primaryKey" json:"url"`
 	TaskName      string            `json:"taskName"`
 	Prefix        string            `json:"prefix"`
 	DelOnComplete bool              `json:"delOnComplete"`
 	KeyIV         string            `json:"keyIV"`
-	Headers       string            `json:"headers"`
-	headers       map[string]string `gorm:"-"`
+	Headers       string            `json:"headersMap"`
+	HeadersMap    map[string]string `gorm:"-"`
+
+	Ctx     context.Context         `gorm:"-" json:"-"`
+	Client  *http.Client            `gorm:"-" json:"-"`
+	Handler eventbus.RuntimeHandler `gorm:"-" json:"-"`
+	Logger  logger.AppLogger        `gorm:"-" json:"-"`
+	DstPath string                  `gorm:"-" json:"-"`
 }
 
-type playListInfo struct {
+type PlayListInfo struct {
 	Uri  string `json:"uri"`
 	Desc string `json:"desc"`
 }
@@ -45,7 +44,7 @@ type playListInfo struct {
 type EventMessage struct {
 	Code    int             `json:"code"`
 	Message string          `json:"message"`
-	Info    []*playListInfo `json:"info"`
+	Info    []*PlayListInfo `json:"info"`
 	Title   string          `json:"title"`
 }
 
@@ -59,14 +58,34 @@ const (
 	TaskTypeCommon
 )
 
-type ParseResult struct {
+type Result struct {
 	Type TaskType
 	Data interface{}
 }
 
-func (t *ParserTask) Parse() (*ParseResult, error) {
-	if t.headers == nil {
-		t.headers = make(map[string]string)
+func (t *ParserTask) SetupRuntime(handler eventbus.RuntimeHandler) {
+	t.Handler = handler
+}
+
+func (t *ParserTask) SetupContext(c context.Context) {
+	t.Ctx = c
+}
+
+func (t *ParserTask) SetupClient(c *http.Client) {
+	t.Client = c
+}
+
+func (t *ParserTask) SetupLogger(l logger.AppLogger) {
+	t.Logger = l
+}
+
+func (t *ParserTask) SetupDownloadPath(p string) {
+	t.DstPath = p
+}
+
+func (t *ParserTask) Parse() (*Result, error) {
+	if t.HeadersMap == nil {
+		t.HeadersMap = make(map[string]string)
 	}
 
 	if len(t.Headers) > 0 {
@@ -76,7 +95,7 @@ func (t *ParserTask) Parse() (*ParseResult, error) {
 			if len(arr) != 2 {
 				continue
 			}
-			t.headers[strings.TrimSpace(arr[0])] = strings.TrimSpace(arr[1])
+			t.HeadersMap[strings.TrimSpace(arr[0])] = strings.TrimSpace(arr[1])
 		}
 	}
 
@@ -105,11 +124,11 @@ func (t *ParserTask) Parse() (*ParseResult, error) {
 			return t.getPlayerList()
 		}
 	default:
-		return &ParseResult{Type: TaskTypeCommon, Data: []string{t.Url}}, nil
+		return &Result{Type: TaskTypeCommon, Data: []string{t.Url}}, nil
 	}
 }
 
-func (t *ParserTask) handleM3UList() (*ParseResult, error) {
+func (t *ParserTask) handleM3UList() (*Result, error) {
 	playlist, err := m3u.Parse(t.Url)
 	if err != nil {
 		return nil, err
@@ -131,7 +150,7 @@ func (t *ParserTask) handleM3UList() (*ParseResult, error) {
 		})
 	}
 
-	return &ParseResult{Type: TaskTypeM3U, Data: tasks}, nil
+	return &Result{Type: TaskTypeM3U, Data: tasks}, nil
 }
 
 func (t *ParserTask) NewChinaAACCTask() *ChinaAACCParserTask {
@@ -162,7 +181,7 @@ func (t *ParserTask) NewBilibiliTask(u *url.URL) *BilibiliParserTask {
 	return ret
 }
 
-func (t *ParserTask) parseLocalFile(path string) (*ParseResult, error) {
+func (t *ParserTask) parseLocalFile(path string) (*Result, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -173,7 +192,7 @@ func (t *ParserTask) parseLocalFile(path string) (*ParseResult, error) {
 	}
 	switch listType {
 	case m3u8.MEDIA:
-		return &ParseResult{Type: TaskTypeM3U8, Data: p}, nil
+		return &Result{Type: TaskTypeM3U8, Data: p}, nil
 	case m3u8.MASTER:
 		return t.selectVariant(p.(*m3u8.MasterPlaylist))
 	}
@@ -211,29 +230,29 @@ func (t *ParserTask) BuildReq(u string) (*http.Request, error) {
 		return nil, err
 	}
 
-	origin := t.headers["Origin"]
+	origin := t.HeadersMap["Origin"]
 	if len(origin) == 0 {
-		origin = t.headers["origin"]
+		origin = t.HeadersMap["origin"]
 	}
 	if len(origin) == 0 {
 		origin = playlistUrl.Host
 	}
 	req.Header.Set("Origin", origin)
 
-	refer := t.headers["Referer"]
+	refer := t.HeadersMap["Referer"]
 	if len(refer) == 0 {
-		refer = t.headers["referer"]
+		refer = t.HeadersMap["referer"]
 	}
 	if len(refer) == 0 {
 		refer = playlistUrl.Host
 	}
 	req.Header.Set("Referer", refer)
 
-	req = req.WithContext(SharedApp.ctx)
+	req = req.WithContext(t.Ctx)
 	return req, nil
 }
 
-func (t *ParserTask) selectVariant(l *m3u8.MasterPlaylist) (*ParseResult, error) {
+func (t *ParserTask) selectVariant(l *m3u8.MasterPlaylist) (*Result, error) {
 	// 等待前端选择
 	msg := &EventMessage{
 		Code:    1,
@@ -242,15 +261,15 @@ func (t *ParserTask) selectVariant(l *m3u8.MasterPlaylist) (*ParseResult, error)
 	}
 
 	for i, variant := range l.Variants {
-		msg.Info = append(msg.Info, &playListInfo{
+		msg.Info = append(msg.Info, &PlayListInfo{
 			Desc: variant.Resolution,
 			Uri:  strconv.Itoa(i),
 		})
 	}
 
 	ch := make(chan int)
-	SharedApp.eventsEmit(SelectVariant, msg)
-	SharedApp.eventsOnce(OnVariantSelected, func(optionalData ...interface{}) {
+	t.Handler.EventsEmit(eventbus.SelectVariant, msg)
+	t.Handler.EventsOnce(eventbus.OnVariantSelected, func(optionalData ...interface{}) {
 		res := optionalData[0].(string)
 		i, _ := strconv.Atoi(res)
 		ch <- i
@@ -260,9 +279,9 @@ func (t *ParserTask) selectVariant(l *m3u8.MasterPlaylist) (*ParseResult, error)
 	return t.handleVariant(l.Variants[idx])
 }
 
-func (t *ParserTask) handleVariant(v *m3u8.Variant) (*ParseResult, error) {
+func (t *ParserTask) handleVariant(v *m3u8.Variant) (*Result, error) {
 	if v.Chunklist != nil {
-		return &ParseResult{Type: TaskTypeM3U8, Data: v.Chunklist}, nil
+		return &Result{Type: TaskTypeM3U8, Data: v.Chunklist}, nil
 	}
 	req, err := t.BuildReq(v.URI)
 	if err != nil {
@@ -273,20 +292,20 @@ func (t *ParserTask) handleVariant(v *m3u8.Variant) (*ParseResult, error) {
 	return t.Parse()
 }
 
-func (t *ParserTask) retrieveM3U8List() (m3u8.Playlist, m3u8.ListType, error) {
+func (t *ParserTask) RetrieveM3U8List() (m3u8.Playlist, m3u8.ListType, error) {
 	req, err := t.BuildReq(t.Url)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	resp, err := SharedApp.client.Do(req)
+	resp, err := t.Client.Do(req)
 	if err != nil {
 		return nil, 0, err
 	}
 	defer func(Body io.ReadCloser) {
 		err = Body.Close()
 		if err != nil {
-			SharedApp.logError(err.Error())
+			t.Logger.LogError(err.Error())
 		}
 	}(resp.Body)
 
@@ -301,7 +320,7 @@ func (t *ParserTask) handleFor509Error(err error) (m3u8.Playlist, m3u8.ListType,
 	if _, ok = e.Err.(x509.CertificateInvalidError); !ok {
 		return nil, 0, err
 	}
-	result, err := SharedApp.messageDialog(runtime.MessageDialogOptions{
+	result, err := t.Handler.MessageDialog(runtime.MessageDialogOptions{
 		Type:          runtime.QuestionDialog,
 		Title:         "遇到证书错误",
 		Message:       "是否忽略?",
@@ -311,13 +330,15 @@ func (t *ParserTask) handleFor509Error(err error) (m3u8.Playlist, m3u8.ListType,
 	if err != nil || result == "No" {
 		return nil, 0, err
 	}
-	tr := SharedApp.client.Transport.(*http.Transport)
-	tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} // 忽略证书错误
-	return t.retrieveM3U8List()
+	tr, ok := t.Client.Transport.(*http.Transport)
+	if ok {
+		tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} // 忽略证书错误
+	}
+	return t.RetrieveM3U8List()
 }
 
-func (t *ParserTask) getPlayerList() (*ParseResult, error) {
-	playlist, listType, err := t.retrieveM3U8List()
+func (t *ParserTask) getPlayerList() (*Result, error) {
+	playlist, listType, err := t.RetrieveM3U8List()
 	if err != nil {
 		playlist, listType, err = t.handleFor509Error(err)
 		if err != nil {
@@ -327,6 +348,6 @@ func (t *ParserTask) getPlayerList() (*ParseResult, error) {
 	if listType == m3u8.MASTER {
 		return t.selectVariant(playlist.(*m3u8.MasterPlaylist))
 	} else {
-		return &ParseResult{Type: TaskTypeM3U8, Data: playlist}, nil
+		return &Result{Type: TaskTypeM3U8, Data: playlist}, nil
 	}
 }

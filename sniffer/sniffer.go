@@ -1,6 +1,8 @@
-package main
+package sniffer
 
 import (
+	"GiveMeAnOffer/eventbus"
+	"GiveMeAnOffer/logger"
 	"context"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
@@ -12,6 +14,10 @@ type Sniffer struct {
 	Link          string
 	resourceLinks map[string]bool
 	Cancel        context.CancelFunc
+
+	ctx     context.Context
+	logger  logger.AppLogger
+	handler eventbus.RuntimeHandler
 }
 
 func NewSniffer(link string) *Sniffer {
@@ -20,19 +26,27 @@ func NewSniffer(link string) *Sniffer {
 	}
 }
 
+func (s *Sniffer) SetupLogger(l logger.AppLogger) {
+	s.logger = l
+}
+
+func (s *Sniffer) SetupRuntimeHandler(h eventbus.RuntimeHandler) {
+	s.handler = h
+}
+
 func (s *Sniffer) GetLinks() ([]string, error) {
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.DisableGPU,
 		chromedp.NoDefaultBrowserCheck,
 		chromedp.Flag("headless", true),
-		chromedp.Flag("ignore-certificate-errors", true),
+		chromedp.Flag("ignore-certificate-custom_error", true),
 	)
 
-	allocCtx, cancel := chromedp.NewExecAllocator(SharedApp.ctx, opts...)
+	allocCtx, cancel := chromedp.NewExecAllocator(s.ctx, opts...)
 	defer cancel()
 
-	taskCtx, cancel := chromedp.NewContext(allocCtx, chromedp.WithLogf(func(s string, i ...interface{}) {
-		SharedApp.logInfof(s, i)
+	taskCtx, cancel := chromedp.NewContext(allocCtx, chromedp.WithLogf(func(ss string, i ...interface{}) {
+		s.logger.LogInfof(ss, i)
 	}))
 
 	defer cancel()
@@ -49,7 +63,7 @@ func (s *Sniffer) GetLinks() ([]string, error) {
 
 	chromedp.ListenTarget(taskCtx, s.interceptResource(taskCtx))
 
-	SharedApp.logInfof("开始嗅探 URL：", s.Link)
+	s.logger.LogInfof("开始嗅探 URL：", s.Link)
 
 	err := chromedp.Run(taskCtx,
 		network.Enable(),
@@ -69,13 +83,13 @@ func (s *Sniffer) GetLinks() ([]string, error) {
 	return links, nil
 }
 
-func (s *Sniffer) interceptResource(ctx context.Context) func(interface{}) {
+func (s *Sniffer) interceptResource(_ context.Context) func(interface{}) {
 	s.resourceLinks = make(map[string]bool)
 	suffixes := []string{".m3u8", ".mp4", ".flv", ".mp3", ".mpd", "wav"}
 	return func(event interface{}) {
 		switch ev := event.(type) {
 		case *network.EventResponseReceived:
-			SharedApp.eventsEmit("intercept-url", ev.Response)
+			s.handler.EventsEmit("intercept-url", ev.Response)
 			for _, suffix := range suffixes {
 				if strings.Contains(ev.Response.URL, suffix) {
 					s.resourceLinks[ev.Response.URL] = true

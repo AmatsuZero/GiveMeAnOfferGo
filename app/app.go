@@ -1,9 +1,16 @@
-package main
+package app
 
 import (
+	"GiveMeAnOffer/downloader"
+	"GiveMeAnOffer/eventbus"
+	"GiveMeAnOffer/merge"
+	"GiveMeAnOffer/parse"
+	"GiveMeAnOffer/sniffer"
+	"GiveMeAnOffer/utils"
 	"context"
 	"errors"
 	"fmt"
+	"github.com/flytam/filenamify"
 	"net"
 	"net/http"
 	"os"
@@ -24,7 +31,9 @@ import (
 var configFilePath string
 var appFolder string
 
-type AppCtxKey string
+type CtxKey string
+
+var SharedApp *App
 
 func init() {
 	appFolder, _ = os.UserConfigDir()
@@ -39,21 +48,24 @@ func init() {
 		}
 	}
 
-	configFilePath = filepath.Join(appFolder, "config.json")
+	configFilePath = filepath.Join(appFolder, "Config.json")
+
+	// Create an instance of the app structure
+	SharedApp = NewApp()
 }
 
 // App struct
 type App struct {
-	config         *UserConfig
+	Config         *UserConfig
 	ctx            context.Context
 	client         *http.Client
 	stopTasks      context.CancelFunc
-	sniffer        *Sniffer
+	sniffer        *sniffer.Sniffer
 	concurrentLock chan struct{}
 
 	db     *gorm.DB
-	tasks  []*DownloadTaskUIItem
-	queues map[string]StoppableTask
+	tasks  []*downloader.DownloadTaskUIItem
+	queues map[string]downloader.StoppableTask
 }
 
 // NewApp creates a new App application struct
@@ -76,31 +88,31 @@ func NewApp() *App {
 	}
 }
 
-func (a *App) startup(ctx context.Context) {
+func (a *App) Startup(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	a.ctx, a.stopTasks = ctx, cancel
 
 	config, err := NewConfig(configFilePath)
 	if err != nil {
-		a.logError(err.Error())
+		a.LogError(err.Error())
 	} else if config.ConfigProxy != nil {
 		// 写入代理配置
 		err = os.Setenv("HTTP_PROXY", config.ConfigProxy.http)
 		if err != nil {
-			a.logError(err.Error())
+			a.LogError(err.Error())
 		}
 		err = os.Setenv("HTTPS_PROXY", config.ConfigProxy.https)
 		if err != nil {
-			a.logError(err.Error())
+			a.LogError(err.Error())
 		}
 	}
-	a.config = config
+	a.Config = config
 	a.concurrentLock = make(chan struct{}, config.ConCurrentCnt)
 	a.initDB()
 }
 
-func (a *App) shutdown(ctx context.Context) {
-	err := a.config.Save()
+func (a *App) Shutdown(ctx context.Context) {
+	err := a.Config.Save()
 	if err != nil {
 		runtime.LogError(ctx, err.Error())
 	}
@@ -147,12 +159,27 @@ func (a *App) OpenSelectTsDir(dir string) ([]string, error) {
 	return a.OpenSelectTsDir(dir)
 }
 
-func (a *App) StartMergeTs(config *MergeFilesConfig) (string, error) {
+func (a *App) StartMergeTs(config *merge.FilesConfig) (string, error) {
+	config.SetupLogger(a)
+	fn := ""
+	if len(config.Output) == 0 {
+		fn = config.TsName
+		if len(fn) > 0 {
+			n, err := filenamify.Filenamify(fn, filenamify.Options{})
+			if err != nil {
+				n = fmt.Sprintf("%v", time.Now().Unix())
+			}
+			fn = n
+		} else {
+			fn = fmt.Sprintf("%v", time.Now().Unix())
+		}
+		config.Output = filepath.Join(a.Config.PathDownloader, fn+".mp4")
+	}
 	return config.Merge()
 }
 
 func (a *App) OpenConfigDir() (string, error) {
-	defaultDir := a.config.PathDownloader
+	defaultDir := a.Config.PathDownloader
 	if len(defaultDir) == 0 {
 		base, _ := os.UserHomeDir()
 		defaultDir = filepath.Join(base, "Downloads")
@@ -168,64 +195,70 @@ func (a *App) OpenConfigDir() (string, error) {
 		return "", err
 	}
 
-	a.config.PathDownloader = dir
+	a.Config.PathDownloader = dir
 	return dir, err
 }
 
-func (a *App) TaskAdd(task *ParserTask) error {
+func (a *App) TaskAdd(task *parse.ParserTask) error {
+	task.SetupRuntime(a)
+	task.SetupClient(a.client)
+	task.SetupContext(a.ctx)
+	task.SetupLogger(a)
+	task.SetupDownloadPath(a.Config.PathDownloader)
 	ret, err := task.Parse()
+
 	if err != nil {
 		return err
 	}
 	switch ret.Type {
-	case TaskTypeCommon:
+	case parse.TaskTypeCommon:
 		err = a.handleCommonTask(task, ret)
-	case TaskTypeChinaAACC:
+	case parse.TaskTypeChinaAACC:
 		err = a.handleAACCTask(ret)
-	case TaskTypeM3U8:
+	case parse.TaskTypeM3U8:
 		err = a.handleM3U8Task(task, ret)
-	case TaskTypeM3U:
+	case parse.TaskTypeM3U:
 		err = a.handleM3UTask(ret)
-	case TaskTypeBilibili:
+	case parse.TaskTypeBilibili:
 		err = a.handleBilibiliTask(ret)
 	}
 	return err
 }
 
-func (a *App) handleBilibiliTask(result *ParseResult) error {
-	tasks := result.Data.([]*BilibiliParserTask)
+func (a *App) handleBilibiliTask(result *parse.Result) error {
+	tasks := result.Data.([]*parse.BilibiliParserTask)
 	for _, task := range tasks {
-		go func(t *BilibiliParserTask) {
-			item := &DownloadTaskUIItem{
+		go func(t *parse.BilibiliParserTask) {
+			item := &downloader.DownloadTaskUIItem{
 				ParserTask: t.ParserTask,
 				Status:     "初始化...",
-				State:      DownloadTaskProcessing,
+				State:      downloader.DownloadTaskProcessing,
 			}
-			a.eventsEmit(TaskNotifyCreate, item)
+			a.EventsEmit(eventbus.TaskNotifyCreate, item)
 
-			downloader := &CommonDownloader{}
-			downloader.NotifyItem = item
-			err := downloader.StartDownload(t.ParserTask, t.Urls)
+			d := &downloader.CommonDownloader{}
+			d.NotifyItem = item
+			err := d.StartDownload(t.ParserTask, t.Urls)
 
 			if err != nil {
 				item.Status = "下载失败，请检查链接有效性"
-				item.State = DownloadTaskError
-				a.eventsEmit(TaskFinish, item)
+				item.State = downloader.DownloadTaskError
+				a.EventsEmit(eventbus.TaskFinish, item)
 				return
 			}
 
 			// 遍历下载文件夹，调整顺序
-			files, err := os.ReadDir(downloader.DownloadDir)
+			files, err := os.ReadDir(d.DownloadDir)
 			var fileList []string
 			if err != nil {
 				item.Status = "读取文件夹失败"
-				item.State = DownloadTaskError
-				a.eventsEmit(TaskFinish, item)
+				item.State = downloader.DownloadTaskError
+				a.EventsEmit(eventbus.TaskFinish, item)
 				return
 			}
 
 			for _, f := range files {
-				fileList = append(fileList, filepath.Join(downloader.DownloadDir, f.Name()))
+				fileList = append(fileList, filepath.Join(d.DownloadDir, f.Name()))
 			}
 
 			sort.Slice(fileList, func(i, j int) bool {
@@ -233,58 +266,58 @@ func (a *App) handleBilibiliTask(result *ParseResult) error {
 				return t.OrderDict[lhs] < t.OrderDict[rhs]
 			})
 
-			merger := &MergeFilesConfig{
+			merger := &merge.FilesConfig{
 				Files:     fileList,
 				TsName:    t.TaskName,
-				MergeType: MergeTypeSpeed,
+				MergeType: merge.Speed,
 			}
 
-			output, err := merger.Merge()
+			output, err := a.StartMergeTs(merger)
 			if err != nil {
 				item.Status = "合并出错，请尝试手动合并"
-				item.State = DownloadTaskError
-				a.eventsEmit(TaskFinish, item)
+				item.State = downloader.DownloadTaskError
+				a.EventsEmit(eventbus.TaskFinish, item)
 				return
 			}
 
 			if t.DelOnComplete {
-				err = os.RemoveAll(downloader.DownloadDir)
+				err = os.RemoveAll(d.DownloadDir)
 				if err != nil {
-					SharedApp.logErrorf("临时文件删除失败：%v", err)
+					a.LogErrorf("临时文件删除失败：%v", err)
 				} else {
-					SharedApp.logInfo("临时文件删除完成")
+					a.LogInfo("临时文件删除完成")
 				}
 			}
 
 			item.Status = "已完成"
 			item.IsDone = true
 			item.VideoPath = output
-			item.State = DownloadTaskDone
-			a.eventsEmit(TaskFinish, item)
+			item.State = downloader.DownloadTaskDone
+			a.EventsEmit(eventbus.TaskFinish, item)
 		}(task)
 	}
 	return nil
 }
 
-func (a *App) handleM3UTask(result *ParseResult) (err error) {
-	tasks := result.Data.([]*ParserTask)
+func (a *App) handleM3UTask(result *parse.Result) (err error) {
+	tasks := result.Data.([]*parse.ParserTask)
 	ch := make(chan int)
 
-	msg := &EventMessage{
+	msg := &parse.EventMessage{
 		Code:    1,
 		Message: "请选择要下载的链接",
 		Title:   "* 片源",
 	}
 
 	for i, task := range tasks {
-		msg.Info = append(msg.Info, &playListInfo{
+		msg.Info = append(msg.Info, &parse.PlayListInfo{
 			Desc: task.TaskName,
 			Uri:  strconv.Itoa(i),
 		})
 	}
 
-	SharedApp.eventsEmit(SelectVariant, msg)
-	SharedApp.eventsOnce(OnVariantSelected, func(optionalData ...interface{}) {
+	a.EventsEmit(eventbus.SelectVariant, msg)
+	a.EventsOnce(eventbus.OnVariantSelected, func(optionalData ...interface{}) {
 		res := optionalData[0].(string)
 		i, _ := strconv.Atoi(res)
 		ch <- i
@@ -294,9 +327,9 @@ func (a *App) handleM3UTask(result *ParseResult) (err error) {
 	return a.TaskAdd(tasks[idx])
 }
 
-func (a *App) handleM3U8Task(task *ParserTask, result *ParseResult) (err error) {
+func (a *App) handleM3U8Task(task *parse.ParserTask, result *parse.Result) (err error) {
 	mpl := result.Data.(*m3u8.MediaPlaylist)
-	queue := &M3U8DownloadQueue{}
+	queue := &downloader.M3U8DownloadQueue{}
 	a.queues[task.Url] = queue
 	// 任务列表添加任务
 	item := a.addTaskNotifyItem(task)
@@ -311,10 +344,10 @@ func (a *App) handleM3U8Task(task *ParserTask, result *ParseResult) (err error) 
 	}
 	// 通知前端任务即将开始
 	item.Status = info
-	a.eventsEmit(TaskStatusUpdate, item)
+	a.EventsEmit(eventbus.TaskStatusUpdate, item)
 
 	shouldStop := false
-	a.eventsOn(TaskStop, func(optionalData ...interface{}) {
+	a.EventsOn(eventbus.TaskStop, func(optionalData ...interface{}) {
 		u := optionalData[0].(string)
 		if u != task.Url { // 只停止自己的任务
 			return
@@ -322,14 +355,14 @@ func (a *App) handleM3U8Task(task *ParserTask, result *ParseResult) (err error) 
 		queue.Stop()
 		shouldStop = true
 		item.Status = "任务停止中..."
-		a.eventsEmit(TaskFinish, item)
+		a.EventsEmit(eventbus.TaskFinish, item)
 	})
 
 	go func() {
 		defer delete(a.queues, task.Url)
 
-		item.State = DownloadTaskProcessing
-		a.eventsEmit(TaskStatusUpdate, item)
+		item.State = downloader.DownloadTaskProcessing
+		a.EventsEmit(eventbus.TaskStatusUpdate, item)
 		// 开始下载
 		a.concurrentLock <- struct{}{}
 		err = queue.StartDownload(task, mpl)
@@ -337,66 +370,66 @@ func (a *App) handleM3U8Task(task *ParserTask, result *ParseResult) (err error) 
 		<-a.concurrentLock
 		if shouldStop {
 			item.Status = "任务已经停止"
-			item.State = DownloadTaskError
-			a.eventsEmit(TaskFinish, item)
+			item.State = downloader.DownloadTaskError
+			a.EventsEmit(eventbus.TaskFinish, item)
 			return
 		} else if err != nil {
 			item.Status = "下载失败，请检查链接有效性"
-			item.State = DownloadTaskError
-			a.eventsEmit(TaskFinish, item)
+			item.State = downloader.DownloadTaskError
+			a.EventsEmit(eventbus.TaskFinish, item)
 			return
 		}
 
 		item.Status = "已完成，合并中..."
-		a.eventsEmit(TaskFinish, item)
-		a.logInfof("切片下载完成，一共%v个", len(queue.tasks))
+		a.EventsEmit(eventbus.TaskFinish, item)
+		a.LogInfof("切片下载完成，一共%v个", len(queue.Tasks))
 
-		merger := NewMergeConfigFromDownloadQueue(queue, task.TaskName)
-		output, err := merger.Merge()
+		merger := merge.NewMergeConfigFromDownloadQueue(queue, task.TaskName)
+		output, err := a.StartMergeTs(merger)
 		if err != nil {
 			item.Status = "合并出错，请尝试手动合并"
-			item.State = DownloadTaskError
-			a.eventsEmit(TaskFinish, item)
+			item.State = downloader.DownloadTaskError
+			a.EventsEmit(eventbus.TaskFinish, item)
 			return
 		}
 
-		a.logInfo("切片合并完成")
+		a.LogInfo("切片合并完成")
 		if task.DelOnComplete {
 			err = os.RemoveAll(queue.DownloadDir)
 			if err != nil {
-				a.logErrorf("切片删除失败: %v", err)
+				a.LogErrorf("切片删除失败: %v", err)
 			} else {
-				a.logInfo("切片删除完成")
+				a.LogInfo("切片删除完成")
 			}
 		}
 
 		item.Status = "已完成"
 		item.IsDone = true
-		item.State = DownloadTaskDone
+		item.State = downloader.DownloadTaskDone
 		item.VideoPath = output
-		a.eventsEmit(TaskFinish, item)
+		a.EventsEmit(eventbus.TaskFinish, item)
 	}()
 	return
 }
 
-func (a *App) handleAACCTask(result *ParseResult) error {
-	ch := result.Data.(chan *ParserTask)
+func (a *App) handleAACCTask(result *parse.Result) error {
+	ch := result.Data.(chan *parse.ParserTask)
 	for parserTask := range ch {
 		err := a.TaskAdd(parserTask)
 		if err != nil {
-			a.logErrorf("正保网校课程下载失败，任务名：%v，链接：%v", parserTask.TaskName, parserTask.Url)
+			a.LogErrorf("正保网校课程下载失败，任务名：%v，链接：%v", parserTask.TaskName, parserTask.Url)
 		}
 	}
 	return nil
 }
 
-func (a *App) handleCommonTask(task *ParserTask, result *ParseResult) (err error) {
+func (a *App) handleCommonTask(task *parse.ParserTask, result *parse.Result) (err error) {
 	item := a.addTaskNotifyItem(task)
 
 	go func() {
-		item.State = DownloadTaskProcessing
+		item.State = downloader.DownloadTaskProcessing
 		a.concurrentLock <- struct{}{}
-		q := &CommonDownloader{}
+		q := &downloader.CommonDownloader{}
 		a.queues[task.Url] = q
 		q.NotifyItem = item
 		err = q.StartDownload(task, result.Data.([]string))
@@ -406,15 +439,15 @@ func (a *App) handleCommonTask(task *ParserTask, result *ParseResult) (err error
 	return
 }
 
-func (a *App) TaskAddMuti(tasks []*ParserTask) error {
+func (a *App) TaskAddMuti(tasks []*parse.ParserTask) error {
 	var wg sync.WaitGroup
 	for _, task := range tasks {
 		wg.Add(1)
-		go func(t *ParserTask) {
+		go func(t *parse.ParserTask) {
 			defer wg.Done()
 			e := a.TaskAdd(t)
 			if e != nil {
-				a.logErrorf("下载任务失败:%v, 原因：%v", t.Url, e.Error())
+				a.LogErrorf("下载任务失败:%v, 原因：%v", t.Url, e.Error())
 			}
 
 		}(task)
@@ -427,21 +460,23 @@ func (a *App) SniffLinks(u string) ([]string, error) {
 	if a.sniffer != nil && a.sniffer.Cancel != nil {
 		a.sniffer.Cancel()
 	}
-	a.sniffer = NewSniffer(u)
+	a.sniffer = sniffer.NewSniffer(u)
+	a.sniffer.SetupLogger(a)
+	a.sniffer.SetupLogger(a)
 	return a.sniffer.GetLinks()
 }
 
 func (a *App) Open(link string) error {
 	if len(link) == 0 {
-		link = a.config.PathDownloader
+		link = a.Config.PathDownloader
 	}
 	return open.Run(link)
 }
 
 func (a *App) Play(file string) error {
-	msg, err := Cmd("ffplay", []string{file})
+	msg, err := utils.Cmd("ffplay", []string{file})
 	if err == nil {
-		a.logInfof("播放文件 %v \n %v", file, msg)
+		a.LogInfof("播放文件 %v \n %v", file, msg)
 	}
 	return err
 }
@@ -459,7 +494,7 @@ func (a *App) getCli() *Cli {
 	return val.(*Cli)
 }
 
-func (a *App) eventsEmit(eventName string, optionalData ...interface{}) {
+func (a *App) EventsEmit(eventName string, optionalData ...interface{}) {
 	cli := a.getCli()
 	if cli != nil {
 		cli.eventBus.Publish(eventName, optionalData...)
@@ -468,7 +503,7 @@ func (a *App) eventsEmit(eventName string, optionalData ...interface{}) {
 	}
 }
 
-func (a *App) eventsOnce(eventName string, callback func(optionalData ...interface{})) {
+func (a *App) EventsOnce(eventName string, callback func(optionalData ...interface{})) {
 	cli := a.getCli()
 	if cli != nil {
 		_ = cli.eventBus.Subscribe(eventName, callback)
@@ -477,14 +512,14 @@ func (a *App) eventsOnce(eventName string, callback func(optionalData ...interfa
 	}
 }
 
-func (a *App) messageDialog(dialogOptions runtime.MessageDialogOptions) (string, error) {
+func (a *App) MessageDialog(dialogOptions runtime.MessageDialogOptions) (string, error) {
 	if a.isCliMode() {
 		return "", nil
 	}
 	return runtime.MessageDialog(a.ctx, dialogOptions)
 }
 
-func (a *App) eventsOn(eventName string, callback func(optionalData ...interface{})) {
+func (a *App) EventsOn(eventName string, callback func(optionalData ...interface{})) {
 	cli := a.getCli()
 	if cli != nil {
 		_ = cli.eventBus.Subscribe(eventName, callback)
@@ -493,39 +528,39 @@ func (a *App) eventsOn(eventName string, callback func(optionalData ...interface
 	}
 }
 
-func (a *App) logInfof(format string, args ...interface{}) {
+func (a *App) LogInfof(format string, args ...interface{}) {
 	cli := a.getCli()
 	if cli != nil {
 		if *cli.verbose {
-			fmt.Fprintf(os.Stdout, "INFO | "+format+"\n", args...)
+			_, _ = fmt.Fprintf(os.Stdout, "INFO | "+format+"\n", args...)
 		}
 	} else {
 		runtime.LogInfof(a.ctx, format, args...)
 	}
 }
 
-func (a *App) logInfo(message string) {
+func (a *App) LogInfo(message string) {
 	cli := a.getCli()
 	if cli != nil {
 		if *cli.verbose {
-			fmt.Fprintln(os.Stdout, "INFO | "+message)
+			_, _ = fmt.Fprintln(os.Stdout, "INFO | "+message)
 		}
 	} else {
 		runtime.LogInfo(a.ctx, message)
 	}
 }
 
-func (a *App) logError(message string) {
+func (a *App) LogError(message string) {
 	if a.isCliMode() {
-		fmt.Fprintln(os.Stderr, "ERR | "+message)
+		_, _ = fmt.Fprintln(os.Stderr, "ERR | "+message)
 	} else {
 		runtime.LogError(a.ctx, message)
 	}
 }
 
-func (a *App) logErrorf(format string, args ...interface{}) {
+func (a *App) LogErrorf(format string, args ...interface{}) {
 	if a.isCliMode() {
-		fmt.Fprintf(os.Stderr, "ERR | "+format+"\n", args...)
+		_, _ = fmt.Fprintf(os.Stderr, "ERR | "+format+"\n", args...)
 	} else {
 		runtime.LogErrorf(a.ctx, format, args...)
 	}

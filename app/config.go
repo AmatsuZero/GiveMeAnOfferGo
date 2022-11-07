@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"encoding/json"
@@ -39,7 +39,7 @@ func NewConfig(path string) (*UserConfig, error) {
 	defer func(file *os.File) {
 		err = file.Close()
 		if err != nil {
-			SharedApp.logError(err.Error())
+			SharedApp.LogError(err.Error())
 		}
 	}(file)
 	var tmp UserConfig
@@ -60,7 +60,7 @@ func (c *UserConfig) Save() error {
 	defer func(f *os.File) {
 		err = f.Close()
 		if err != nil {
-			SharedApp.logError(err.Error())
+			SharedApp.LogError(err.Error())
 		}
 	}(f)
 	_, err = f.Write(data)
