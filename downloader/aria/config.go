@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 )
 
@@ -44,6 +45,26 @@ type CryptoLevel string
 const (
 	CryptoLevelNone CryptoLevel = "plain"
 	CryptoLevelArc4 CryptoLevel = "arc4"
+)
+
+type EventPollType string
+
+const (
+	EventPollTypeEPoll  EventPollType = "epoll"
+	EventPollTypeKqueue EventPollType = "kqueue"
+	EventPollTypePort   EventPollType = "port"
+	EventPollTypePoll   EventPollType = "poll"
+	EventPollTypeSelect EventPollType = "select"
+)
+
+type LogLevel string
+
+const (
+	LogLevelDebug  LogLevel = "debug"
+	LogLevelInfo   LogLevel = "info"
+	LogLevelNotice LogLevel = "notice"
+	LogLevelWarn   LogLevel = "warn"
+	LogLevelError  LogLevel = "error"
 )
 
 type Config struct {
@@ -173,36 +194,36 @@ type Config struct {
 		DHT 网络与 UDP tracker 监听端口(UDP), 默认:6881-6999
 		因协议不同，可以与 BT 监听端口使用相同的端口，方便配置防火墙和端口转发策略。
 	*/
-	DHTListenPort int `json:"dht-listen-port"`
+	DHTListenPort int `conf:"dht-listen-port"`
 	// 启用 IPv4 DHT 功能, PT 下载(私有种子)会自动禁用, 默认:true
 	EnableDHT bool
 	/*
 		启用 IPv6 DHT 功能, PT 下载(私有种子)会自动禁用，默认:false
 		在没有 IPv6 支持的环境开启可能会导致 DHT 功能异常
 	*/
-	EnableDHT6 bool `json:"enable-dht-6"`
+	EnableDHT6 bool `conf:"enable-dht-6"`
 	/*
 		指定 BT 和 DHT 网络中的 IP 地址
 		使用场景：在家庭宽带没有公网 IP 的情况下可以把 BT 和 DHT 监听端口转发至具有公网 IP 的服务器，在此填写服务器的 IP ，可以提升 BT 下载速率。
 	*/
-	BTExternalIP string `json:"bt-external-ip"`
+	BTExternalIP string `conf:"bt-external-ip"`
 	// IPv4 DHT 文件路径，默认：$HOME/.aria2/dht.dat
 	DHTFilePath string
 	// IPv6 DHT 文件路径，默认：$HOME/.aria2/dht6.dat
-	DHT6FilePath string
+	DHT6FilePath string `conf:"dht-6-file-path"`
 	// IPv4 DHT 网络引导节点
-	DHTEntryPoint string
+	DHTEntryPoint string `conf:"dht-entry-point"`
 	// IPv6 DHT 网络引导节点
-	DHTEntryPoint6 string
+	DHTEntryPoint6 string `json:"dht-entry-point6"`
 	// 本地节点发现, PT 下载(私有种子)会自动禁用 默认:false
 	BTEnableLPD bool `json:"bt-enable-lpd"`
 	/*
 		指定用于本地节点发现的接口，可能的值：接口，IP地址
 		如果未指定此选项，则选择默认接口。
 	*/
-	BTLPDInterface string
+	BTLPDInterface string `conf:"bt-lpd-interface"`
 	// 启用节点交换, PT 下载(私有种子)会自动禁用, 默认:true
-	EnablePeerExchange bool
+	EnablePeerExchange bool `conf:"enable-peer-exchange"`
 	/*
 		BT 下载最大连接数（单任务），运行时可修改。0 为不限制，默认:55
 		理想情况下连接数越多下载越快，但在实际情况是只有少部分连接到的做种者上传速度快，其余的上传慢或者不上传。
@@ -210,57 +231,57 @@ type Config struct {
 		进程崩溃：如果设备 CPU 性能一般，连接数过多导致 CPU 占用过高，因资源不足 Aria2 进程会强制被终结。
 		网络阻塞：在内网环境下，即使下载没有占满带宽也会导致其它设备无法正常上网。因远古低性能路由器的转发性能瓶颈导致
 	*/
-	BTMaxPeers int
+	BTMaxPeers int `conf:"bt-max-peers"`
 	/*
 		BT 下载期望速度值（单任务），运行时可修改。单位 K 或 M 。默认:50K
 		BT 下载速度低于此选项值时会临时提高连接数来获得更快的下载速度，不过前提是有更多的做种者可供连接。
 		实测临时提高连接数没有上限，但不会像不做限制一样无限增加，会根据算法进行合理的动态调节。
 	*/
-	BTRequestPeerSpeedLimit int64
+	BTRequestPeerSpeedLimit int64 `conf:"bt-request-peer-speed-limit"`
 	/*
 		全局最大上传速度限制, 运行时可修改, 默认:0 (无限制)
 		设置过低可能影响 BT 下载速度
 	*/
-	MaxOverallUploadLimit int64
+	MaxOverallUploadLimit int64 `conf:"max-overall-upload-limit"`
 	// 单任务上传速度限制, 默认:0 (无限制)
-	MaxUploadLimit int64
+	MaxUploadLimit int64 `conf:"max-upload-limit"`
 	/*
 		最小分享率。当种子的分享率达到此选项设置的值时停止做种, 0 为一直做种, 默认:1.0
 		强烈建议您将此选项设置为大于等于 1.0
 	*/
-	SeedRatio float64
+	SeedRatio float64 `conf:"seed-ratio"`
 	// 最小做种时间（分钟）。设置为 0 时将在 BT 任务下载完成后停止做种。
-	SeedTime int
+	SeedTime int `conf:"seed-time"`
 	// 做种前检查文件哈希, 默认:true
-	BTHashCheckSeed bool
+	BTHashCheckSeed bool `conf:"bt-hash-check-seed"`
 	// 继续之前的BT任务时, 无需再次校验, 默认:false
-	BTSeedUnverified bool
+	BTSeedUnverified bool `conf:"bt-seed-unverified"`
 	/*
 		BT tracker 服务器连接超时时间（秒）。默认：60
 		建立连接后，此选项无效，将使用 bt-tracker-timeout 选项的值
 	*/
-	BTTrackerConnectTimeout int
+	BTTrackerConnectTimeout int `json:"bt-tracker-connect-timeout"`
 	// BT tracker 服务器超时时间（秒）。默认：60
-	BTTrackerTimeout int
+	BTTrackerTimeout int `conf:"bt-tracker-timeout"`
 	// BT 服务器连接间隔时间（秒）。默认：0 (自动)
-	BTTrackerInterval int
+	BTTrackerInterval int `conf:"bt-tracker-interval"`
 	// BT 下载优先下载文件开头或结尾
 	BTPrioritizePiece struct {
 		Head, Tail int64
-	}
+	} `conf:"bt-prioritize-piece"`
 	/*
 		保存通过 WebUI(RPC) 上传的种子文件(.torrent)，默认:true
 		所有涉及种子文件保存的选项都建议开启，不保存种子文件有任务丢失的风险。
 		通过 RPC 自定义临时下载目录可能不会保存种子文件。
 	*/
-	RPCSaveUploadMetadata bool
+	RPCSaveUploadMetadata bool `conf:"rpc-save-upload-metadata"`
 	/*
 		下载种子文件(.torrent)自动开始下载, 默认:true，可选：false|mem
 		true：保存种子文件
 		false：仅下载种子文件
 		mem：将种子保存在内存中
 	*/
-	FollowTorrent FollowTorrentStrategy
+	FollowTorrent FollowTorrentStrategy `conf:"follow-torrent"`
 	/*
 	   种子文件下载完后暂停任务，默认：false
 	   在开启 follow-torrent 选项后下载种子文件或磁力会自动开始下载任务进行下载，而同时开启当此选项后会建立相关任务并暂停。
@@ -316,6 +337,53 @@ type Config struct {
 	EnableRPC bool
 	// 接受所有远程请求, 默认:false
 	RPCAllowOriginAll bool
+	// 允许外部访问, 默认:false
+	RPCListenAll bool
+	// RPC 监听端口, 默认:6800
+	RPCListenPort int
+	// RPC 密钥
+	RPCSecret string
+	// RPC 最大请求大小
+	RPCMaxRequestSize int64
+	/*
+		RPC 服务 SSL/TLS 加密, 默认：false
+		启用加密后必须使用 https 或者 wss 协议连接
+		不推荐开启，建议使用 web server 反向代理，比如 Nginx、Caddy ，灵活性更强。
+	*/
+	RPCSecure bool
+	// 在 RPC 服务中启用 SSL/TLS 加密时的证书文件(.pem/.crt)
+	RPCCertificate string
+	// 在 RPC 服务中启用 SSL/TLS 加密时的私钥文件(.key)
+	RPCPrivateKey string
+	// 事件轮询方式, 可选：epoll, kqueue, port, poll, select, 不同系统默认值不同
+	EventPoll EventPollType
+	// 启用异步 DNS 功能。默认：true
+	AsyncDNS bool
+	// 指定异步 DNS 服务器列表，未指定则从 /etc/resolv.conf 中读取
+	AsyncDNSServer []string
+	/*
+		指定单个网络接口，可能的值：接口，IP地址，主机名
+		如果接口具有多个 IP 地址，则建议指定 IP 地址。
+		已知指定网络接口会影响依赖本地 RPC 的连接的功能场景，即通过 localhost 和 127.0.0.1 无法与 Aria2 服务端进行讯通。
+	*/
+	Interface string
+	/*
+		指定多个网络接口，多个值之间使用逗号(,)分隔。
+		使用 interface 选项时会忽略此项。
+	*/
+	MultipleInterface []string
+	// 日志文件保存路径，忽略或设置为空为不保存，默认：不保存
+	Log string
+	// 日志级别，可选 debug, info, notice, warn, error 。默认：debug
+	LogLevel LogLevel
+	// 控制台日志级别，可选 debug, info, notice, warn, error ，默认：notice
+	ConsoleLogLevel LogLevel
+	// 安静模式，禁止在控制台输出日志，默认：false
+	Quiet bool
+	// 下载进度摘要输出间隔时间（秒），0 为禁止输出。默认：60
+	SummaryInterval int
+	Refer           string
+	BTMaxOpenFiles  int
 }
 
 func DefaultConfig(dir string) *Config {
@@ -358,8 +426,8 @@ func DefaultConfig(dir string) *Config {
 		ListenPort:              51413,
 		DHTListenPort:           51413,
 		EnableDHT:               true,
-		DHTFilePath:             filepath.Join(dir, "dht.dat"),
-		DHT6FilePath:            filepath.Join(dir, "dht6.dat"),
+		DHTFilePath:             filepath.Join(dir, "DHT", "dht.dat"),
+		DHT6FilePath:            filepath.Join(dir, "DHT", "dht6.dat"),
 		DHTEntryPoint:           "dht.transmissionbt.com:6881",
 		DHTEntryPoint6:          "dht.transmissionbt.com:6881",
 		BTEnableLPD:             true,
@@ -390,6 +458,14 @@ func DefaultConfig(dir string) *Config {
 		RPCAllowOriginAll:      true,
 		OnDownloadStop:         filepath.Join(dir, "scripts", "delete.sh"),
 		OnDownloadComplete:     filepath.Join(dir, "scripts", "clean.sh"),
+		RPCListenAll:           true,
+		RPCSecret:              "P3TERX",
+		RPCMaxRequestSize:      10 * utils.MB,
+		EventPoll:              EventPollTypeSelect,
+		AsyncDNS:               true,
+		AsyncDNSServer:         []string{"119.29.29.29", "223.5.5.5", "8.8.8.8", "1.1.1.1"},
+		LogLevel:               LogLevelNotice,
+		BTMaxOpenFiles:         16,
 	}
 }
 
@@ -445,7 +521,58 @@ func (c *Config) StartUp(ctx context.Context, client *http.Client, logger logger
 		} else {
 			logger.LogInfo("更新脚本成功")
 		}
+		wg.Done()
+	}()
+
+	// 下载 DHT
+	wg.Add(1)
+	go func() {
+		t := &parse.ParserTask{
+			TaskName: "DHT",
+			DstPath:  c.SaveDir,
+			Ctx:      ctx,
+			Client:   client,
+			Logger:   logger,
+		}
+
+		dsts := []string{"dht.dat", "dht6.dat"}
+		d := &downloader.CommonDownloader{}
+
+		urls := []string{
+			"https://github.com/P3TERX/aria2.conf/blob/master/dht.dat?raw=true",
+			"https://github.com/P3TERX/aria2.conf/blob/master/dht6.dat?raw=true",
+		}
+
+		err := d.StartDownload(t, urls, dsts...)
+		if err != nil && logger != nil {
+			logger.LogErrorf("更新脚本失败: %v", err)
+		} else {
+			logger.LogInfo("更新脚本成功")
+		}
+		wg.Done()
 	}()
 
 	wg.Wait()
+}
+
+func (c *Config) GenerateConfigFile() (string, error) {
+	f, err := os.Create(filepath.Join(c.SaveDir, "ari2.conf"))
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	t := reflect.TypeOf(c)
+	v := reflect.ValueOf(c)
+
+	for k := 0; k < t.NumField(); k++ {
+		lex := t.Field(k).Tag.Get("conf")
+		val := v.Field(k).Interface()
+		_, err = f.WriteString(fmt.Sprintf("%v=%v\n", lex, val))
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return f.Name(), nil
 }
