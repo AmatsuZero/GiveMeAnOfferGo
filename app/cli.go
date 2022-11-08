@@ -241,18 +241,26 @@ func (c *Cli) printVersion(_ *cobra.Command, _ []string) {
 }
 
 func (c *Cli) addAriaCmd() *Cli {
-	port := new(int)
+	port, secret := new(int), ""
+	localPort := new(int)
+
 	cmd := &cobra.Command{
 		Use:   "aria",
 		Short: "启动 aria 服务",
 		Run: func(cmd *cobra.Command, args []string) {
+			SharedApp.Config.AriaConfig.ListenPort = *port
+			SharedApp.Config.AriaConfig.RPCSecret = secret
+
 			client := aria.Client{
 				Config: SharedApp.Config.AriaConfig,
 			}
-			client.RunLocal(*port)
+
+			client.RunLocal(*localPort)
 		},
 	}
 	port = cmd.Flags().IntP("port", "p", 6800, "启动 aria2 端口号")
+	cmd.Flags().StringVarP(&secret, "secret", "s", "123456", "设置 TOKEN")
+	localPort = cmd.Flags().Int("localport", 8080, "本地服务端口号")
 	c.rootCmd.AddCommand(cmd)
 	return c
 }

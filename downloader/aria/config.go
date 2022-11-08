@@ -389,6 +389,9 @@ type Config struct {
 	SummaryInterval int    `conf:"summary-interval"`
 	Refer           string `conf:"refer"`
 	BTMaxOpenFiles  int    `conf:"bt-max-open-files"`
+
+	logger logger.AppLogger
+	ctx    context.Context
 }
 
 func DefaultConfig(dir string) *Config {
@@ -480,6 +483,9 @@ func DefaultConfig(dir string) *Config {
 }
 
 func (c *Config) StartUp(ctx context.Context, client *http.Client, logger logger.AppLogger) {
+	c.ctx = ctx
+	c.logger = logger
+
 	wg := &sync.WaitGroup{}
 	// 更新 Trackers
 	wg.Add(1)
@@ -562,7 +568,44 @@ func (c *Config) StartUp(ctx context.Context, client *http.Client, logger logger
 		wg.Done()
 	}()
 
+	// 下载 AriaNG， 这个没必要反复下
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if _, err := os.Stat(filepath.Join(c.ConfigDir, "static", "index.html")); !errors.Is(err, os.ErrNotExist) {
+			return
+		}
+
+		t := &parse.ParserTask{
+			TaskName: "tmp",
+			DstPath:  c.ConfigDir,
+			Ctx:      ctx,
+			Client:   client,
+			Logger:   logger,
+		}
+
+		d := &downloader.CommonDownloader{}
+		err := d.StartDownload(t, []string{"https://github.com/mayswind/AriaNg/releases/download/1.3.0/AriaNg-1.3.0-AllInOne.zip"})
+		if err != nil {
+			logger.LogErrorf("下载静态页面失败: %v", err)
+			return
+		}
+		defer func() {
+			_ = os.RemoveAll(filepath.Join(c.ConfigDir, "tmp"))
+		}()
+
+		_, err = utils.Unzip(filepath.Join(c.ConfigDir, "tmp", "AriaNg-1.3.0-AllInOne.zip"), filepath.Join(c.ConfigDir, "static"))
+		if err != nil {
+			logger.LogErrorf("解压静态页面失败：%v", err)
+		} else {
+			logger.LogInfo("解压静态页面成功")
+		}
+	}()
 	wg.Wait()
+}
+
+func (c *Config) downloadIndexPage() {
+
 }
 
 func (c *Config) GenerateConfigFile() (string, error) {
