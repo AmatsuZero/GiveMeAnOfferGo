@@ -2,6 +2,7 @@ package app
 
 import (
 	"GiveMeAnOffer/downloader"
+	"GiveMeAnOffer/downloader/aria"
 	"GiveMeAnOffer/merge"
 	"GiveMeAnOffer/parse"
 	"context"
@@ -35,6 +36,7 @@ func NewCli() *Cli {
 	cli := &Cli{
 		ctx:      ctx,
 		eventBus: eventbus.NewAsyncEventBus(),
+		verbose:  new(bool),
 	}
 
 	ctx = context.WithValue(ctx, CliKey, cli)
@@ -60,7 +62,7 @@ func NewCli() *Cli {
 	rootCmd.PersistentFlags().Bool("headless", true, "无 UI 启动")
 	cli.verbose = rootCmd.PersistentFlags().BoolP("verbose", "v", false, "是否打印日志信息")
 
-	cli.addVersionCmd().addParseCmd().addMergeFileCmd()
+	cli.addVersionCmd().addParseCmd().addMergeFileCmd().addAriaCmd()
 
 	return cli
 }
@@ -236,6 +238,23 @@ func (c *Cli) parse(task *parse.ParserTask) (err error) {
 
 func (c *Cli) printVersion(_ *cobra.Command, _ []string) {
 	_, _ = fmt.Fprintln(os.Stdout, "v1.0.0")
+}
+
+func (c *Cli) addAriaCmd() *Cli {
+	port := new(int)
+	cmd := &cobra.Command{
+		Use:   "aria",
+		Short: "启动 aria 服务",
+		Run: func(cmd *cobra.Command, args []string) {
+			client := aria.Client{
+				Config: SharedApp.Config.AriaConfig,
+			}
+			client.RunLocal(*port)
+		},
+	}
+	port = cmd.Flags().IntP("port", "p", 6800, "启动 aria2 端口号")
+	c.rootCmd.AddCommand(cmd)
+	return c
 }
 
 func (c *Cli) Execute() error {

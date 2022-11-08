@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"os/exec"
 )
@@ -18,4 +19,15 @@ func Cmd(commandName string, params []string) (string, error) {
 	}
 	err = cmd.Wait()
 	return out.String(), err
+}
+
+func CreateFileIfNotExist(p string) error {
+	if _, err := os.Stat(p); errors.Is(err, os.ErrNotExist) {
+		f, e := os.Create(p)
+		if e != nil {
+			return e
+		}
+		f.Close()
+	}
+	return nil
 }

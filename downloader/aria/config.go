@@ -8,10 +8,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 )
 
@@ -68,7 +70,8 @@ const (
 )
 
 type Config struct {
-	Trackers []string
+	Trackers  []string
+	ConfigDir string
 	// 下载目录。可使用绝对路径或相对路径, 默认: 当前启动位置
 	SaveDir string `conf:"dir"`
 	/*
@@ -77,7 +80,7 @@ type Config struct {
 		建议在有足够的内存空闲情况下适当增加，但不要超过剩余可用内存空间大小。
 		此项值仅决定上限，实际对内存的占用取决于网速(带宽)和设备性能等其它因素。
 	*/
-	DiskCache int64 `conf:"disk-cache"`
+	DiskCache int64 `conf:"disk-cache, readable"`
 	/*
 		文件预分配方式, 可选：none, prealloc, trunc, falloc, 默认:prealloc
 		预分配对于机械硬盘可有效降低磁盘碎片、提升磁盘读写性能、延长磁盘寿命。
@@ -88,7 +91,7 @@ type Config struct {
 	*/
 	FileAllocation FileAllocType `conf:"file-allocation"`
 	// 文件预分配大小限制。小于此选项值大小的文件不预分配空间，单位 K 或 M，默认：5M
-	NoFileAllocationLimit int64 `conf:"no-file-allocation-limit"`
+	NoFileAllocationLimit int64 `conf:"no-file-allocation-limit, readable"`
 	// 断点续传
 	Continue bool `conf:"continue"`
 	// 始终尝试断点续传，无法断点续传则终止下载，默认：true
@@ -153,9 +156,9 @@ type Config struct {
 		比如此项值为 10M, 当文件为 20MB 会分成两段并使用两个来源下载, 文件为 15MB 则只使用一个来源下载。
 		理论上值越小使用下载分段就越多，所能获得的实际线程数就越大，下载速度就越快，但受限于所下载文件服务器的策略。
 	*/
-	MinSplitSize int64 `conf:"min-split-size"`
+	MinSplitSize int64 `conf:"min-split-size, readable"`
 	// HTTP/FTP 下载分片大小，所有分割都必须是此项值的倍数，最小值为 1M (增强版为 1K)，默认：1M
-	PieceLength int64 `conf:"piece-length"`
+	PieceLength int64 `conf:"piece-length, readable"`
 	/*
 		允许分片大小变化。默认：false
 		false：当分片大小与控制文件中的不同时将会中止下载
@@ -237,12 +240,12 @@ type Config struct {
 		BT 下载速度低于此选项值时会临时提高连接数来获得更快的下载速度，不过前提是有更多的做种者可供连接。
 		实测临时提高连接数没有上限，但不会像不做限制一样无限增加，会根据算法进行合理的动态调节。
 	*/
-	BTRequestPeerSpeedLimit int64 `conf:"bt-request-peer-speed-limit"`
+	BTRequestPeerSpeedLimit int64 `conf:"bt-request-peer-speed-limit, readable"`
 	/*
 		全局最大上传速度限制, 运行时可修改, 默认:0 (无限制)
 		设置过低可能影响 BT 下载速度
 	*/
-	MaxOverallUploadLimit int64 `conf:"max-overall-upload-limit"`
+	MaxOverallUploadLimit int64 `conf:"max-overall-upload-limit, readable"`
 	// 单任务上传速度限制, 默认:0 (无限制)
 	MaxUploadLimit int64 `conf:"max-upload-limit"`
 	/*
@@ -267,7 +270,8 @@ type Config struct {
 	BTTrackerInterval int `conf:"bt-tracker-interval"`
 	// BT 下载优先下载文件开头或结尾
 	BTPrioritizePiece struct {
-		Head, Tail int64
+		Head int64 `conf:"head, readable"`
+		Tail int64 `conf:"tail, readable"`
 	} `conf:"bt-prioritize-piece"`
 	/*
 		保存通过 WebUI(RPC) 上传的种子文件(.torrent)，默认:true
@@ -345,7 +349,7 @@ type Config struct {
 	// RPC 密钥
 	RPCSecret string `conf:"rpc-secret"`
 	// RPC 最大请求大小
-	RPCMaxRequestSize int64 `conf:"rpc-max-request-size"`
+	RPCMaxRequestSize int64 `conf:"rpc-max-request-size, readable"`
 	/*
 		RPC 服务 SSL/TLS 加密, 默认：false
 		启用加密后必须使用 https 或者 wss 协议连接
@@ -401,6 +405,7 @@ func DefaultConfig(dir string) *Config {
 			"https://cdn.staticaly.com/gh/XIU2/TrackersListCollection@master/all_aria2.txt",
 			"https://trackers.p3terx.com/all_aria2.txt",
 		},
+		ConfigDir:               dir,
 		FileAllocation:          FileAllocTypeNone,
 		DiskCache:               64 * utils.MB,
 		NoFileAllocationLimit:   64 * utils.MB,
@@ -440,10 +445,13 @@ func DefaultConfig(dir string) *Config {
 		BTHashCheckSeed:         true,
 		BTTrackerConnectTimeout: 10,
 		BTTrackerTimeout:        10,
-		BTPrioritizePiece: struct{ Head, Tail int64 }{
+		BTPrioritizePiece: struct {
+			Head int64 `conf:"head, readable"`
+			Tail int64 `conf:"tail, readable"`
+		}(struct{ Head, Tail int64 }{
 			Head: 32 * utils.MB,
 			Tail: 32 * utils.MB,
-		},
+		}),
 		RPCSaveUploadMetadata:  true,
 		FollowTorrent:          SaveOnDisk,
 		BTSaveMetadata:         true,
@@ -467,6 +475,7 @@ func DefaultConfig(dir string) *Config {
 		AsyncDNSServer:         []string{"119.29.29.29", "223.5.5.5", "8.8.8.8", "1.1.1.1"},
 		LogLevel:               LogLevelNotice,
 		BTMaxOpenFiles:         16,
+		Timeout:                10,
 	}
 }
 
@@ -477,7 +486,7 @@ func (c *Config) StartUp(ctx context.Context, client *http.Client, logger logger
 	go func() {
 		t := &parse.ParserTask{
 			TaskName: "trackers",
-			DstPath:  c.SaveDir,
+			DstPath:  c.ConfigDir,
 			Ctx:      ctx,
 			Client:   client,
 			Logger:   logger,
@@ -503,7 +512,7 @@ func (c *Config) StartUp(ctx context.Context, client *http.Client, logger logger
 	go func() {
 		t := &parse.ParserTask{
 			TaskName: "scripts",
-			DstPath:  c.SaveDir,
+			DstPath:  c.ConfigDir,
 			Ctx:      ctx,
 			Client:   client,
 			Logger:   logger,
@@ -530,7 +539,7 @@ func (c *Config) StartUp(ctx context.Context, client *http.Client, logger logger
 	go func() {
 		t := &parse.ParserTask{
 			TaskName: "DHT",
-			DstPath:  c.SaveDir,
+			DstPath:  c.ConfigDir,
 			Ctx:      ctx,
 			Client:   client,
 			Logger:   logger,
@@ -554,16 +563,31 @@ func (c *Config) StartUp(ctx context.Context, client *http.Client, logger logger
 	}()
 
 	wg.Wait()
-
-	c.GenerateConfigFile()
 }
 
 func (c *Config) GenerateConfigFile() (string, error) {
-	f, err := os.Create(filepath.Join(c.SaveDir, "ari2.conf"))
+	// 创建会话文件
+	if len(c.InputFile) > 0 {
+		err := utils.CreateFileIfNotExist(c.InputFile)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	if len(c.SaveSession) > 0 {
+		err := utils.CreateFileIfNotExist(c.SaveSession)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	f, err := os.Create(filepath.Join(c.ConfigDir, "ari2.conf"))
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func(f *os.File) {
+		_ = f.Close()
+	}(f)
 
 	t := reflect.TypeOf(*c)
 	v := reflect.ValueOf(*c)
@@ -573,11 +597,73 @@ func (c *Config) GenerateConfigFile() (string, error) {
 		if len(lex) == 0 {
 			continue
 		}
-		val := v.Field(k).Interface()
-		_, err = f.WriteString(fmt.Sprintf("%v=%v\n", lex, val))
+
+		var rex interface{}
+		val := v.Field(k)
+		arr := strings.Split(lex, ",")
+		lex = arr[0]
+		if len(arr) > 1 && strings.TrimSpace(arr[1]) == "readable" && val.Kind() == reflect.Int64 {
+			rex = utils.HumanSize(float64(val.Interface().(int64)))
+		} else if a, ok := val.Interface().([]string); ok {
+			rex = strings.Join(a, ",")
+		} else if lex == "bt-prioritize-piece" {
+			var strs []string
+			if c.BTPrioritizePiece.Head > 0 {
+				strs = append(strs, fmt.Sprintf("head=%v", utils.HumanSize(float64(c.BTPrioritizePiece.Head))))
+			}
+			if c.BTPrioritizePiece.Tail > 0 {
+				strs = append(strs, fmt.Sprintf("tail=%v", utils.HumanSize(float64(c.BTPrioritizePiece.Tail))))
+			}
+			if len(strs) == 0 {
+				continue
+			}
+			rex = strings.Join(strs, ",")
+		} else if str, flag := val.Interface().(string); flag {
+			if len(str) > 0 {
+				rex = str
+			} else {
+				continue
+			}
+		} else {
+			s := fmt.Sprintf("%v", val.Interface())
+			if len(s) == 0 {
+				continue
+			}
+			rex = s
+		}
+		_, err = f.WriteString(fmt.Sprintf("%v=%v\n", lex, rex))
 		if err != nil {
 			return "", err
 		}
+	}
+	// 写入 trackers
+	dict := map[string]struct{}{}
+	filepath.Walk(filepath.Join(c.ConfigDir, "trackers"), func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		arr := strings.Split(string(data), ",")
+		for _, s := range arr {
+			dict[s] = struct{}{}
+		}
+
+		return nil
+	})
+
+	if len(dict) > 0 {
+		arr := make([]string, 0, len(dict))
+		for s, _ := range dict {
+			arr = append(arr, s)
+		}
+		f.WriteString(fmt.Sprintf("bt-tracker=%v", strings.Join(arr, ",")))
 	}
 
 	return f.Name(), nil
