@@ -248,7 +248,7 @@ func (c *Cli) addAriaCmd() *Cli {
 		Use:   "aria",
 		Short: "启动 aria 服务",
 		Run: func(cmd *cobra.Command, args []string) {
-			SharedApp.Config.AriaConfig.ListenPort = *port
+			SharedApp.Config.AriaConfig.RPCListenPort = *port
 			SharedApp.Config.AriaConfig.RPCSecret = secret
 
 			client := aria.Client{
