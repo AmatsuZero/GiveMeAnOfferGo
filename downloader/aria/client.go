@@ -1,12 +1,14 @@
 package aria
 
 import (
-	"GiveMeAnOffer/utils"
 	"fmt"
-	"github.com/skratchdot/open-golang/open"
 	"log"
 	"net/http"
 	"path/filepath"
+
+	"GiveMeAnOffer/utils"
+
+	"github.com/skratchdot/open-golang/open"
 )
 
 type Client struct {
@@ -26,7 +28,7 @@ func (c *Client) RunLocal(port int) error {
 		})
 
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("启动 aria2 失败： %v", err)
 		}
 	}()
 
@@ -37,7 +39,8 @@ func (c *Client) RunLocal(port int) error {
 
 	p := fmt.Sprintf(":%v", port)
 	open.Run("http://localhost" + p)
-	log.Fatal(http.ListenAndServe(p, nil))
+	err := http.ListenAndServe(p, nil)
+	log.Fatalf("启动本地服务失败: %v", err)
 
 	return nil
 }
