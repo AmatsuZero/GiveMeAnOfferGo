@@ -12,26 +12,33 @@ import (
 )
 
 type Client struct {
-	Config *Config
+	Config             *Config
+	IsRPCServerRunning bool
+}
+
+func (c *Client) RunRPCServer() error {
+	if c.IsRPCServerRunning {
+		return nil
+	}
+
+	p, err := c.Config.GenerateConfigFile()
+	if err != nil {
+		return err
+	}
+
+	c.IsRPCServerRunning = true
+
+	_, err = utils.Cmd("aria2c", []string{
+		"--conf-path",
+		p,
+	})
+
+	c.IsRPCServerRunning = false
+
+	return err
 }
 
 func (c *Client) RunLocal(port int) error {
-	go func() {
-		p, err := c.Config.GenerateConfigFile()
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		_, err = utils.Cmd("aria2c", []string{
-			"--conf-path",
-			p,
-		})
-
-		if err != nil {
-			log.Fatalf("启动 aria2 失败： %v", err)
-		}
-	}()
-
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		p := filepath.Join(c.Config.ConfigDir, "static", "index.html")
 		http.ServeFile(w, r, p)

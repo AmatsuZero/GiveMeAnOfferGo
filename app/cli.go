@@ -86,6 +86,9 @@ func (c *Cli) addParseCmd() *Cli {
 	parseCmd := &cobra.Command{
 		Use:   "parse",
 		Short: "解析并下载 m3u8 文件，按 q 终止",
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			SharedApp.DomReady(c.ctx)
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			SharedApp.concurrentLock = make(chan struct{}, *concurrentCnt)
 			parserTask.DelOnComplete = *delOnComplete
@@ -247,9 +250,12 @@ func (c *Cli) addAriaCmd() *Cli {
 	cmd := &cobra.Command{
 		Use:   "aria",
 		Short: "启动 aria 服务",
-		Run: func(cmd *cobra.Command, args []string) {
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			SharedApp.Config.AriaConfig.RPCListenPort = *port
 			SharedApp.Config.AriaConfig.RPCSecret = secret
+			SharedApp.DomReady(c.ctx)
+		},
+		Run: func(cmd *cobra.Command, args []string) {
 
 			client := aria.Client{
 				Config: SharedApp.Config.AriaConfig,

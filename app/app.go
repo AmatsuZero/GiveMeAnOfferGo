@@ -106,8 +106,8 @@ func (a *App) Startup(ctx context.Context) {
 			a.LogError(err.Error())
 		}
 	}
+
 	a.Config = config
-	a.Config.AriaConfig.StartUp(ctx, a.client, a)
 	a.concurrentLock = make(chan struct{}, config.ConCurrentCnt)
 	a.tasks = make([]*downloader.DownloadTaskUIItem, 0)
 }
@@ -435,6 +435,11 @@ func (a *App) handleCommonTask(task *parse.ParserTask, result *parse.Result) (er
 		q.NotifyItem = item
 		err = q.StartDownload(task, result.Data.([]string))
 		<-a.concurrentLock
+
+		item.Status = "已完成"
+		item.IsDone = true
+		item.State = downloader.DownloadTaskDone
+		a.EventsEmit(eventbus.TaskFinish, item)
 	}()
 
 	return

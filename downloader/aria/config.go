@@ -503,7 +503,7 @@ func (c *Config) StartUp(ctx context.Context, client *http.Client, logger logger
 			dsts = append(dsts, fmt.Sprintf("%v.txt", i))
 		}
 
-		d := &downloader.CommonDownloader{}
+		d := &downloader.CommonDownloader{UseSimpleDownloader: true}
 		err := d.StartDownload(t, c.Trackers, dsts...)
 		if err != nil && logger != nil {
 			logger.LogErrorf("更新 trackers 失败: %v", err)
@@ -525,7 +525,7 @@ func (c *Config) StartUp(ctx context.Context, client *http.Client, logger logger
 		}
 
 		dsts := []string{"delete.sh", "clean.sh"}
-		d := &downloader.CommonDownloader{}
+		d := &downloader.CommonDownloader{UseSimpleDownloader: true}
 
 		scripts := []string{
 			"https://raw.githubusercontent.com/P3TERX/aria2.conf/master/delete.sh",
@@ -552,7 +552,7 @@ func (c *Config) StartUp(ctx context.Context, client *http.Client, logger logger
 		}
 
 		dsts := []string{"dht.dat", "dht6.dat"}
-		d := &downloader.CommonDownloader{}
+		d := &downloader.CommonDownloader{UseSimpleDownloader: true}
 
 		urls := []string{
 			"https://github.com/P3TERX/aria2.conf/blob/master/dht.dat?raw=true",
@@ -584,7 +584,7 @@ func (c *Config) StartUp(ctx context.Context, client *http.Client, logger logger
 			Logger:   logger,
 		}
 
-		d := &downloader.CommonDownloader{}
+		d := &downloader.CommonDownloader{UseSimpleDownloader: true}
 		err := d.StartDownload(t, []string{"https://github.com/mayswind/AriaNg/releases/download/1.3.0/AriaNg-1.3.0-AllInOne.zip"})
 		if err != nil {
 			logger.LogErrorf("下载静态页面失败: %v", err)

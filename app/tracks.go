@@ -2,9 +2,11 @@ package app
 
 import (
 	"GiveMeAnOffer/downloader"
+	"GiveMeAnOffer/downloader/aria"
 	"GiveMeAnOffer/eventbus"
 	"GiveMeAnOffer/parse"
 	"context"
+	"fmt"
 	"golang.org/x/exp/slices"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -99,12 +101,30 @@ func (a *App) initDB() {
 }
 
 func (a *App) DomReady(_ context.Context) {
+
 	result := a.db.Find(&a.tasks)
 	a.LogInfof("读取数据 %v 条", result.RowsAffected)
 
 	for _, task := range a.tasks {
 		a.EventsEmit(eventbus.TaskNotifyCreate, task)
 	}
+
+	// 启动 aria2c rpc 服务
+	go func() {
+		a.Config.AriaConfig.StartUp(a.ctx, a.client, a)
+
+		client := aria.Client{
+			Config: a.Config.AriaConfig,
+		}
+
+		err := client.RunRPCServer()
+		if err != nil {
+			a.LogErrorf("启动 aria2 rpc 服务失败：%v", err)
+		}
+	}()
+
+	a.ctx = context.WithValue(a.ctx, downloader.RPCAddr, fmt.Sprintf("ws://localhost:%v/jsonrpc", a.Config.AriaConfig.RPCListenPort))
+	a.ctx = context.WithValue(a.ctx, downloader.RPCToken, a.Config.AriaConfig.RPCSecret)
 }
 
 func (a *App) saveTracks() {

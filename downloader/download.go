@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/siku2/arigo"
 	"io"
 	"net/http"
 	"net/url"
@@ -406,16 +407,49 @@ func (q *M3U8DownloadQueue) StartDownload(config *parse.ParserTask, list *m3u8.M
 
 type CommonDownloader struct {
 	M3U8DownloadQueue
+	client              *arigo.Client
+	gid                 string
+	UseSimpleDownloader bool
 }
 
 type DownloadTaskState string
+
+type CtxKey string
 
 const (
 	DownloadTaskProcessing DownloadTaskState = "processing"
 	DownloadTaskError      DownloadTaskState = "error"
 	DownloadTaskDone       DownloadTaskState = "finish"
 	DownloadTaskIdle       DownloadTaskState = "idle"
+
+	RPCAddr  CtxKey = "rpc-server"
+	RPCToken CtxKey = "rpc-token"
 )
+
+func (c *CommonDownloader) preDownload(config *parse.ParserTask) error {
+	err := c.M3U8DownloadQueue.preDownload(config)
+	if err != nil {
+		return err
+	}
+
+	if c.UseSimpleDownloader {
+		return nil
+	}
+
+	addr, ok1 := config.Ctx.Value(RPCAddr).(string)
+	token, ok2 := config.Ctx.Value(RPCToken).(string)
+
+	if ok1 && ok2 {
+		client, e := arigo.Dial(addr, token)
+		if e != nil {
+			config.Logger.LogInfof("链接 aria2c rpc server 失败：%v\n", e)
+		} else {
+			c.client = &client
+		}
+	}
+
+	return nil
+}
 
 func (c *CommonDownloader) StartDownload(config *parse.ParserTask, urls []string, dsts ...string) error {
 	err := c.preDownload(config)
@@ -423,6 +457,15 @@ func (c *CommonDownloader) StartDownload(config *parse.ParserTask, urls []string
 		return err
 	}
 
+	if c.client != nil {
+		return c.ariaDownload(config, urls)
+	} else {
+		return c.simpleDownload(config, urls, dsts...)
+	}
+}
+
+func (c *CommonDownloader) simpleDownload(config *parse.ParserTask, urls []string, dsts ...string) error {
+	var err error
 	for idx, u := range urls {
 		req, e := http.NewRequest("GET", u, nil)
 		for k, v := range config.HeadersMap {
@@ -484,5 +527,54 @@ func (c *CommonDownloader) StartDownload(config *parse.ParserTask, urls []string
 	}
 
 	wg.Wait()
+
 	return nil
+}
+
+func (c *CommonDownloader) ariaDownload(config *parse.ParserTask, uris []string) error {
+	gid, err := c.client.AddURI(uris, &arigo.Options{Dir: c.DownloadDir})
+	if err != nil {
+		return err
+	}
+
+	c.gid = gid.GID
+
+	ticker := time.NewTicker(time.Second)
+
+	// 一定要调用Stop()，回收资源
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-config.Ctx.Done():
+			return nil
+		case _ = <-ticker.C:
+			status, e := gid.TellStatus("status", "totalLength", "completedLength", "files")
+			if e != nil {
+				return e
+			}
+
+			if c.NotifyItem != nil {
+				progress := float32(status.CompletedLength) / float32(status.TotalLength)
+
+				c.NotifyItem.Status = fmt.Sprintf("下载中...  %.2f%%", progress*100)
+				config.Handler.EventsEmit(eventbus.TaskStatusUpdate, c.NotifyItem)
+
+				c.NotifyItem.VideoPath = status.Files[0].Path
+			}
+
+			if status.Status == "complete" {
+				return nil
+			}
+		}
+	}
+}
+
+func (c *CommonDownloader) Stop() {
+	if c.client == nil || len(c.gid) == 0 {
+		c.M3U8DownloadQueue.Stop()
+		return
+	}
+
+	c.client.Delete(c.gid)
 }
